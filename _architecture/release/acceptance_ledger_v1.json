@@ -1,6 +1,6 @@
 {
   "schema_version": "mucaro-release-acceptance-ledger/1.0",
-  "updated_utc": "2026-11-02T20:21:26.735896Z",
+  "updated_utc": "2026-11-03T06:15:20.748388Z",
   "rows": [
     {
       "requirement_id": "GOAL-001",
@@ -1146,12 +1146,13 @@
         "backend/app/web_browsing.py",
         "backend/app/web_search.py",
         "backend/app/web_render.py",
-        "backend/app/web_capture_store.py"
+        "backend/app/web_capture_store.py",
+        "backend/app/web_research.py"
       ],
       "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
-      "benchmark": null,
+      "positive_gate": "python3 scripts/evaluate_web_research.py",
+      "negative_gate": "python3 -m pytest backend/tests/test_web_research.py -q",
+      "benchmark": "scripts/evaluate_web_research.py (authored offline scope only)",
       "evidence_refs": [
         "_architecture/release/evidence/rendered_qa_chromium_d53ae4815069.json",
         "_architecture/release/evidence/rendered_qa_webkit_3ba0d8229819.json",
@@ -1161,12 +1162,25 @@
         "_architecture/release/evidence/local_release-3ba0d8229819.json",
         "_architecture/release/evidence/fresh_clone-3ba0d8229819.json",
         "_architecture/release/evidence/source_artifact-3ba0d8229819.json",
-        "_architecture/release/evidence/source_manifest-3ba0d8229819.json"
+        "_architecture/release/evidence/source_manifest-3ba0d8229819.json",
+        "backend/tests/test_web_research.py",
+        "backend/tests/fixtures/web_research_eval_v1.json",
+        "scripts/evaluate_web_research.py",
+        "docs/WEB_RESEARCH.md",
+        "_architecture/release/evidence/web_research_checkpoint_48f36a197fcf.json",
+        "_architecture/release/evidence/local_release-48f36a197fcf.json",
+        "_architecture/release/evidence/fresh_clone-48f36a197fcf.json",
+        "_architecture/release/evidence/source_artifact-48f36a197fcf.json",
+        "_architecture/release/evidence/web_research_eval-48f36a197fcf.json",
+        "_architecture/release/evidence/rendered_qa_chromium_7c963594c8b4.json",
+        "_architecture/release/evidence/rendered_qa_webkit_7c963594c8b4.json",
+        "_architecture/release/evidence/web_research_chromium_48f36a197fcf.json",
+        "_architecture/release/evidence/web_research_webkit_48f36a197fcf.json"
       ],
       "state": "OPEN",
       "blocker_id": null,
       "dag_node": "N11",
-      "notes": "Live search needs BLK-WEB-001; prompt-injection resistance absent. UPDATE 2026-11-02: HTTP capture now serializes complete index updates across threads/processes and publishes frozen snapshot files exclusively. A reproduced two-writer lost-index-entry defect is repaired; 12 concurrent actual HTTP captures and eight separate-process captures retain all IDs and counts. ID+hash recovery is shared by GUI/API/CLI, performs no network request, and preserves earlier bytes. These changes strengthen CAPTURE/FREEZE recovery; live SEARCH, full COMPARE/SYNTHESIZE integration, and generalized prompt-injection evaluation remain OPEN. Verified checkpoint 3ba0d8229819: all 28 local release gates pass with 1735 tests passed and 8 skipped. Source fresh-clone and independently verified/extracted ZIP installation checks both pass; both installed environments report pypdf 6.21.4. These are source/host checks; no native, physical-device, hosted or full-product promotion is implied."
+      "notes": "UPDATE 2026-11-03: Source 48f36a197fcf passes 29/29 local release gates, 1773 backend tests with 8 skips, fresh-clone certification and independently verified source-ZIP installation checks. Full Chromium/WebKit runs pass 383/383 each at earlier source 7c963594c8b4, with 36 zero-violation axe scans per engine. Later research-only replays pass 45/45 each at 48f36a197fcf, with three additional zero-violation scans per engine; those receipts remain PARTIAL. All four frontend input, built-asset and served-index manifests match; whole backend-tree identity across these heads is not claimed. Earlier latest-browser/qualification notes are SUPERSEDED; their receipts remain historical. The governed mucaro/web-research skill connects explicit frozen ID/SHA inputs to GUI/CLI/API comparison, exact citations, offline extractive synthesis, explicit model routing, and saved report lineage. Complete multiset accounting preserves duplicate occurrences; the 1000-passage regression surfaces a late changed value and retains every ranking tie. Stale hashes, symlinks/foreign paths, encoding/size limits, no context, invalid model references, provider budgets, permissions and deactivation have negative gates. Accounting enforcement survives optimized Python. Prior notes describing comparison/synthesis and instruction resistance as wholly absent are SUPERSEDED within this bounded scope. Live search still needs BLK-WEB-001; broader real-source, model-semantic and generalized prompt-injection evaluation remain OPEN."
     },
     {
       "requirement_id": "TGT-007",
@@ -1967,7 +1981,8 @@
         "frontend/src/App.jsx",
         "frontend/src/styles.css",
         "frontend/src/components/Composer.jsx",
-        "frontend/src/components/workspaces/CaptureRecovery.jsx"
+        "frontend/src/components/workspaces/CaptureRecovery.jsx",
+        "frontend/src/components/workspaces/WebResearch.jsx"
       ],
       "dependencies": [],
       "positive_gate": null,
@@ -1990,12 +2005,25 @@
         "_architecture/release/evidence/rendered_qa_webkit_3ba0d8229819.json",
         "backend/tests/test_web_capture_store.py",
         "backend/tests/test_file_lock.py",
-        "docs/WEB_CAPTURE_STORE.md"
+        "docs/WEB_CAPTURE_STORE.md",
+        "backend/tests/test_web_research.py",
+        "backend/tests/fixtures/web_research_eval_v1.json",
+        "scripts/evaluate_web_research.py",
+        "docs/WEB_RESEARCH.md",
+        "_architecture/release/evidence/web_research_checkpoint_48f36a197fcf.json",
+        "_architecture/release/evidence/local_release-48f36a197fcf.json",
+        "_architecture/release/evidence/fresh_clone-48f36a197fcf.json",
+        "_architecture/release/evidence/source_artifact-48f36a197fcf.json",
+        "_architecture/release/evidence/web_research_eval-48f36a197fcf.json",
+        "_architecture/release/evidence/rendered_qa_chromium_7c963594c8b4.json",
+        "_architecture/release/evidence/rendered_qa_webkit_7c963594c8b4.json",
+        "_architecture/release/evidence/web_research_chromium_48f36a197fcf.json",
+        "_architecture/release/evidence/web_research_webkit_48f36a197fcf.json"
       ],
       "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N17",
-      "notes": "Declared Chromium journeys now cover desktop 1440x900, touch tablet 820x1180, and mobile 390x844 with 27 axe scans detecting zero violations across the source/asset-equivalent receipts. Tablet and mobile controls satisfy the measured touch-target and field-size checks; raster coordinate editing and output downloads are exercised. Tablet and narrow raster result screens were visually inspected. Full WCAG/manual assistive-technology review, VoiceOver/WKWebView, software keyboards, and physical-device behavior remain unverified. UPDATE 2026-10-30: WebKit pointer clicks now focus the actual button before sheet mounting, so Escape restores its opener. Native touch selects use a visible themed chevron and render at least 44px high. Tablet/narrow screens were visually inspected; representative WebKit screenshots are retained. Full manual WCAG/assistive-technology, native WKWebView, physical devices, and complete design review remain unverified. Latest full browser evidence: clean source 622e9c48fb948bf816245203fb8316df3a90e83e, Chromium 141.0.7390.37 321/321 and WebKit 26.0 321/321, each at desktop 1440x900, touch tablet 820x1180, and mobile 390x844. Each engine records 30 axe scans with zero violations; this is bounded browser evidence, not full accessibility/native/device certification. Supplemental proof at 4019745eb7de: 4/4 actual emulated touch-event profiles pass in Chromium/WebKit at tablet and mobile sizes, with one matching-byte download request per tap. All 28 local release gates pass (1704 tests passed, 8 skipped), and source fresh-clone installation/CLI/launcher checks pass. Source installation and emulation do not establish native, physical-device or hosted release completion. UPDATE 2026-11-02: The full browser harness passes Chromium 340/340 at d53ae4815069 and WebKit 340/340 at 3ba0d8229819. Each engine covers desktop/tablet/narrow mobile and 33 axe scans with zero detected violations. Actual emulated touch activation covers recovery and duplicate refusal; the empty conversation scroll list is keyboard reachable. A delayed send acknowledgement preserves newer draft edits. App identities match across all 353 backend/frontend entries and all frontend input/build/index manifests. Physical-device/native/manual full-accessibility proof remains open."
+      "notes": "UPDATE 2026-11-03: Source 48f36a197fcf passes 29/29 local release gates, 1773 backend tests with 8 skips, fresh-clone certification and independently verified source-ZIP installation checks. Full Chromium/WebKit runs pass 383/383 each at earlier source 7c963594c8b4, with 36 zero-violation axe scans per engine. Later research-only replays pass 45/45 each at 48f36a197fcf, with three additional zero-violation scans per engine; those receipts remain PARTIAL. All four frontend input, built-asset and served-index manifests match; whole backend-tree identity across these heads is not claimed. Earlier latest-browser/qualification notes are SUPERSEDED; their receipts remain historical. Research verifies explicit activation, one-click/tap invocation, duplicate-source and rapid-activation refusal, numbered citations, exact excerpt/hash inspection, readable metrics, differing passages, verified downloads, stale metadata refusal, navigation retention and revocation. Latest representative desktop/tablet/narrow result screens were visually inspected. Full manual WCAG/VoiceOver, native WKWebView, physical devices, software keyboards, theme breadth and complete application design review remain unverified."
     },
     {
       "requirement_id": "TGT-037",
@@ -2220,12 +2248,13 @@
       "implementation_refs": [
         "backend/app/web_browsing.py",
         "backend/app/injection_guard.py",
-        "backend/app/web_capture_store.py"
+        "backend/app/web_capture_store.py",
+        "backend/app/web_research.py"
       ],
       "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
-      "benchmark": null,
+      "positive_gate": "python3 scripts/evaluate_web_research.py",
+      "negative_gate": "python3 -m pytest backend/tests/test_web_research.py -q",
+      "benchmark": "scripts/evaluate_web_research.py (authored offline scope only)",
       "evidence_refs": [
         "backend/tests/test_prompt_injection.py::test_injected_web_snapshot_is_evidence_only",
         "backend/tests/test_web_browsing.py",
@@ -2237,12 +2266,25 @@
         "_architecture/release/evidence/local_release-3ba0d8229819.json",
         "_architecture/release/evidence/fresh_clone-3ba0d8229819.json",
         "_architecture/release/evidence/source_artifact-3ba0d8229819.json",
-        "_architecture/release/evidence/source_manifest-3ba0d8229819.json"
+        "_architecture/release/evidence/source_manifest-3ba0d8229819.json",
+        "backend/tests/test_web_research.py",
+        "backend/tests/fixtures/web_research_eval_v1.json",
+        "scripts/evaluate_web_research.py",
+        "docs/WEB_RESEARCH.md",
+        "_architecture/release/evidence/web_research_checkpoint_48f36a197fcf.json",
+        "_architecture/release/evidence/local_release-48f36a197fcf.json",
+        "_architecture/release/evidence/fresh_clone-48f36a197fcf.json",
+        "_architecture/release/evidence/source_artifact-48f36a197fcf.json",
+        "_architecture/release/evidence/web_research_eval-48f36a197fcf.json",
+        "_architecture/release/evidence/rendered_qa_chromium_7c963594c8b4.json",
+        "_architecture/release/evidence/rendered_qa_webkit_7c963594c8b4.json",
+        "_architecture/release/evidence/web_research_chromium_48f36a197fcf.json",
+        "_architecture/release/evidence/web_research_webkit_48f36a197fcf.json"
       ],
       "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N11",
-      "notes": "Instruction-bearing source content verified inert; OPEN/CAPTURE/FREEZE/CITE covered by existing web tests. SEARCH needs BLK-WEB-001; COMPARE/SYNTHESIZE workflow benchmark not yet frozen. UPDATE 2026-11-02: CAPTURE/FREEZE persistence and recovery now include actual concurrent HTTP/server inputs, separate-process writers, byte-bound idempotency, malformed state, count/identity conflicts, capacity, interruption and authenticated recovery. Authored saved fixtures support browser recovery checks without network acquisition and do not claim live search, real-source comparison/synthesis or semantic research correctness. The broader benchmark remains PROVISIONAL. Verified checkpoint 3ba0d8229819: all 28 local release gates pass with 1735 tests passed and 8 skipped. Source fresh-clone and independently verified/extracted ZIP installation checks both pass; both installed environments report pypdf 6.21.4. These are source/host checks; no native, physical-device, hosted or full-product promotion is implied."
+      "notes": "UPDATE 2026-11-03: Source 48f36a197fcf passes 29/29 local release gates, 1773 backend tests with 8 skips, fresh-clone certification and independently verified source-ZIP installation checks. Full Chromium/WebKit runs pass 383/383 each at earlier source 7c963594c8b4, with 36 zero-violation axe scans per engine. Later research-only replays pass 45/45 each at 48f36a197fcf, with three additional zero-violation scans per engine; those receipts remain PARTIAL. All four frontend input, built-asset and served-index manifests match; whole backend-tree identity across these heads is not claimed. Earlier latest-browser/qualification notes are SUPERSEDED; their receipts remain historical. The authored offline COMPARE/CITE/SYNTHESIZE corpus is frozen at nine cases and 1.0 thresholds for case pass rate, exact excerpt fidelity, and no-context accuracy. All cases pass; all 15 excerpts match extracted text and both negative contexts withhold synthesis. Cases cover duplicates, whitespace versus byte identity, multilingual/mojibake preservation, conflicting observations, HTML exclusions, empty context and instruction-bearing text. A separate 1000-passage regression verifies the late difference and complete candidate retention. Browser research uses actual local HTTP captures, then stops their source servers before comparison. The older no-benchmark statement is SUPERSEDED for this authored corpus; live SEARCH and representative real-world/model-semantic correctness remain unproven, so the broader benchmark stays PROVISIONAL."
     },
     {
       "requirement_id": "MATRIX-009",
@@ -2400,7 +2442,8 @@
         "qa/rendered/rendered_qa.mjs",
         ".github/workflows/rendered-qa.yml",
         "frontend/src/components/Composer.jsx",
-        "frontend/src/components/workspaces/CaptureRecovery.jsx"
+        "frontend/src/components/workspaces/CaptureRecovery.jsx",
+        "frontend/src/components/workspaces/WebResearch.jsx"
       ],
       "dependencies": [],
       "positive_gate": null,
@@ -2432,12 +2475,25 @@
         "_architecture/release/evidence/local_release-3ba0d8229819.json",
         "_architecture/release/evidence/fresh_clone-3ba0d8229819.json",
         "_architecture/release/evidence/source_artifact-3ba0d8229819.json",
-        "_architecture/release/evidence/source_manifest-3ba0d8229819.json"
+        "_architecture/release/evidence/source_manifest-3ba0d8229819.json",
+        "backend/tests/test_web_research.py",
+        "backend/tests/fixtures/web_research_eval_v1.json",
+        "scripts/evaluate_web_research.py",
+        "docs/WEB_RESEARCH.md",
+        "_architecture/release/evidence/web_research_checkpoint_48f36a197fcf.json",
+        "_architecture/release/evidence/local_release-48f36a197fcf.json",
+        "_architecture/release/evidence/fresh_clone-48f36a197fcf.json",
+        "_architecture/release/evidence/source_artifact-48f36a197fcf.json",
+        "_architecture/release/evidence/web_research_eval-48f36a197fcf.json",
+        "_architecture/release/evidence/rendered_qa_chromium_7c963594c8b4.json",
+        "_architecture/release/evidence/rendered_qa_webkit_7c963594c8b4.json",
+        "_architecture/release/evidence/web_research_chromium_48f36a197fcf.json",
+        "_architecture/release/evidence/web_research_webkit_48f36a197fcf.json"
       ],
       "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N18",
-      "notes": "214/214 full rendered checks pass for desktop/mobile at clean source 385bc85f8caa. A separate scoped tablet replay passes 78/78 at adbb1ca0576a; it remains RENDERED_QA_PARTIAL and does not rerun ancillary network/stream/recovery scenarios. Hard application identity is verified: 347 identical backend/frontend Git entries, zero one-sided/symmetric differences, identical frontend input manifests and built asset hashes. Together the receipts exercise three viewport classes with 27 zero-violation axe scans, real OCR/GIS/raster workflows, readable unresolved D8 states, editable coordinates, verified GeoTIFF downloads, and live development-proxy routing. Screens were visually reviewed at tablet/narrow widths. Native/device behavior and the complete design/accessibility review remain open. UPDATE 2026-10-30: The full default three-profile harness now passes in both engines, superseding earlier current-browser scope claims while retaining historical evidence. Checks include real OCR/vector/raster engines, output discovery and byte hashes, direct parents, correct answer-ID export binding, older-run paging, one download under a double-click, snapshot retention/retry, restored focus and 44px targets. Genuine empty-state checks use an isolated real service; memory fixtures are viewport-specific. Both receipts bind actual frontend input/assets and served index bytes and verify source/build stability. Native/device and complete manual design/accessibility review remain open. Latest full browser evidence: clean source 622e9c48fb948bf816245203fb8316df3a90e83e, Chromium 141.0.7390.37 321/321 and WebKit 26.0 321/321, each at desktop 1440x900, touch tablet 820x1180, and mobile 390x844. Each engine records 30 axe scans with zero violations; this is bounded browser evidence, not full accessibility/native/device certification. Supplemental proof at 4019745eb7de: 4/4 actual emulated touch-event profiles pass in Chromium/WebKit at tablet and mobile sizes, with one matching-byte download request per tap. All 28 local release gates pass (1704 tests passed, 8 skipped), and source fresh-clone installation/CLI/launcher checks pass. Source installation and emulation do not establish native, physical-device or hosted release completion. UPDATE 2026-11-02: Full Chromium 340/340 and WebKit 340/340 runs cover three viewport classes, 66 zero-violation axe scans in total, actual touch recovery, wrong-hash refusal, preserved capture/index bytes on replay, retained references, one pending request under rapid activation, empty-state scrolling, and preservation of a newer composer draft under delayed acknowledgement. The Chromium runner changed only the queued fixture query to known source content; the app is byte-identical to WebKit source across 353 backend/frontend entries, and frontend inputs/assets/served-index hashes match. Scope remains bounded browser evidence; native/device and full manual design/accessibility review remain open. Verified checkpoint 3ba0d8229819: all 28 local release gates pass with 1735 tests passed and 8 skipped. Source fresh-clone and independently verified/extracted ZIP installation checks both pass; both installed environments report pypdf 6.21.4. These are source/host checks; no native, physical-device, hosted or full-product promotion is implied."
+      "notes": "UPDATE 2026-11-03: Source 48f36a197fcf passes 29/29 local release gates, 1773 backend tests with 8 skips, fresh-clone certification and independently verified source-ZIP installation checks. Full Chromium/WebKit runs pass 383/383 each at earlier source 7c963594c8b4, with 36 zero-violation axe scans per engine. Later research-only replays pass 45/45 each at 48f36a197fcf, with three additional zero-violation scans per engine; those receipts remain PARTIAL. All four frontend input, built-asset and served-index manifests match; whole backend-tree identity across these heads is not claimed. Earlier latest-browser/qualification notes are SUPERSEDED; their receipts remain historical. Research journeys cover activation and grants, exact source bindings, duplicate-source refusal, one persisted execution per rapid activation, differing-passage/citation inspection, report SHA verification, insufficient-context recovery, retained drafts/results and revocation. Internal IDs moved from the reading view into citation details; metrics remain readable at narrow widths. Representative desktop/tablet/narrow result screens were visually inspected. Broad manual/native/device/design obligations remain OPEN."
     },
     {
       "requirement_id": "MATRIX-016",

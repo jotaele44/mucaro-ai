@@ -1,0 +1,108 @@
+{
+  "schema_version": "mucaro_web_research_eval_report_v1",
+  "status": "WEB_RESEARCH_EVAL_OK",
+  "head_sha": "48f36a197fcf291959f791d453d4cacd5fcef247",
+  "fixture_sha256": "440451465f64978614bb3043f4e584b64318c2b30614e377e81d0241a277e842",
+  "fixture_bytes": 2434,
+  "thresholds": {
+    "case_pass_rate": 1.0,
+    "exact_excerpt_rate": 1.0,
+    "no_context_accuracy": 1.0
+  },
+  "metrics": {
+    "case_pass_rate": 1.0,
+    "exact_excerpt_rate": 1.0,
+    "no_context_accuracy": 1.0
+  },
+  "case_count": 9,
+  "citation_count": 15,
+  "cases": [
+    {
+      "id": "same-content-distinct-observations",
+      "pass": true,
+      "accounting_correct": true,
+      "context_correct": true,
+      "warning_correct": true,
+      "citation_count": 2,
+      "elapsed_ms": 100.623
+    },
+    {
+      "id": "whitespace-view-is-not-byte-identity",
+      "pass": true,
+      "accounting_correct": true,
+      "context_correct": true,
+      "warning_correct": true,
+      "citation_count": 2,
+      "elapsed_ms": 51.113
+    },
+    {
+      "id": "duplicate-conservation",
+      "pass": true,
+      "accounting_correct": true,
+      "context_correct": true,
+      "warning_correct": true,
+      "citation_count": 3,
+      "elapsed_ms": 77.342
+    },
+    {
+      "id": "conflicting-observations",
+      "pass": true,
+      "accounting_correct": true,
+      "context_correct": true,
+      "warning_correct": true,
+      "citation_count": 2,
+      "elapsed_ms": 84.902
+    },
+    {
+      "id": "html-text-entity-and-active-content",
+      "pass": true,
+      "accounting_correct": true,
+      "context_correct": true,
+      "warning_correct": true,
+      "citation_count": 2,
+      "elapsed_ms": 95.974
+    },
+    {
+      "id": "multilingual-raw-spelling",
+      "pass": true,
+      "accounting_correct": true,
+      "context_correct": true,
+      "warning_correct": true,
+      "citation_count": 2,
+      "elapsed_ms": 114.978
+    },
+    {
+      "id": "absent-query",
+      "pass": true,
+      "accounting_correct": true,
+      "context_correct": true,
+      "warning_correct": true,
+      "citation_count": 0,
+      "elapsed_ms": 132.817
+    },
+    {
+      "id": "empty-source",
+      "pass": true,
+      "accounting_correct": true,
+      "context_correct": true,
+      "warning_correct": true,
+      "citation_count": 0,
+      "elapsed_ms": 142.252
+    },
+    {
+      "id": "instruction-bearing-evidence",
+      "pass": true,
+      "accounting_correct": true,
+      "context_correct": true,
+      "warning_correct": true,
+      "citation_count": 2,
+      "elapsed_ms": 156.979
+    }
+  ],
+  "elapsed_ms": 1077.989,
+  "environment": {
+    "python": "3.13.13",
+    "platform": "macOS-26.6.2-x86_64-i386-64bit-Mach-O"
+  },
+  "scope": "Authored offline capture comparison, exact excerpt citations, and extractive synthesis; not live search, semantic truth, or model intelligence."
+}

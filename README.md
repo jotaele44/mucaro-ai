@@ -176,6 +176,9 @@ directory is on a network share.
 
 The CLI exposes the same local ingestion, planning, validation, and cited-answer flow used by the app.
 See `docs/CLI.md` for exit codes, retrieval strategies, structured error payloads, and output contracts.
+The [frozen web research guide](docs/WEB_RESEARCH.md) covers source comparison,
+exact citations, offline excerpts, explicit model synthesis, and saved reports
+through the GUI, CLI, and API.
 
 ```bash
 python scripts/mucaro.py ingest data/input

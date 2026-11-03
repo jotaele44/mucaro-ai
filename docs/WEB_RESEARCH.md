@@ -165,3 +165,46 @@ retain failing subprocess output, and browser checks must await the submitted
 execution ID instead of accepting a previously saved result as new completion.
 This runbook and the regression corpus are reusable guidance; they do
 not establish that a model or agent has been trained.
+
+## Qualification at the frozen source checkpoint
+
+The tested source is `48f36a197fcf291959f791d453d4cacd5fcef247`, tree
+`12e3c06a74cc04c7e9cc60caac87916aa3754e8e`. It passes 29/29 local release gates,
+1,773 backend tests (8 skipped), fresh-clone installation/CLI/launcher checks,
+and installation from the separately verified 697-member source ZIP. Its
+qualified ZIP SHA-256 is
+`736764a7712902dddc8529df36bbb1efd75a480ad2103abaf91c5b37b2bd3070`.
+The two installed environments match all 62 frozen package versions: intersection
+and union 62, A-only/B-only/symmetric-difference 0. This establishes version-set
+equality, not byte identity of complete environments.
+
+The nine authored evaluation cases pass all frozen thresholds; all 15 cited
+excerpts match exact extracted text and both no-context cases withhold synthesis.
+The 1,000-passage regression preserves 999 shared occurrences, one A-only and
+one B-only occurrence, union 1,001, and symmetric difference 2. It verifies that
+the changed value at passage 500 appears in synthesis while all 1,000 tied
+candidates per source remain recorded.
+
+Full Chromium/WebKit browser runs pass 383/383 each at earlier source
+`7c963594c8b450c433c249ab7e5ac3236cb83700`. After accounting/security hardening,
+both engines pass research-only 45/45 replays at the tested source above.
+Frontend input/build/served-index identities match all four runs; the later
+backend is not claimed identical to the earlier one. There are 72 automated axe
+scans across the full runs and six additional scans across the scoped replays,
+with zero detected violations. The result screens were visually inspected at
+desktop, tablet, and narrow mobile sizes. This remains bounded browser review.
+
+The earlier source failed one security test because production assertions could
+be disabled by optimized Python. Its failed release receipt is retained as
+SUPERSEDED evidence. Explicit nonnegative-integer arithmetic guards and an
+optimized-Python negative regression resolve that failure; no security waiver
+was added. Earlier harness setup/selector/timing failures remain in the ignored
+raw run directories. The byte-preserved receipts, manifest, dependency constraints,
+screenshots, and hashes are indexed in
+`_architecture/release/evidence/web_research_checkpoint_48f36a197fcf.json`.
+
+The 139-requirement ledger remains authoritative and the full release remains
+PROVISIONAL. Live search, live-provider/semantic research quality, broader real
+corpora, native/device/manual accessibility, and hosted release obligations keep
+their existing states. The primary checkout, prototype snapshots, and v0.1.4
+baseline were preserved. No push, hosted merge, new tag, or deployment occurred.

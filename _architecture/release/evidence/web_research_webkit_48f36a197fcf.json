@@ -1,0 +1,567 @@
+{
+  "schema_version": "mucaro-rendered-qa/1.0",
+  "status": "RENDERED_QA_PARTIAL",
+  "head_sha": "48f36a197fcf291959f791d453d4cacd5fcef247",
+  "worktree_clean": true,
+  "dirty_paths": [],
+  "created_utc": "2026-11-03T06:05:11.924Z",
+  "browser": "webkit 26.0",
+  "viewports": {
+    "desktop": "1440x900",
+    "tablet": "820x1180 (touch emulation, DPR 2)",
+    "iphone": "390x844 (iPhone 13 profile, touch, DPR 3)"
+  },
+  "viewport_selection": [],
+  "checks": [
+    {
+      "name": "backend serves the page built from the recorded frontend source",
+      "viewport": "all",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "research refuses duplicate observations before invocation",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "rapid research activation sends one request while pending",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "one research action persists one execution with both source parents",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": "before=0 after=1 execution=skillexec_d0ace79dc2f42609"
+    },
+    {
+      "name": "research preserves observed disagreement and instruction warning",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "research differences inspector exposes both conflicting values",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "research answer uses readable citation numbers with IDs in inspection",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "first citation activation exposes exact excerpt and full hash",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "research download matches saved report digest and complete accounting",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "research no-context feedback does not invent citations",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "research selections draft and saved result survive navigation",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "research metadata refresh cannot silently accept a changed source digest",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "research content fits supported viewport",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "axe frozen web research: no serious/critical WCAG violations",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": "0 minor"
+    },
+    {
+      "name": "research revocation disables new work and retains saved result",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "research refuses duplicate observations before invocation",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "rapid research activation sends one request while pending",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "one research action persists one execution with both source parents",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": "before=3 after=4 execution=skillexec_4799a957032768d7"
+    },
+    {
+      "name": "research preserves observed disagreement and instruction warning",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "research differences inspector exposes both conflicting values",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "research answer uses readable citation numbers with IDs in inspection",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "first citation activation exposes exact excerpt and full hash",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "research download matches saved report digest and complete accounting",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "research no-context feedback does not invent citations",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "research selections draft and saved result survive navigation",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "research metadata refresh cannot silently accept a changed source digest",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "research content fits supported viewport",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "axe frozen web research: no serious/critical WCAG violations",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": "0 minor"
+    },
+    {
+      "name": "research revocation disables new work and retains saved result",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "research refuses duplicate observations before invocation",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "rapid research activation sends one request while pending",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "one research action persists one execution with both source parents",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": "before=6 after=7 execution=skillexec_a5ed59321ab372be"
+    },
+    {
+      "name": "research preserves observed disagreement and instruction warning",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "research differences inspector exposes both conflicting values",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "research answer uses readable citation numbers with IDs in inspection",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "first citation activation exposes exact excerpt and full hash",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "research download matches saved report digest and complete accounting",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "research no-context feedback does not invent citations",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "research selections draft and saved result survive navigation",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "research metadata refresh cannot silently accept a changed source digest",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "research content fits supported viewport",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "axe frozen web research: no serious/critical WCAG violations",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": "0 minor"
+    },
+    {
+      "name": "research revocation disables new work and retains saved result",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "instruction-bearing research sources create no tool calls",
+      "viewport": "all",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "source identity and built assets stay unchanged throughout rendered verification",
+      "viewport": "all",
+      "pass": true,
+      "detail": ""
+    }
+  ],
+  "passed": 45,
+  "failed": 0,
+  "axe": [
+    {
+      "view": "frozen web research",
+      "viewport": "desktop",
+      "violations": []
+    },
+    {
+      "view": "frozen web research",
+      "viewport": "tablet",
+      "violations": []
+    },
+    {
+      "view": "frozen web research",
+      "viewport": "iphone",
+      "violations": []
+    }
+  ],
+  "screenshots": [
+    {
+      "file": "data/exports/rendered_qa/20261103T060439Z-48f36a197fcf/desktop-18-frozen-web-research.png",
+      "sha256": "a50d6ad06d9ea9ad01fa4dbcc2136df4cf309e0ff17a324f29def0ba1d61ec29"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261103T060439Z-48f36a197fcf/tablet-18-frozen-web-research.png",
+      "sha256": "583f603fc2d3336d9384772fcdaa000b7d2d160290c29719634be43180a7b0f2"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261103T060439Z-48f36a197fcf/iphone-18-frozen-web-research.png",
+      "sha256": "b2e39c31cc5a6fbf5b000f65c510cbaef1b0a54d96a5a1e66fa9a2b027bab20c"
+    }
+  ],
+  "fixtures": [
+    {
+      "kind": "AUTHORED_HTTP_RESEARCH_OBSERVATIONS",
+      "captures": [
+        {
+          "snapshot_id": "websnap_a6878139568441f9",
+          "sha256": "ba627092e813c331f55e19eb11f82867a38fd912aab6c97bb06371ba34e1c30b"
+        },
+        {
+          "snapshot_id": "websnap_fb9af0b8f27f9bb2",
+          "sha256": "b81fc5e6d0d2eec2f08688522407a350b55065a4dedc570dd8d86edd11425f98"
+        }
+      ],
+      "limitation": "Two captured local HTTP documents, including instruction-bearing text. Source servers stop before comparison; this is not live-web or model semantic proof."
+    }
+  ],
+  "build_binding": {
+    "command": "npm run build",
+    "source_head_sha": "48f36a197fcf291959f791d453d4cacd5fcef247",
+    "frontend_inputs": [
+      {
+        "file": "frontend/.npmrc",
+        "bytes": 59,
+        "sha256": "7565382d04653dc25ae01941c92af03c8b8ff29568685eea3faa820265e95911"
+      },
+      {
+        "file": "frontend/index.html",
+        "bytes": 945,
+        "sha256": "9b4d78fc8e0973fd0efbfd5331157feda968b16855ececdce6cd4132981d03ac"
+      },
+      {
+        "file": "frontend/package-lock.json",
+        "bytes": 56751,
+        "sha256": "8257c520df25b314dfa2bfaf6cacd97a5df99f909c0cb640699a99f414e21328"
+      },
+      {
+        "file": "frontend/package.json",
+        "bytes": 408,
+        "sha256": "06d04d85927890d36dc50470f0399d72a8e87ac982f1aab34abded91c3fcdcf9"
+      },
+      {
+        "file": "frontend/public/favicon.png",
+        "bytes": 127083,
+        "sha256": "d4bfa436774febb2e3e9dca2e98f9ce230a9a228cfccf8b972a0381a7665fad9"
+      },
+      {
+        "file": "frontend/src/App.jsx",
+        "bytes": 13890,
+        "sha256": "b3b539ac1db19cf8b3102616e6ca167ce39c8b1c0d56b9cbd4cf4bd285eadf4a"
+      },
+      {
+        "file": "frontend/src/api.js",
+        "bytes": 16649,
+        "sha256": "5f937430434c1ee56f8b3117d91d81688279690955944e90f99fff35cbd5b833"
+      },
+      {
+        "file": "frontend/src/clipboard.js",
+        "bytes": 2076,
+        "sha256": "ab01ff5443723bb0196f4dc649020bcb81d8ad1ff53d238a2cb20b5171c221ba"
+      },
+      {
+        "file": "frontend/src/components/ChatView.jsx",
+        "bytes": 20280,
+        "sha256": "870b588f6c96143ded18af011c51be75b884d22077e80860f2fec22743f1e3bf"
+      },
+      {
+        "file": "frontend/src/components/CleartextNotice.jsx",
+        "bytes": 878,
+        "sha256": "2dfe0bb8dba39e155f9c563fbb326d0de3ed8e767e9c9ebea214ae19eaeca99f"
+      },
+      {
+        "file": "frontend/src/components/Composer.jsx",
+        "bytes": 8690,
+        "sha256": "c61ae46a32f5e10c50607aa1f6a101bc69ff85c9646ee8d9fe01338a32665f8a"
+      },
+      {
+        "file": "frontend/src/components/ConfirmSheet.jsx",
+        "bytes": 1338,
+        "sha256": "4bfc260f776054f8c270d3db89b0dd7000e4deaafb632f6b541ef7827ea7ae8b"
+      },
+      {
+        "file": "frontend/src/components/DirectoryIntake.jsx",
+        "bytes": 7160,
+        "sha256": "45de639dec02821875a4f51ae1de743c9e4ca518ed3ba0478ba5e3f5b548ba42"
+      },
+      {
+        "file": "frontend/src/components/EvidencePanel.jsx",
+        "bytes": 2854,
+        "sha256": "6128418c1ca23b3cdf89a3d11eceaa0d3a311b96122c29ffbe7f4b4935149e2f"
+      },
+      {
+        "file": "frontend/src/components/Icons.jsx",
+        "bytes": 1709,
+        "sha256": "169a7499b455fa40dde1d975f83343171bff62513a0be392f7171cc222100e46"
+      },
+      {
+        "file": "frontend/src/components/MessageActions.jsx",
+        "bytes": 9706,
+        "sha256": "8b2419178b9ce8a7bb133def51429bc1f8f0c34af97e2aa8ed9d8f2ca712b18f"
+      },
+      {
+        "file": "frontend/src/components/RichText.jsx",
+        "bytes": 1442,
+        "sha256": "59ad2505281fe54e08b0b50d628eab1cfcfeace2f5fcc9741a39ed756f7e7031"
+      },
+      {
+        "file": "frontend/src/components/RunBlock.jsx",
+        "bytes": 16487,
+        "sha256": "46241307f20a5f16afea4cb2a0fcc570d10889de4bc7469544ecf5b0c598fef6"
+      },
+      {
+        "file": "frontend/src/components/Sheet.jsx",
+        "bytes": 2973,
+        "sha256": "ae8cb1cc4d39bc119c72f7e94d3300e51de094e730fa593a16f03203529ef179"
+      },
+      {
+        "file": "frontend/src/components/TasksDrawer.jsx",
+        "bytes": 3762,
+        "sha256": "137a3d238e0b7ba1f01f7e4f1c7dde72d0dd9c0d323731c92c32e852716092e2"
+      },
+      {
+        "file": "frontend/src/components/TokenGate.jsx",
+        "bytes": 3985,
+        "sha256": "b98148a98fcc3c5e38054827f4a61030a4b995ec16da079fd8ac0f13f106d6bf"
+      },
+      {
+        "file": "frontend/src/components/workspaces/ArtifactLibrary.jsx",
+        "bytes": 6526,
+        "sha256": "0f374da4eb6d20616bf1a796d0658155c1f2b0620522a244ebaa0086c49d6042"
+      },
+      {
+        "file": "frontend/src/components/workspaces/CaptureRecovery.jsx",
+        "bytes": 3071,
+        "sha256": "1ca48cd6eef1166227c7a1a05c3ba4e43e80274cab8dc64614f0cb86ab8d2742"
+      },
+      {
+        "file": "frontend/src/components/workspaces/GoalWorkspace.jsx",
+        "bytes": 6817,
+        "sha256": "7185729ed9981a804753479ed634dccc26353538b8f6829a9940f1ede7ba4bbb"
+      },
+      {
+        "file": "frontend/src/components/workspaces/MemoryWorkspace.jsx",
+        "bytes": 3665,
+        "sha256": "5afadf5beafa8a0af977ca02fcf2aa543ff31229af30f109ffc866bfc7bae09a"
+      },
+      {
+        "file": "frontend/src/components/workspaces/OCRWorkspace.jsx",
+        "bytes": 7120,
+        "sha256": "e0670ef2d5fa90a0c12846a49a2ce2641d10a64774455a062941f39ea93613ca"
+      },
+      {
+        "file": "frontend/src/components/workspaces/ProvenanceWorkspace.jsx",
+        "bytes": 2802,
+        "sha256": "2407d4e1c4538edd504c7869e3c4557e0e2fbfb02ecc0e47ebffaa79f0ea3ef0"
+      },
+      {
+        "file": "frontend/src/components/workspaces/ReadinessWorkspace.jsx",
+        "bytes": 4979,
+        "sha256": "56963f0f1baf31052def35264413b02e202930316b13a812c727a9f6bc2d73b8"
+      },
+      {
+        "file": "frontend/src/components/workspaces/SettingsWorkspace.jsx",
+        "bytes": 4953,
+        "sha256": "563d46e65dbbf1aaf9e40ed1c37acab8d2a93681caafb0c25977e5b79ba1cdb5"
+      },
+      {
+        "file": "frontend/src/components/workspaces/SkillsWorkspace.jsx",
+        "bytes": 23989,
+        "sha256": "7d05d25a65875d5abcf76e687732bf70a1592edde5593bc37e1d4cade27b822d"
+      },
+      {
+        "file": "frontend/src/components/workspaces/SourcesWorkspace.jsx",
+        "bytes": 6042,
+        "sha256": "c338dea00f74e3a8d7126d9a1b40325dd2b50abbce2a20e69713211f471724fc"
+      },
+      {
+        "file": "frontend/src/components/workspaces/SpecializedWorkspace.jsx",
+        "bytes": 14499,
+        "sha256": "4b5f361ad9f36e2ad5cfdc1f4610e803b298ed5c14b2fc9e20e61ec767df6d41"
+      },
+      {
+        "file": "frontend/src/components/workspaces/TasksWorkspace.jsx",
+        "bytes": 6304,
+        "sha256": "fddaa6a2e06e6ebf977c2044fbccf60329400b092fecc1a512abaa68d6f42e53"
+      },
+      {
+        "file": "frontend/src/components/workspaces/WebResearch.jsx",
+        "bytes": 13740,
+        "sha256": "ecf483d42a882cec8b602782caaeadd45425fe1c90bd0d6cf7a4e1a53cf46ddf"
+      },
+      {
+        "file": "frontend/src/feed.js",
+        "bytes": 4646,
+        "sha256": "8cb1bc38ffdba2c08499a1cbfb560406c39032461dc8fcb8f560b4b269f0b00f"
+      },
+      {
+        "file": "frontend/src/files.js",
+        "bytes": 4754,
+        "sha256": "3dd0e1845e041d422f6e48c3802986595b36fc1859254f1d6d0246d1b5afc3cf"
+      },
+      {
+        "file": "frontend/src/main.jsx",
+        "bytes": 242,
+        "sha256": "832f752c6b6a454a26dbc4f2654f5bd633f2b103516c8c0abac648308c133a7e"
+      },
+      {
+        "file": "frontend/src/styles.css",
+        "bytes": 24096,
+        "sha256": "1ac1ccc6df310cf178efefee031e60957f979aa2b8719a0f51397e40481c06b7"
+      },
+      {
+        "file": "frontend/vite.config.js",
+        "bytes": 1003,
+        "sha256": "85114e381d60e641952224a8b038dadc272277c91e026640bfe421cbeb1f9185"
+      }
+    ],
+    "assets": [
+      {
+        "file": "frontend/dist/assets/index-3fQK4jDS.css",
+        "bytes": 18708,
+        "sha256": "b9b3d3510f3ba919c12c3e507f323a014df71e77f93d94666318aebce9575077"
+      },
+      {
+        "file": "frontend/dist/assets/index-DJoBy0eN.js",
+        "bytes": 346996,
+        "sha256": "8c459bb46e04cee181cde8a9e92776d55b95f026dcda8f1fc8221239d1e9523c"
+      },
+      {
+        "file": "frontend/dist/favicon.png",
+        "bytes": 127083,
+        "sha256": "d4bfa436774febb2e3e9dca2e98f9ce230a9a228cfccf8b972a0381a7665fad9"
+      },
+      {
+        "file": "frontend/dist/index.html",
+        "bytes": 1043,
+        "sha256": "9f68ea3a17d49120cb06d96502f74de76478a121c5656295ac7d2275f7d69899"
+      }
+    ],
+    "served_index_sha256": "9f68ea3a17d49120cb06d96502f74de76478a121c5656295ac7d2275f7d69899"
+  },
+  "limitations": [
+    "Rendered in Playwright webkit; this does not execute the packaged WKWebView window.",
+    "iPhone width is emulated on a desktop browser engine, not rendered by iOS Safari on a phone.",
+    "Tablet layout uses desktop-browser touch emulation, not a physical tablet or its software keyboard.",
+    "Phone access is exercised through a non-loopback address of this machine, not from a physical phone on a real network.",
+    "Development run (--only-new): the core viewport scenarios did not run, so this is not a complete receipt."
+  ]
+}

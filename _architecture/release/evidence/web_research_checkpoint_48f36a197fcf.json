@@ -1,0 +1,116 @@
+{
+  "schema_version": "mucaro_web_research_checkpoint_v1",
+  "status": "BOUNDED_LOCAL_PASS_FULL_PRODUCT_PROVISIONAL",
+  "source_head": "48f36a197fcf291959f791d453d4cacd5fcef247",
+  "source_tree": "12e3c06a74cc04c7e9cc60caac87916aa3754e8e",
+  "local_release_gates": 29,
+  "backend_tests": {
+    "passed": 1773,
+    "skipped": 8
+  },
+  "full_browser_baseline": {
+    "head": "7c963594c8b450c433c249ab7e5ac3236cb83700",
+    "checks_per_engine": 383,
+    "axe_scans_per_engine": 36,
+    "violations": 0
+  },
+  "post_hardening_research_replay": {
+    "head": "48f36a197fcf291959f791d453d4cacd5fcef247",
+    "checks_per_engine": 45,
+    "axe_scans_per_engine": 3,
+    "violations": 0,
+    "scope": "PARTIAL research-only; does not claim full browser replay at this head"
+  },
+  "frontend_inputs_equal_across_four_receipts": true,
+  "built_assets_and_served_index_equal_across_four_receipts": true,
+  "dependency_version_set_equivalence": {
+    "kind": "PACKAGE_VERSION_SET_ONLY",
+    "intersection": 62,
+    "a_only": 0,
+    "b_only": 0,
+    "union": 62,
+    "symmetric_difference": 0
+  },
+  "superseded_failure": {
+    "head": "7c963594c8b450c433c249ab7e5ac3236cb83700",
+    "state": "SUPERSEDED",
+    "reason": "Three production assertions replaced by explicit invariant checks; security test and optimized-Python negative gate now pass."
+  },
+  "evidence": [
+    {
+      "path": "_architecture/release/evidence/fresh_clone-48f36a197fcf.json",
+      "sha256": "97c33539650602dfe07e31d19360f28e5426db6b8d75359b5d2d77c857a7f6dc",
+      "bytes": 924
+    },
+    {
+      "path": "_architecture/release/evidence/local_release-48f36a197fcf.json",
+      "sha256": "05ecd0ff2f435ad95e83918bd51748da533eb526b675944e4499736564b406c4",
+      "bytes": 15658
+    },
+    {
+      "path": "_architecture/release/evidence/local_release_failed_7c963594c8b4.json",
+      "sha256": "67f56ba4826bc28003c771503048e5b260845e7db3f8b0c1ba32f9fc256624dc",
+      "bytes": 20883
+    },
+    {
+      "path": "_architecture/release/evidence/rendered_qa_chromium_7c963594c8b4.json",
+      "sha256": "1a5ac534740a15a0c3f6b80d7ceb403a6de2f27de7f707591fa4ac537fb1367f",
+      "bytes": 94953
+    },
+    {
+      "path": "_architecture/release/evidence/rendered_qa_webkit_7c963594c8b4.json",
+      "sha256": "3c430c8c93d6e0ae015a4cef2796b077653a0571f54583e05549984497fde042",
+      "bytes": 94940
+    },
+    {
+      "path": "_architecture/release/evidence/source_artifact-48f36a197fcf.json",
+      "sha256": "f869ddd88775023794d6d03b4460d8613b0eb793fd3d5adda468f914a8bf01e0",
+      "bytes": 1234
+    },
+    {
+      "path": "_architecture/release/evidence/source_manifest-48f36a197fcf.json",
+      "sha256": "9e7c83b491656fd9c4948eb06a15997bf83a1d9a0195a274aba793a7917f50ac",
+      "bytes": 124859
+    },
+    {
+      "path": "_architecture/release/evidence/web_research_chromium_48f36a197fcf.json",
+      "sha256": "5f87d16b8e6553f8bd484803445ce68d6b4fd2f698fd07434201ba51e0bae9dd",
+      "bytes": 18118
+    },
+    {
+      "path": "_architecture/release/evidence/web_research_eval-48f36a197fcf.json",
+      "sha256": "6470c482ff5709a20c8a6ea3fa2e149ba988c1dede071f593bd019bae188f7f0",
+      "bytes": 2862
+    },
+    {
+      "path": "_architecture/release/evidence/web_research_install_versions_48f36a197fcf.txt",
+      "sha256": "4af8058b23945df8525f78db9fa0b7d834bd38600421270d9132232e458dc90e",
+      "bytes": 1127
+    },
+    {
+      "path": "_architecture/release/evidence/web_research_webkit_48f36a197fcf.json",
+      "sha256": "fea6ed6c34763d4fd47d4ed27d582ee714b00b0d258184f28f2620a58ffeba44",
+      "bytes": 18105
+    },
+    {
+      "path": "_architecture/release/evidence/web_research_webkit_desktop_48f36a197fcf.png",
+      "sha256": "a50d6ad06d9ea9ad01fa4dbcc2136df4cf309e0ff17a324f29def0ba1d61ec29",
+      "bytes": 127953
+    },
+    {
+      "path": "_architecture/release/evidence/web_research_webkit_iphone_48f36a197fcf.png",
+      "sha256": "b2e39c31cc5a6fbf5b000f65c510cbaef1b0a54d96a5a1e66fa9a2b027bab20c",
+      "bytes": 205476
+    },
+    {
+      "path": "_architecture/release/evidence/web_research_webkit_tablet_48f36a197fcf.png",
+      "sha256": "583f603fc2d3336d9384772fcdaa000b7d2d160290c29719634be43180a7b0f2",
+      "bytes": 141500
+    }
+  ],
+  "limits": [
+    "Authored offline corpus, not live search or model-semantic proof.",
+    "Local browser/host installs, not native/device/hosted certification.",
+    "No push, hosted merge, tag, deployment or primary-checkout mutation."
+  ]
+}

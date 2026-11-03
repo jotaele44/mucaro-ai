@@ -1,0 +1,28 @@
+{
+  "command": [
+    "/Users/jotaele/Developer/worktrees/mucaro-pdf-security-20261102/.pdf-check-venv/bin/python",
+    "scripts/certify_source_artifact.py",
+    "/Users/jotaele/Developer/mucaro-ai-agent-dag-cert/data/exports/packages/research-48f36a19/mucaro-ai-0.1.23-48f36a197fcf-artifact-manifest.json"
+  ],
+  "created_utc": "2026-11-03T06:11:50Z",
+  "head_sha": "48f36a197fcf291959f791d453d4cacd5fcef247",
+  "payload": {
+    "archive_path": "/Users/jotaele/Developer/mucaro-ai-agent-dag-cert/data/exports/packages/research-48f36a19/mucaro-ai-0.1.23-48f36a197fcf-source.zip",
+    "checks": [
+      "package_verify_current_head",
+      "extract_source_archive",
+      "venv",
+      "pip_install",
+      "npm_ci",
+      "release_check",
+      "cli_help",
+      "desktop_package_self_test"
+    ],
+    "kept": true,
+    "manifest_path": "/Users/jotaele/Developer/mucaro-ai-agent-dag-cert/data/exports/packages/research-48f36a19/mucaro-ai-0.1.23-48f36a197fcf-artifact-manifest.json",
+    "source_dir": "/var/folders/0p/s67bd63s0cbdzz4rtd6_sm2m0000gn/T/mucaro-ai-source-artifact-ikg535l8/mucaro-ai-0.1.23"
+  },
+  "receipt_type": "source_artifact",
+  "schema_version": "mucaro_release_receipt_v1",
+  "status": "SOURCE_ARTIFACT_CERT_OK"
+}

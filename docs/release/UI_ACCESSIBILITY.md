@@ -5,18 +5,23 @@ declares for TGT-036, and the rendered evidence behind it. The checks are
 concrete, not subjective. They are exercised by `qa/rendered/rendered_qa.mjs`
 at desktop 1440×900, touch tablet 820×1180, and narrow mobile 390×844.
 
-Latest browser evidence (2026-11-02): Chromium passes 340/340 checks at
-`d53ae4815069` and WebKit passes 340/340 at `3ba0d8229819`, with 33 axe scans per
-engine and zero detected violations. The two sources have 353 identical
-backend/frontend Git entries, no one-sided entries, and matching frontend input,
-built-asset and served-index manifests. The sole runner change grounds a queued
-test query in its fixture sources. Receipts are
-`_architecture/release/evidence/rendered_qa_chromium_d53ae4815069.json` and
-`_architecture/release/evidence/rendered_qa_webkit_3ba0d8229819.json`.
-These supersede the prior browser checkpoint for this tested application scope;
-the native/device/full-manual-review boundaries below remain open.
+Latest browser evidence (2026-11-03): full Chromium and WebKit runs pass 383/383
+checks each at `7c963594c8b450c433c249ab7e5ac3236cb83700`, with 36 axe scans per
+engine and zero detected violations. The subsequent accounting hardening at
+`48f36a197fcf291959f791d453d4cacd5fcef247` has a separate research-only replay:
+45/45 checks and three zero-violation axe scans in each engine. Those later
+receipts are explicitly PARTIAL, not a full browser rerun. All four receipts
+have identical frontend inputs, built assets, and served-index hashes.
+Backend accounting enforcement, its error category, a certification diagnostic,
+and tests changed after the full browser baseline; whole backend-tree identity
+is not claimed. The later source passes 29/29 local release gates with 1,773
+tests passed and 8 skipped, plus independent fresh-clone and source-ZIP checks.
+See `_architecture/release/evidence/web_research_checkpoint_48f36a197fcf.json`
+for receipt paths and hashes. Earlier checkpoints below retain historical scope.
+Native/device/full-manual-review boundaries remain open.
 
-The current full browser checkpoint is `622e9c48fb948bf816245203fb8316df3a90e83e`:
+The historical full browser checkpoint `622e9c48fb948bf816245203fb8316df3a90e83e`
+is superseded for current browser claims:
 321/321 checks pass independently in Chromium 141.0.7390.37 and WebKit 26.0.
 Each engine ran all three viewport classes and 30 axe scans with zero detected
 violations. The receipts are
@@ -40,6 +45,7 @@ proof is reused.
 
 | Behaviour | How it is verified |
 |---|---|
+| **Frozen-source research.** Source selection binds ID and SHA, default synthesis stays offline, differences and exact citations are inspectable, and reports download through byte verification. Pending repeated activation is fenced; old results and drafts survive navigation. Changed metadata cannot silently accept a new source digest. | Both full 383-check runs and both later 45-check research-only replays exercise actual local HTTP captures after their servers stop. Desktop/tablet/mobile cover activation, duplicate-source refusal, one persisted execution, difference inspection, numbered citation display, exact excerpts/hash inspection, verified download, no-context recovery, navigation, stale metadata, and revocation. Latest representative desktop/tablet/mobile screens were visually inspected. Live-model semantics, native and physical-device proof remain open. |
 | **Capture recovery.** Sources offers an explicit ID/hash form, retains its draft references, rejects stale bytes and blocks duplicate pending activation. A successful result states that the saved observation was indexed without a new fetch. | Full browser runs use real API recovery with authored frozen files; all three viewport classes exercise wrong-hash refusal, one pending request, exact saved-file/index accounting, draft retention, and unchanged index bytes on replay. Tablet/mobile use actual emulated touch events. Each profile receives an axe scan. |
 | **Drafts during acknowledgement.** Typing the next draft while a previous send is pending must not lose edits. | A real delayed message response verifies that a later draft revision remains after acknowledgement in both browser engines. A synchronous in-flight guard also fences repeated sends before the next render. |
 | **Empty conversation scrolling.** The empty conversation list remains keyboard reachable even when its scroll geometry has no focusable rows. | The list has an explicit tab stop and the recovery/empty-library screens pass the formerly failing scrollable-region accessibility check. |
@@ -67,7 +73,7 @@ source/asset stability at the end. A source commit alone does not establish
 which frontend bytes were rendered. Reuse earlier receipts only within their
 recorded scope and build evidence.
 
-The tablet replay is explicitly `RENDERED_QA_PARTIAL`: its ancillary network,
+The historical raster-only tablet replay is explicitly `RENDERED_QA_PARTIAL`: its ancillary network,
 streaming, sharing, launch, and specialized-workspace scenarios were not rerun.
 It supplements the complete desktop/mobile run only because all 347 backend/
 frontend Git entries, frontend input manifests, and built asset hashes match.

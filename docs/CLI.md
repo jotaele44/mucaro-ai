@@ -13,6 +13,11 @@ To recover a saved web capture after an index-write failure, use
 the failed capture receipt. Recovery reuses the exact saved file without fetching
 the URL again. See [Frozen web captures and recovery](WEB_CAPTURE_STORE.md).
 
+Use `mucaro captures list` to find indexed observations and `mucaro captures
+compare` to invoke the active `mucaro/web-research` skill with two explicit
+ID/SHA bindings. See [Frozen web research](WEB_RESEARCH.md) for activation,
+question and synthesis options, exact citations, scope, and verified downloads.
+
 ## Install
 
 From the repo root:

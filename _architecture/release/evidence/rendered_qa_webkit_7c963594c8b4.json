@@ -1,0 +1,3113 @@
+{
+  "schema_version": "mucaro-rendered-qa/1.0",
+  "status": "RENDERED_QA_PASS",
+  "head_sha": "7c963594c8b450c433c249ab7e5ac3236cb83700",
+  "worktree_clean": true,
+  "dirty_paths": [],
+  "created_utc": "2026-11-02T23:46:25.464Z",
+  "browser": "webkit 26.0",
+  "viewports": {
+    "desktop": "1440x900",
+    "tablet": "820x1180 (touch emulation, DPR 2)",
+    "iphone": "390x844 (iPhone 13 profile, touch, DPR 3)"
+  },
+  "viewport_selection": [
+    "desktop",
+    "tablet",
+    "iphone"
+  ],
+  "checks": [
+    {
+      "name": "backend serves the page built from the recorded frontend source",
+      "viewport": "all",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "development frontend forwards every current API group instead of serving HTML",
+      "viewport": "all",
+      "pass": true,
+      "detail": "[{\"root\":\"/agent\",\"status\":404,\"json\":true},{\"root\":\"/approve\",\"status\":404,\"json\":true},{\"root\":\"/artifacts\",\"status\":404,\"json\":true},{\"root\":\"/ask\",\"status\":404,\"json\":true},{\"root\":\"/chunks\",\"status\":404,\"json\":true},{\"root\":\"/coding\",\"status\":404,\"json\":true},{\"root\":\"/config\",\"status\":404,\"json\":true},{\"root\":\"/conversations\",\"status\":404,\"json\":true},{\"root\":\"/exports\",\"status\":404,\"json\":t"
+    },
+    {
+      "name": "loading state renders while the service starts",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "empty conversation state",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "empty send is disabled (F05)",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "axe empty: no serious/critical WCAG violations",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": "0 minor"
+    },
+    {
+      "name": "answer completes with citations",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": "2 citations"
+    },
+    {
+      "name": "answer text rendered",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "axe answer: no serious/critical WCAG violations",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": "0 minor"
+    },
+    {
+      "name": "message text is selectable",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": "{\"userSelect\":\"\",\"webkitUserSelect\":\"text\",\"selectedText\":\"Mock cited answer for query: How does source lineage work?\\nConversation context turns used: 0\\nMemory items used: 0\\nEvidence summary:\\n[1] # Source Lineage Sample This sample explains that every answer must cite retrieved chunk IDs and source IDs. The Execution Gate enforces planning, readiness scoring, mode selection, approval lock, and"
+    },
+    {
+      "name": "sent message exposes one Copy and one Edit action",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "received message exposes one Copy and one Edit action",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "message actions are icons with a name and a tooltip",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": "Copy message text(Copy) 30x28, Edit message(Edit) 30x28, Copy message text(Copy) 30x28, Edit message(Edit) 30x28, Read message aloud(Read aloud) 30x28, Save answer as a file(Save) 30x28, Share answer(Share) 30x28"
+    },
+    {
+      "name": "copy action reports success",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "Copy shows a check mark after copying",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "only the received message offers Save and Share",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "the Save sheet offers the answer and the records saved with it",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": "✕ | Markdown (.md) | Plain text (.txt) | Report with sources (.md) | Full answer record (.json) | Citations table (.csv)"
+    },
+    {
+      "name": "axe save sheet: no serious/critical WCAG violations",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": "0 minor"
+    },
+    {
+      "name": "Save as Markdown downloads the answer with its question and sources",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": "mucaro-how-does-source-lineage-work.md: \"# How does source lineage work?\\n\\nMock cited answer for query: How does source li\""
+    },
+    {
+      "name": "the Save sheet closes after saving",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "Save full answer record downloads the trace Mucaro saved with the answer",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": "mucaro-how-does-source-lineage-work-record.json run_id=run_07b87c5bb109"
+    },
+    {
+      "name": "sent message edit renders explicit provenance marker",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "received message edit renders explicit provenance marker",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "reload reproduces the transcript (F02)",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "message display revisions survive reload",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "citation opens exact source evidence",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "Escape closes the sheet and returns focus",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": "Open citation 1: src_bfbf9a5edb5c991d"
+    },
+    {
+      "name": "permission sheet shows the exact tool and arguments",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "tool summary counts from records",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "tool drawer lists the executed call",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "submit disabled until a choice is made (F11)",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "options carry consequences (F10)",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "retry asks for a fresh approval (F16)",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "per-call outcomes stay distinct after retry (F08, F16)",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "choice receipt persists in the feed (F13)",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "plan mode shows the plan and executes nothing (F06)",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "message queued behind the active turn (F04)",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "queued message editable before dispatch (F04)",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "stop interrupts and the queued message then runs (F03)",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "Shift+Enter keeps composing (F05)",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "rename from the conversation menu (F17)",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "delete confirms and states there is no archive (F17)",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "background tasks list runs with metrics",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "sources workspace lists ingested sources",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "axe sources: no serious/critical WCAG violations",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": "0 minor"
+    },
+    {
+      "name": "memory add is visible with provenance",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "provenance shows a verified audit chain",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "settings shows model choice and offline capabilities",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "axe settings: no serious/critical WCAG violations",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": "0 minor"
+    },
+    {
+      "name": "task workspace offers the created prerequisite as a labeled dependency choice",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "task workspace persists a dependent task through the one-click picker",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "dependent task refuses to start before its prerequisite is done",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "dependent task becomes startable after the prerequisite is done",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "Skills workspace lists the governed health skill",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "Skills workspace opens an authorized skill, invokes it, and displays its receipt",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "deactivating a skill removes invocation and retains its last receipt",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "skill revocation survives reload and offers explicit reauthorization",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "reauthorized skill invokes once under a rapid double activation",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": "1 invocation request(s)"
+    },
+    {
+      "name": "OCR skill exposes labeled document settings instead of requiring JSON",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "governed OCR skill extracts known text with the real local engine",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "axe skills: no serious/critical WCAG violations",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": "0 minor"
+    },
+    {
+      "name": "conversation OCR waits for an explicit skill approval",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "conversation OCR completes with a recorded tool outcome",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "OCR document settings survive workspace navigation",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "GIS workspace inspects a frozen real-source layer and explains Z/topology limits",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "spatial results save with matching source identity through one explicit action",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "spatial settings reveal reference inputs only for operations that use them",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "axe governed GIS: no serious/critical WCAG violations",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": "0 minor"
+    },
+    {
+      "name": "GIS workspace inspects a frozen real GeoTIFF with explicit band and NODATA counts",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "axe raster coordinate controls: no serious/critical WCAG violations",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": "0 minor"
+    },
+    {
+      "name": "raster coordinate rows sample the known cell and preserve an outside point",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "sample point removal preserves the first coordinate without invoking work",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "governed D8 flow retains complete cell accounting and a derived raster",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "derived GeoTIFF download matches the saved output artifact bytes",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "axe raster results: no serious/critical WCAG violations",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": "0 minor"
+    },
+    {
+      "name": "conversation export follows the recorded answer ID and downloads its actual trace",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "conversation export cards show persisted states rather than an unknown field",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "Artifacts finds a persisted GIS output by stable artifact ID",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "saved artifact inspection shows recorded hash and direct parents",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "a rapid double-click starts exactly one saved-file download",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "artifact library returns the original recorded raster bytes",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "saved outputs reopen after leaving the workspace",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "a library load failure preserves the last snapshot and explains recovery",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "an unmatched library filter has an actionable empty state",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "axe saved output library: no serious/critical WCAG violations",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": "0 minor"
+    },
+    {
+      "name": "Skills load failure provides a visible recovery action",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "Skills recovery preserves settings and never repeats OCR execution",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "no horizontal page overflow",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "no console errors",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "loading state renders while the service starts",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "empty conversation state",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "empty send is disabled (F05)",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "axe empty: no serious/critical WCAG violations",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": "0 minor"
+    },
+    {
+      "name": "answer completes with citations",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": "2 citations"
+    },
+    {
+      "name": "answer text rendered",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "axe answer: no serious/critical WCAG violations",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": "0 minor"
+    },
+    {
+      "name": "message text is selectable",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": "{\"userSelect\":\"\",\"webkitUserSelect\":\"text\",\"selectedText\":\"Mock cited answer for query: How does source lineage work?\\nConversation context turns used: 0\\nMemory items used: 1\\nMemory context:\\n- preference: Prefer tables for comparisons (desktop)\\nEvidence summary:\\n[1] # Source Lineage Sample This sample explains that every answer must cite retrieved chunk IDs and source IDs. The Execution Gate "
+    },
+    {
+      "name": "sent message exposes one Copy and one Edit action",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "received message exposes one Copy and one Edit action",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "message actions are icons with a name and a tooltip",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": "Copy message text(Copy) 44x44, Edit message(Edit) 44x44, Copy message text(Copy) 44x44, Edit message(Edit) 44x44, Read message aloud(Read aloud) 44x44, Save answer as a file(Save) 44x44, Share answer(Share) 44x44"
+    },
+    {
+      "name": "copy action reports success",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "Copy shows a check mark after copying",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "only the received message offers Save and Share",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "the Save sheet offers the answer and the records saved with it",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": "✕ | Markdown (.md) | Plain text (.txt) | Report with sources (.md) | Full answer record (.json) | Citations table (.csv)"
+    },
+    {
+      "name": "axe save sheet: no serious/critical WCAG violations",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": "0 minor"
+    },
+    {
+      "name": "Save as Markdown downloads the answer with its question and sources",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": "mucaro-how-does-source-lineage-work.md: \"# How does source lineage work?\\n\\nMock cited answer for query: How does source li\""
+    },
+    {
+      "name": "the Save sheet closes after saving",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "Save full answer record downloads the trace Mucaro saved with the answer",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": "mucaro-how-does-source-lineage-work-record.json run_id=run_989bcd752601"
+    },
+    {
+      "name": "sent message edit renders explicit provenance marker",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "received message edit renders explicit provenance marker",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "reload reproduces the transcript (F02)",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "message display revisions survive reload",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "citation opens exact source evidence",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "Escape closes the sheet and returns focus",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": "Open citation 1: src_bfbf9a5edb5c991d"
+    },
+    {
+      "name": "permission sheet shows the exact tool and arguments",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "tool summary counts from records",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "tool drawer lists the executed call",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "submit disabled until a choice is made (F11)",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "options carry consequences (F10)",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "pending question survives a new message (F14)",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "submit stays disabled for an empty Other answer (F11)",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "freeform answer recorded as the choice (F12, F13)",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "plan mode shows the plan and executes nothing (F06)",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "message queued behind the active turn (F04)",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "queued message editable before dispatch (F04)",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "stop interrupts and the queued message then runs (F03)",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "Shift+Enter keeps composing (F05)",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "rename from the conversation menu (F17)",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "delete confirms and states there is no archive (F17)",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "background tasks list runs with metrics",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "sources workspace lists ingested sources",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "axe sources: no serious/critical WCAG violations",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": "0 minor"
+    },
+    {
+      "name": "memory add is visible with provenance",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "provenance shows a verified audit chain",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "settings shows model choice and offline capabilities",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "axe settings: no serious/critical WCAG violations",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": "0 minor"
+    },
+    {
+      "name": "Skills workspace lists the governed health skill",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "Skills workspace opens an authorized skill, invokes it, and displays its receipt",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "deactivating a skill removes invocation and retains its last receipt",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "skill revocation survives reload and offers explicit reauthorization",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "reauthorized skill invokes once under a rapid double activation",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": "1 invocation request(s)"
+    },
+    {
+      "name": "OCR skill exposes labeled document settings instead of requiring JSON",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "governed OCR skill extracts known text with the real local engine",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "axe skills: no serious/critical WCAG violations",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": "0 minor"
+    },
+    {
+      "name": "conversation OCR waits for an explicit skill approval",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "conversation OCR completes with a recorded tool outcome",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "OCR document settings survive workspace navigation",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "GIS workspace inspects a frozen real-source layer and explains Z/topology limits",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "spatial results save with matching source identity through one explicit action",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "spatial settings reveal reference inputs only for operations that use them",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "axe governed GIS: no serious/critical WCAG violations",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": "0 minor"
+    },
+    {
+      "name": "GIS workspace inspects a frozen real GeoTIFF with explicit band and NODATA counts",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "axe raster coordinate controls: no serious/critical WCAG violations",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": "0 minor"
+    },
+    {
+      "name": "raster coordinate rows sample the known cell and preserve an outside point",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "sample point removal preserves the first coordinate without invoking work",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "governed D8 flow retains complete cell accounting and a derived raster",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "derived GeoTIFF download matches the saved output artifact bytes",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "axe raster results: no serious/critical WCAG violations",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": "0 minor"
+    },
+    {
+      "name": "conversation export follows the recorded answer ID and downloads its actual trace",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "conversation export cards show persisted states rather than an unknown field",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "Artifacts finds a persisted GIS output by stable artifact ID",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "saved artifact inspection shows recorded hash and direct parents",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "a rapid double-click starts exactly one saved-file download",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "artifact library returns the original recorded raster bytes",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "saved outputs reopen after leaving the workspace",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "a library load failure preserves the last snapshot and explains recovery",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "an unmatched library filter has an actionable empty state",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "axe saved output library: no serious/critical WCAG violations",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": "0 minor"
+    },
+    {
+      "name": "Skills load failure provides a visible recovery action",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "Skills recovery preserves settings and never repeats OCR execution",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "form fields are at least 16px (no iOS focus zoom)",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": "17 fields"
+    },
+    {
+      "name": "touch targets are at least 44px tall",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": "49 targets"
+    },
+    {
+      "name": "no horizontal page overflow",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "no console errors",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "loading state renders while the service starts",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "empty conversation state",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "empty send is disabled (F05)",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "axe empty: no serious/critical WCAG violations",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": "0 minor"
+    },
+    {
+      "name": "answer completes with citations",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": "2 citations"
+    },
+    {
+      "name": "answer text rendered",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "axe answer: no serious/critical WCAG violations",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": "0 minor"
+    },
+    {
+      "name": "message text is selectable",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": "{\"userSelect\":\"\",\"webkitUserSelect\":\"text\",\"selectedText\":\"Mock cited answer for query: How does source lineage work?\\nConversation context turns used: 0\\nMemory items used: 2\\nMemory context:\\n- preference: Prefer tables for comparisons (tablet)\\n- preference: Prefer tables for comparisons (desktop)\\nEvidence summary:\\n[1] # Source Lineage Sample This sample explains that every answer must cite r"
+    },
+    {
+      "name": "sent message exposes one Copy and one Edit action",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "received message exposes one Copy and one Edit action",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "message actions are icons with a name and a tooltip",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": "Copy message text(Copy) 44x44, Edit message(Edit) 44x44, Copy message text(Copy) 44x44, Edit message(Edit) 44x44, Read message aloud(Read aloud) 44x44, Save answer as a file(Save) 44x44, Share answer(Share) 44x44"
+    },
+    {
+      "name": "copy action reports success",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "Copy shows a check mark after copying",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "only the received message offers Save and Share",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "the Save sheet offers the answer and the records saved with it",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": "✕ | Markdown (.md) | Plain text (.txt) | Report with sources (.md) | Full answer record (.json) | Citations table (.csv)"
+    },
+    {
+      "name": "axe save sheet: no serious/critical WCAG violations",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": "0 minor"
+    },
+    {
+      "name": "Save as Markdown downloads the answer with its question and sources",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": "mucaro-how-does-source-lineage-work.md: \"# How does source lineage work?\\n\\nMock cited answer for query: How does source li\""
+    },
+    {
+      "name": "the Save sheet closes after saving",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "Save full answer record downloads the trace Mucaro saved with the answer",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": "mucaro-how-does-source-lineage-work-record.json run_id=run_e1ab96490a24"
+    },
+    {
+      "name": "sent message edit renders explicit provenance marker",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "received message edit renders explicit provenance marker",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "reload reproduces the transcript (F02)",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "message display revisions survive reload",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "citation opens exact source evidence",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "Escape closes the sheet and returns focus",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": "Open citation 1: src_bfbf9a5edb5c991d"
+    },
+    {
+      "name": "permission sheet shows the exact tool and arguments",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "tool summary counts from records",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "tool drawer lists the executed call",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "submit disabled until a choice is made (F11)",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "options carry consequences (F10)",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "pending question survives a new message (F14)",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "submit stays disabled for an empty Other answer (F11)",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "freeform answer recorded as the choice (F12, F13)",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "plan mode shows the plan and executes nothing (F06)",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "message queued behind the active turn (F04)",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "queued message editable before dispatch (F04)",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "stop interrupts and the queued message then runs (F03)",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "Shift+Enter keeps composing (F05)",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "rename from the conversation menu (F17)",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "delete confirms and states there is no archive (F17)",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "background tasks list runs with metrics",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "sources workspace lists ingested sources",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "axe sources: no serious/critical WCAG violations",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": "0 minor"
+    },
+    {
+      "name": "memory add is visible with provenance",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "provenance shows a verified audit chain",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "settings shows model choice and offline capabilities",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "axe settings: no serious/critical WCAG violations",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": "0 minor"
+    },
+    {
+      "name": "Skills workspace lists the governed health skill",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "Skills workspace opens an authorized skill, invokes it, and displays its receipt",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "deactivating a skill removes invocation and retains its last receipt",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "skill revocation survives reload and offers explicit reauthorization",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "reauthorized skill invokes once under a rapid double activation",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": "1 invocation request(s)"
+    },
+    {
+      "name": "OCR skill exposes labeled document settings instead of requiring JSON",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "governed OCR skill extracts known text with the real local engine",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "axe skills: no serious/critical WCAG violations",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": "0 minor"
+    },
+    {
+      "name": "conversation OCR waits for an explicit skill approval",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "conversation OCR completes with a recorded tool outcome",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "OCR document settings survive workspace navigation",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "GIS workspace inspects a frozen real-source layer and explains Z/topology limits",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "spatial results save with matching source identity through one explicit action",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "spatial settings reveal reference inputs only for operations that use them",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "axe governed GIS: no serious/critical WCAG violations",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": "0 minor"
+    },
+    {
+      "name": "GIS workspace inspects a frozen real GeoTIFF with explicit band and NODATA counts",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "axe raster coordinate controls: no serious/critical WCAG violations",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": "0 minor"
+    },
+    {
+      "name": "raster coordinate rows sample the known cell and preserve an outside point",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "sample point removal preserves the first coordinate without invoking work",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "governed D8 flow retains complete cell accounting and a derived raster",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "derived GeoTIFF download matches the saved output artifact bytes",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "axe raster results: no serious/critical WCAG violations",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": "0 minor"
+    },
+    {
+      "name": "conversation export follows the recorded answer ID and downloads its actual trace",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "conversation export cards show persisted states rather than an unknown field",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "older conversation exports remain reachable through cursor pagination",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "Artifacts finds a persisted GIS output by stable artifact ID",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "saved artifact inspection shows recorded hash and direct parents",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "a rapid double-click starts exactly one saved-file download",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "artifact library returns the original recorded raster bytes",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "saved outputs reopen after leaving the workspace",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "a library load failure preserves the last snapshot and explains recovery",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "an unmatched library filter has an actionable empty state",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "axe saved output library: no serious/critical WCAG violations",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": "0 minor"
+    },
+    {
+      "name": "Skills load failure provides a visible recovery action",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "Skills recovery preserves settings and never repeats OCR execution",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "navigation drawer closes after choosing a workspace",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": "[true,true,true,true]"
+    },
+    {
+      "name": "form fields are at least 16px (no iOS focus zoom)",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": "17 fields"
+    },
+    {
+      "name": "touch targets are at least 44px tall",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": "51 targets"
+    },
+    {
+      "name": "no horizontal page overflow",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "no console errors",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "empty workspace fixture has no persisted work runs",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "late send acknowledgement preserves a newer composer draft",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "capture recovery refuses a stale hash and retains source bytes",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "pending capture recovery accepts one request under rapid activation",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "capture recovery indexes the exact saved observation once",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "capture recovery references survive workspace navigation",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "repeated recovery preserves the existing index bytes",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "axe web capture recovery: no serious/critical WCAG violations",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": "0 minor"
+    },
+    {
+      "name": "capture recovery refuses a stale hash and retains source bytes",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "pending capture recovery accepts one request under rapid activation",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "capture recovery indexes the exact saved observation once",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "capture recovery references survive workspace navigation",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "repeated recovery preserves the existing index bytes",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "axe web capture recovery: no serious/critical WCAG violations",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": "0 minor"
+    },
+    {
+      "name": "capture recovery refuses a stale hash and retains source bytes",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "pending capture recovery accepts one request under rapid activation",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "capture recovery indexes the exact saved observation once",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "capture recovery references survive workspace navigation",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "repeated recovery preserves the existing index bytes",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "axe web capture recovery: no serious/critical WCAG violations",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": "0 minor"
+    },
+    {
+      "name": "OCR workspace is navigable and exposes its local upload action",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "OCR workspace renders a structured report for a local image",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "GIS workspace renders backend capability evidence",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "Code workspace states readiness without implying execution",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "Code workspace executes repository status only after explicit approval",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "Code workspace exposes a terminal diff receipt",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "Code workspace renders a bounded file-read receipt",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "Artifacts workspace distinguishes an empty work-run store",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "launch token from the URL fragment authorizes the GUI",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": "status 200"
+    },
+    {
+      "name": "launch token is removed from the address bar",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": "http://127.0.0.1:52142/"
+    },
+    {
+      "name": "launch token kept for this window only (not localStorage)",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": "{\"session\":true,\"local\":false}"
+    },
+    {
+      "name": "reload keeps the launch session authorized",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "Settings shows the launch token as app-managed (no token field)",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "a wrong launch token is refused",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "security headers served with the UI",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "research refuses duplicate observations before invocation",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "rapid research activation sends one request while pending",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "one research action persists one execution with both source parents",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": "before=0 after=1 execution=skillexec_1568fecc3ebf5ab8"
+    },
+    {
+      "name": "research preserves observed disagreement and instruction warning",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "research differences inspector exposes both conflicting values",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "research answer uses readable citation numbers with IDs in inspection",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "first citation activation exposes exact excerpt and full hash",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "research download matches saved report digest and complete accounting",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "research no-context feedback does not invent citations",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "research selections draft and saved result survive navigation",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "research metadata refresh cannot silently accept a changed source digest",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "research content fits supported viewport",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "axe frozen web research: no serious/critical WCAG violations",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": "0 minor"
+    },
+    {
+      "name": "research revocation disables new work and retains saved result",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "research refuses duplicate observations before invocation",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "rapid research activation sends one request while pending",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "one research action persists one execution with both source parents",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": "before=3 after=4 execution=skillexec_3d0284be95fbd46b"
+    },
+    {
+      "name": "research preserves observed disagreement and instruction warning",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "research differences inspector exposes both conflicting values",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "research answer uses readable citation numbers with IDs in inspection",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "first citation activation exposes exact excerpt and full hash",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "research download matches saved report digest and complete accounting",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "research no-context feedback does not invent citations",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "research selections draft and saved result survive navigation",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "research metadata refresh cannot silently accept a changed source digest",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "research content fits supported viewport",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "axe frozen web research: no serious/critical WCAG violations",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": "0 minor"
+    },
+    {
+      "name": "research revocation disables new work and retains saved result",
+      "viewport": "tablet",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "research refuses duplicate observations before invocation",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "rapid research activation sends one request while pending",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "one research action persists one execution with both source parents",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": "before=6 after=7 execution=skillexec_f5413b10af78194f"
+    },
+    {
+      "name": "research preserves observed disagreement and instruction warning",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "research differences inspector exposes both conflicting values",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "research answer uses readable citation numbers with IDs in inspection",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "first citation activation exposes exact excerpt and full hash",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "research download matches saved report digest and complete accounting",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "research no-context feedback does not invent citations",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "research selections draft and saved result survive navigation",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "research metadata refresh cannot silently accept a changed source digest",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "research content fits supported viewport",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "axe frozen web research: no serious/critical WCAG violations",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": "0 minor"
+    },
+    {
+      "name": "research revocation disables new work and retains saved result",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "instruction-bearing research sources create no tool calls",
+      "viewport": "all",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "Rename opens with the cursor in the title field (M1)",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "Rename takes keystroke-by-keystroke typing and keeps focus (M1)",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": "value \"abc\", focus kept: true"
+    },
+    {
+      "name": "focus inside an open sheet is not reset in the background (M1)",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": "button -> button"
+    },
+    {
+      "name": "an idle, healthy app commits no renders (M2)",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": "0 commits in 9 s"
+    },
+    {
+      "name": "one failed health poll keeps the conversation and recovers by itself (M2)",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": "banner shown, runs on screen meanwhile: 1, recovered: true"
+    },
+    {
+      "name": "a plain-text 500 is reported readably (M6)",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": "INTERNAL_FAILURE — 500: Internal Server Error"
+    },
+    {
+      "name": "on a touch keyboard Return adds a line and sends nothing (M4)",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": "value \"line one\\n\", runs started by Return: 0"
+    },
+    {
+      "name": "the composer asks a touch keyboard for a Return key, not Send (M4)",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": "enterkeyhint=enter"
+    },
+    {
+      "name": "Ctrl+Enter still sends from a touch device (M4)",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "with a hardware keyboard Return sends (M4)",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": "enterkeyhint=send"
+    },
+    {
+      "name": "a malformed token fragment does not blank the app (M21)",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": "loaded"
+    },
+    {
+      "name": "removing a source asks first: Keep it keeps it, confirming removes it (M5)",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": "asked: true, kept after Keep it: true, removed after confirming: true"
+    },
+    {
+      "name": "revoking folder access asks first: Keep it keeps it, confirming revokes (M5)",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": "asked: true, kept after Keep it: true, revoked after confirming: true"
+    },
+    {
+      "name": "deleting a memory asks first: Keep it keeps it, confirming deletes it (M5)",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": "asked: true, kept after Keep it: true, deleted after confirming: true"
+    },
+    {
+      "name": "a silent event stream is detected and the page catches up by itself (M3)",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": "caught up after 25.1 s"
+    },
+    {
+      "name": "a refused event stream is retried with backoff, not in a tight loop (M3b)",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": "5 stream attempts in about 10 s"
+    },
+    {
+      "name": "repeated stream failures pause live updates with a visible Resume (M3b)",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": "paused: true, 10 attempts before pausing"
+    },
+    {
+      "name": "Resume reconnects the stream once the service answers (M3b)",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": "notice cleared: true, stream requests after Resume: 1"
+    },
+    {
+      "name": "a token-protected service asks for the token instead of saying it is unreachable (M7)",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": "gate shown: true, \"unreachable\" banner: false"
+    },
+    {
+      "name": "the token field is a password field iOS will not capitalize or correct, 16px+ and 44px tall (M7)",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": "{\"type\":\"password\",\"capitalize\":\"none\",\"correct\":\"off\",\"spellcheck\":\"false\",\"fontSize\":16,\"height\":44}"
+    },
+    {
+      "name": "the token field has no cleartext warning on this computer's own address (M7)",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "the token gate has exactly one visibility toggle despite global navigation controls (M7)",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": "show buttons in gate: 1"
+    },
+    {
+      "name": "a wrong token is refused with an explanation, and Show reveals what was typed (M7)",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": "explained: true, revealed type: text"
+    },
+    {
+      "name": "the right token opens the app and is kept for this tab only (M7)",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": "app opened: true, in session storage: true, in local storage: false"
+    },
+    {
+      "name": "reloading the tab keeps the session authorized (M7)",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "a token that stops working sends the person back to the gate with an explanation (M7)",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": "gate: true, explained: true"
+    },
+    {
+      "name": "entering the token again returns to where the person was (M7)",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "Remember on this device keeps the token for later visits (M7)",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": "stored: true, second page opened without the gate: true"
+    },
+    {
+      "name": "a remote client is refused when no token is configured, for reads and writes (M7)",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": "GET /conversations 403, POST /memory 403"
+    },
+    {
+      "name": "a remote client does not learn host paths from /health or /config (M7)",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": "no host paths"
+    },
+    {
+      "name": "a phone sees why it was refused instead of a dead end (M7)",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": "explained: true, retry offered: true"
+    },
+    {
+      "name": "over the network the token decides: none or wrong is 401, the right one is served (M7)",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": "none 401, wrong 401, right 200"
+    },
+    {
+      "name": "the phone link with the token in its fragment opens the app (M7)",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": "opened: true, address bar: http://192.168.1.55:52428/"
+    },
+    {
+      "name": "Settings says a network connection over http is not encrypted (M7)",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "the token gate warns that a network connection over http is not encrypted (M7)",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "a public bind with a short token refuses to start (M7)",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": "exit code 1, answered requests: false"
+    },
+    {
+      "name": "Copy works where navigator.clipboard does not exist, as over http on a network (M25)",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": "\"Copied to clipboard.\", 1 copy event(s) of 940 characters"
+    },
+    {
+      "name": "a refused copy says why instead of blaming a permission (M25)",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": "\"Copy failed: this browser copies only over a secure connection. Select the text and copy it by hand.\""
+    },
+    {
+      "name": "Share hands the answer to the system share sheet as a text file",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": "\"Shared.\", 1 file(s): mucaro-how-does-source-lineage-work.txt text/plain;charset=utf-8 \"Question: How does source lineage work?\\n\\nMock cite\", 0 download(s)"
+    },
+    {
+      "name": "closing the share sheet saves nothing",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": "\"Sharing cancelled.\", 0 download(s)"
+    },
+    {
+      "name": "Share saves the answer instead where no share sheet exists",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": "mucaro-how-does-source-lineage-work.txt, \"This browser cannot share files, so mucaro-how-does-source-lineage-work.txt was saved instead.\""
+    },
+    {
+      "name": "over http on a network address, Share saves the file and says sharing needs https",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": "forced=true, \"Sharing needs a secure (https) connection, so mucaro-how-does-source-lineage-work.txt was saved instead.\""
+    },
+    {
+      "name": "service-unreachable error state",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "source identity and built assets stay unchanged throughout rendered verification",
+      "viewport": "all",
+      "pass": true,
+      "detail": ""
+    }
+  ],
+  "passed": 383,
+  "failed": 0,
+  "axe": [
+    {
+      "view": "empty",
+      "viewport": "desktop",
+      "violations": []
+    },
+    {
+      "view": "answer",
+      "viewport": "desktop",
+      "violations": []
+    },
+    {
+      "view": "save sheet",
+      "viewport": "desktop",
+      "violations": []
+    },
+    {
+      "view": "sources",
+      "viewport": "desktop",
+      "violations": []
+    },
+    {
+      "view": "settings",
+      "viewport": "desktop",
+      "violations": []
+    },
+    {
+      "view": "skills",
+      "viewport": "desktop",
+      "violations": []
+    },
+    {
+      "view": "governed GIS",
+      "viewport": "desktop",
+      "violations": []
+    },
+    {
+      "view": "raster coordinate controls",
+      "viewport": "desktop",
+      "violations": []
+    },
+    {
+      "view": "raster results",
+      "viewport": "desktop",
+      "violations": []
+    },
+    {
+      "view": "saved output library",
+      "viewport": "desktop",
+      "violations": []
+    },
+    {
+      "view": "empty",
+      "viewport": "tablet",
+      "violations": []
+    },
+    {
+      "view": "answer",
+      "viewport": "tablet",
+      "violations": []
+    },
+    {
+      "view": "save sheet",
+      "viewport": "tablet",
+      "violations": []
+    },
+    {
+      "view": "sources",
+      "viewport": "tablet",
+      "violations": []
+    },
+    {
+      "view": "settings",
+      "viewport": "tablet",
+      "violations": []
+    },
+    {
+      "view": "skills",
+      "viewport": "tablet",
+      "violations": []
+    },
+    {
+      "view": "governed GIS",
+      "viewport": "tablet",
+      "violations": []
+    },
+    {
+      "view": "raster coordinate controls",
+      "viewport": "tablet",
+      "violations": []
+    },
+    {
+      "view": "raster results",
+      "viewport": "tablet",
+      "violations": []
+    },
+    {
+      "view": "saved output library",
+      "viewport": "tablet",
+      "violations": []
+    },
+    {
+      "view": "empty",
+      "viewport": "iphone",
+      "violations": []
+    },
+    {
+      "view": "answer",
+      "viewport": "iphone",
+      "violations": []
+    },
+    {
+      "view": "save sheet",
+      "viewport": "iphone",
+      "violations": []
+    },
+    {
+      "view": "sources",
+      "viewport": "iphone",
+      "violations": []
+    },
+    {
+      "view": "settings",
+      "viewport": "iphone",
+      "violations": []
+    },
+    {
+      "view": "skills",
+      "viewport": "iphone",
+      "violations": []
+    },
+    {
+      "view": "governed GIS",
+      "viewport": "iphone",
+      "violations": []
+    },
+    {
+      "view": "raster coordinate controls",
+      "viewport": "iphone",
+      "violations": []
+    },
+    {
+      "view": "raster results",
+      "viewport": "iphone",
+      "violations": []
+    },
+    {
+      "view": "saved output library",
+      "viewport": "iphone",
+      "violations": []
+    },
+    {
+      "view": "web capture recovery",
+      "viewport": "desktop",
+      "violations": []
+    },
+    {
+      "view": "web capture recovery",
+      "viewport": "tablet",
+      "violations": []
+    },
+    {
+      "view": "web capture recovery",
+      "viewport": "iphone",
+      "violations": []
+    },
+    {
+      "view": "frozen web research",
+      "viewport": "desktop",
+      "violations": []
+    },
+    {
+      "view": "frozen web research",
+      "viewport": "tablet",
+      "violations": []
+    },
+    {
+      "view": "frozen web research",
+      "viewport": "iphone",
+      "violations": []
+    }
+  ],
+  "screenshots": [
+    {
+      "file": "data/exports/rendered_qa/20261102T233951Z-7c963594c8b4/desktop-00-loading.png",
+      "sha256": "8ee51cfc55a1edcd0be58ca3f644b42f7ae023832488fcd18f6b4dbfac3d123b"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261102T233951Z-7c963594c8b4/desktop-01-empty.png",
+      "sha256": "f93b427075b2774e1603f8e90936d923b08baa7172e267e43d143917f0859561"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261102T233951Z-7c963594c8b4/desktop-02-answer.png",
+      "sha256": "ccdcc45cc8450adaaeca6033f82f5a5909967eff92879ba2734698ee6db8c5c7"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261102T233951Z-7c963594c8b4/desktop-02c-save-sheet.png",
+      "sha256": "e00b40f6a6e14129588b96d67bba03b8d388766f3ec6f516d9852ad64efac242"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261102T233951Z-7c963594c8b4/desktop-02b-message-actions.png",
+      "sha256": "9eaa7f4e3a608dabded7946b73bfff2258ad6e29fe30aaac199c51d34af68632"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261102T233951Z-7c963594c8b4/desktop-03-evidence.png",
+      "sha256": "74f960c3e8e57dea8eca8954e871c2759bb0ad6f936cf2f07615d8d38a8ba3bb"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261102T233951Z-7c963594c8b4/desktop-04-approval.png",
+      "sha256": "1b3e49cab05fe29e81ed9e7828116f7c623e3ff8e128716c2889c17354dafa80"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261102T233951Z-7c963594c8b4/desktop-05-tool-done.png",
+      "sha256": "5ac1637cf4796921ae195be787b4e0b419332344d96f72f08778a7f0b36a361d"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261102T233951Z-7c963594c8b4/desktop-06-tool-drawer.png",
+      "sha256": "f27e4af725523274c9a5ebe40ae4c5529c04f5bdc4882ff7fde6c5b75f1842cf"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261102T233951Z-7c963594c8b4/desktop-07-question.png",
+      "sha256": "daee4c4f0c3a5bfec687a0c5b0d276a739812066fe9bb9c78af7cb7ed64bc3dd"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261102T233951Z-7c963594c8b4/desktop-08-receipt.png",
+      "sha256": "4f726405a5298fde316d568739698476ad6af00ba60187b8304adfdeb351e3fc"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261102T233951Z-7c963594c8b4/desktop-09-queue.png",
+      "sha256": "6678981b5443db7d622362cf6db85cae3995fa4953951a8c228fbde249154e6d"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261102T233951Z-7c963594c8b4/desktop-10-after-stop.png",
+      "sha256": "0c9eac62a5c421c90bbe92db34e6557be9bc8a034b2bd3985d16344f35d6a4a4"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261102T233951Z-7c963594c8b4/desktop-11-tasks.png",
+      "sha256": "de3c3a2e9bb7a7ae24deda23dd3fc24c9cc874d2e9692f8ae3739c4e2ee1bff9"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261102T233951Z-7c963594c8b4/desktop-13-sources.png",
+      "sha256": "dbed6db2ad28d571bb61d7b3e6b1bf5464695aa5a53ff6a1a7f08ba0fd26fbb5"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261102T233951Z-7c963594c8b4/desktop-14-memory.png",
+      "sha256": "50bc1835d56f282df1d92c94a441468e989b114668a6f923787b1c2bb8af2baa"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261102T233951Z-7c963594c8b4/desktop-15-provenance.png",
+      "sha256": "9c47df1c763f490a7637ac05c50fb1de49feaedad4f52461f23a175c4a43f3a7"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261102T233951Z-7c963594c8b4/desktop-16-settings.png",
+      "sha256": "91de47bf7dc7afd2a18834652221133290f6692bcbd29d2eab321087c1dbc4a9"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261102T233951Z-7c963594c8b4/desktop-16b-skills-reactivated.png",
+      "sha256": "92162bcf005f8d63e1656b5f187d09eafa7a498c377fea1a04e8890756a1fca8"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261102T233951Z-7c963594c8b4/desktop-16c-governed-ocr.png",
+      "sha256": "e3b7698f25b32102bed4ecb5fa8f8be21fbcf8fd933645e85b8cdadecc39f2c7"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261102T233951Z-7c963594c8b4/desktop-16d-governed-gis.png",
+      "sha256": "8c86056f4dfa53010def9bd4a87a687bbe4c580dc140a633ef82be8a389c5a84"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261102T233951Z-7c963594c8b4/desktop-16e-governed-raster.png",
+      "sha256": "cf65f08a5c4f4252790b1bbfd571e416f0c96abf34fc16650299f6e3580f7954"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261102T233951Z-7c963594c8b4/desktop-16f-artifact-library.png",
+      "sha256": "57d10f489e59ee5716acea39c692fe00533ee3915ddc6da868e7169651f97878"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261102T233951Z-7c963594c8b4/tablet-00-loading.png",
+      "sha256": "2aadb2f5dae5c646d0e63db1ec55b772ba222e24f83721ea31b7ec21a174d26c"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261102T233951Z-7c963594c8b4/tablet-01-empty.png",
+      "sha256": "5f1b51102992fbe66edcace91085472562691047cd6029fd59414a08ea32ddad"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261102T233951Z-7c963594c8b4/tablet-02-answer.png",
+      "sha256": "60b03e0d0aa85d8634de95db288f8894a33099703e6aedd594012ac209a6517e"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261102T233951Z-7c963594c8b4/tablet-02c-save-sheet.png",
+      "sha256": "f499cec279574c4066619ab403d7cd001884f3d372d0f5c86a53e3eef0c6d623"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261102T233951Z-7c963594c8b4/tablet-02b-message-actions.png",
+      "sha256": "b621703ae9143770bcfde48eb61552df6b73e908214a2d664fb538cf675c58bb"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261102T233951Z-7c963594c8b4/tablet-03-evidence.png",
+      "sha256": "acd3abb7c5037748bd14f4bb4658d02d5da58861ee566cf44846de345c0cbb70"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261102T233951Z-7c963594c8b4/tablet-04-approval.png",
+      "sha256": "c81e319340c7a9033a3c3f00e1b175a05ab07833ec229038dd5ec5583e6a76f7"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261102T233951Z-7c963594c8b4/tablet-05-tool-done.png",
+      "sha256": "ca5b32a1bf638e616cfc9490e70c72c92c323089f4c38637713a42578fa995e4"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261102T233951Z-7c963594c8b4/tablet-06-tool-drawer.png",
+      "sha256": "2d5c9f1b0bbcb9ffa201fc21e2f2d613d179f44f0f6c01371675012513f672c5"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261102T233951Z-7c963594c8b4/tablet-07-question.png",
+      "sha256": "dbc1db40010c7862ce6e2db537de74dfc68d63faf574a489250d232ed1e3e42f"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261102T233951Z-7c963594c8b4/tablet-08-receipt.png",
+      "sha256": "07f544c65cad496e62ebd65ae02bdb435747775a7499482130457b499f29aec2"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261102T233951Z-7c963594c8b4/tablet-09-queue.png",
+      "sha256": "8311b5374299e21441abaa6d7533030cc92c7710eed06a9372496ebe0e6d4ffe"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261102T233951Z-7c963594c8b4/tablet-10-after-stop.png",
+      "sha256": "976e8d77128827e8ee902856284aa05c377720ca4d1dff71ffe68efbe0ce9632"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261102T233951Z-7c963594c8b4/tablet-11-tasks.png",
+      "sha256": "f560d2b1dfeea95b2d81667cd8e31ca6e866940285c862761ed6f609d78f0bdb"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261102T233951Z-7c963594c8b4/tablet-13-sources.png",
+      "sha256": "d9c87d632cf15ae55b3d32e110141977a0b13ef43caf41e0da55d93a43fe1e36"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261102T233951Z-7c963594c8b4/tablet-14-memory.png",
+      "sha256": "f160c2423040b4914346bf877dbc5f33965b74d389e54422d2690152d1c4a030"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261102T233951Z-7c963594c8b4/tablet-15-provenance.png",
+      "sha256": "50a4d418c54733f879a10737fac498252c35a2c566c221fe9e4633bd967d3344"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261102T233951Z-7c963594c8b4/tablet-16-settings.png",
+      "sha256": "ad7ca5d5a39571fd47b341614147f32a6dea51568c71ce68de0b21216b404e02"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261102T233951Z-7c963594c8b4/tablet-16b-skills-reactivated.png",
+      "sha256": "5f7ed9e7a003086c9b954e4a509ddc753a8878798e71d68c048b06c88d71c084"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261102T233951Z-7c963594c8b4/tablet-16c-governed-ocr.png",
+      "sha256": "063c0873b1c35a5a7d5c99e6b309e9cefb712dbbd8bb73267a4be1b9c3cc4bb2"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261102T233951Z-7c963594c8b4/tablet-16d-governed-gis.png",
+      "sha256": "9ce774a3165ca31dd835fa7ce40e070239f68e7c2343d21244251b35d663cef1"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261102T233951Z-7c963594c8b4/tablet-16e-governed-raster.png",
+      "sha256": "ccecb3b2e729ce3c01a57fdc177598f410a1a301116ec944e265420122a9fa38"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261102T233951Z-7c963594c8b4/tablet-16f-artifact-library.png",
+      "sha256": "2174fe677ec5edb46c89220088755f6250ffa897dc740835ff8b4097556f49c4"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261102T233951Z-7c963594c8b4/iphone-00-loading.png",
+      "sha256": "fbd3017b0e95ff404963398174b15120560188e8f10a1658b2b4e1503135bd75"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261102T233951Z-7c963594c8b4/iphone-01-empty.png",
+      "sha256": "5bdbaa6d0e1c11fbbc534b7da7aae97d7c8990e177551c18946bbad5f5d9bfb5"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261102T233951Z-7c963594c8b4/iphone-02-answer.png",
+      "sha256": "c693e05b143131e7664ffa7bb6ffb18de199b7d9b0095db2c69888762e7f951d"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261102T233951Z-7c963594c8b4/iphone-02c-save-sheet.png",
+      "sha256": "9d971c99aff2c5cfcdac8bd344a151be1c59b8e49dd22dd334c43c48f979b96c"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261102T233951Z-7c963594c8b4/iphone-02b-message-actions.png",
+      "sha256": "0ba56a963cc3d276651eb53d4bef567c28932c075e6b104f3f27f6fadcb0a020"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261102T233951Z-7c963594c8b4/iphone-03-evidence.png",
+      "sha256": "bd418996b40e58f0a9036bc8dc655b4ca9df3d8e97e55d4fa5d5219b43397cb6"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261102T233951Z-7c963594c8b4/iphone-04-approval.png",
+      "sha256": "2c97497fd1e6b361cb9c7b616975455c24ce14e8b3b24fc2ecf0d44fa5cfe8f8"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261102T233951Z-7c963594c8b4/iphone-05-tool-done.png",
+      "sha256": "ce8398b55011034ee6abd883ec0ce5da121afbb2ea650a5eef5541309dcd206c"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261102T233951Z-7c963594c8b4/iphone-06-tool-drawer.png",
+      "sha256": "3ecea0ffe16fbcc607603666731a560d9906244a2604b9873c98e5a16677f10c"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261102T233951Z-7c963594c8b4/iphone-07-question.png",
+      "sha256": "aaedf4d761f43e2d73a89d22da645b56b1a9c65cc0e0543a1ea0b8b4961d86b5"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261102T233951Z-7c963594c8b4/iphone-08-receipt.png",
+      "sha256": "f2760cbcd891659fe1e887d6cd0d0417ce49d3d5a252f539ca933f3b9fe1a37e"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261102T233951Z-7c963594c8b4/iphone-09-queue.png",
+      "sha256": "d9da82eabbbc0f0a11a7b69e70999b70786eb8b9b4d836b867ecc9a384859878"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261102T233951Z-7c963594c8b4/iphone-10-after-stop.png",
+      "sha256": "7bbb2a2254a63485f9c9cf9755afc8779f30b8aab96ac2baaaeb8ab2a39b45fd"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261102T233951Z-7c963594c8b4/iphone-11-tasks.png",
+      "sha256": "8a1f661735f3672fe400868b76b405d6ea1f813a6ff618f301161f14c63f2dce"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261102T233951Z-7c963594c8b4/iphone-12-nav-open.png",
+      "sha256": "175a83c1809da0422ee4de1063562d90846f46e5a26b5c09a9569b06bea7ae33"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261102T233951Z-7c963594c8b4/iphone-13-sources.png",
+      "sha256": "bc20e0b3b121d74418e00a4ca2ad423954b93c8ee790facac2c9cbad514847a9"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261102T233951Z-7c963594c8b4/iphone-14-memory.png",
+      "sha256": "97499efce00560f061c6eadaf9a927ae34098db86f14ebda7fec51ab624023a0"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261102T233951Z-7c963594c8b4/iphone-15-provenance.png",
+      "sha256": "6cc79fb8d78fd6136276c385a080120a451b027057bca64ad5c9b0ee20f5f8cc"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261102T233951Z-7c963594c8b4/iphone-16-settings.png",
+      "sha256": "3c3d6666758ebef085d3afa28718073258083cdf5ba004d800c717365984d651"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261102T233951Z-7c963594c8b4/iphone-16b-skills-reactivated.png",
+      "sha256": "deb2df541e02cb126ea106a62c2d62a06c3886f2596ffe88a6488de924f48db3"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261102T233951Z-7c963594c8b4/iphone-16c-governed-ocr.png",
+      "sha256": "adb7524a9c7750da227b1159b8c210061db32eab1c9961a2a490b01ace8c535f"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261102T233951Z-7c963594c8b4/iphone-16d-governed-gis.png",
+      "sha256": "d058e1484b45a0d8d1839d804a95aa408da5e7f1e904594c48ea1a0fb26a680b"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261102T233951Z-7c963594c8b4/iphone-16e-governed-raster.png",
+      "sha256": "bf728751c15a5430650d6ef5a563b988cb6c2d58c24928575227f3f248ea89b7"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261102T233951Z-7c963594c8b4/iphone-16f-artifact-library.png",
+      "sha256": "5a9121f63fb15345a5176c377bbfe61cac5981dafa1a39667cc30586c84e66bf"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261102T233951Z-7c963594c8b4/desktop-17-web-capture-recovery.png",
+      "sha256": "4a0c0f3a480d1baab48c602deab9a5df06f81293c56923abd6a3176d4b67a36c"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261102T233951Z-7c963594c8b4/tablet-17-web-capture-recovery.png",
+      "sha256": "1c8f911784d3f56a2ec4c303572f1864dc3b55f3f481c2d5562614dc7c4ec2a1"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261102T233951Z-7c963594c8b4/iphone-17-web-capture-recovery.png",
+      "sha256": "6c1eb661d06885228d1ee3595d2c014fd33dec9f98c50a70695505fb0131d80e"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261102T233951Z-7c963594c8b4/desktop-18-frozen-web-research.png",
+      "sha256": "a50d6ad06d9ea9ad01fa4dbcc2136df4cf309e0ff17a324f29def0ba1d61ec29"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261102T233951Z-7c963594c8b4/tablet-18-frozen-web-research.png",
+      "sha256": "583f603fc2d3336d9384772fcdaa000b7d2d160290c29719634be43180a7b0f2"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261102T233951Z-7c963594c8b4/iphone-18-frozen-web-research.png",
+      "sha256": "b2e39c31cc5a6fbf5b000f65c510cbaef1b0a54d96a5a1e66fa9a2b027bab20c"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261102T233951Z-7c963594c8b4/iphone-18-token-gate.png",
+      "sha256": "45c468ff83482f60a9dbaed097b03117010b2e9ddd7c9db5d446ec0e803398fd"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261102T233951Z-7c963594c8b4/iphone-19-token-refused.png",
+      "sha256": "dbb326bb30a096c15c9545ee02f23b50b29c220523d9d64c74869e7b7cdb70e6"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261102T233951Z-7c963594c8b4/iphone-20-phone-access-off.png",
+      "sha256": "dde185a37e58fbcd123d63c7fddc3686738039f437b667ab16d6214d2e95c181"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261102T233951Z-7c963594c8b4/iphone-21-cleartext-notice.png",
+      "sha256": "4767a7bc06e576a7c22c20a70f57002fa42821922dcc4c63d1a4d3c895720786"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261102T233951Z-7c963594c8b4/desktop-17-service-unreachable.png",
+      "sha256": "0915c0e5902078195aed45d59a882478034dbfac7ab28cd802cc57adb3a72fa6"
+    }
+  ],
+  "fixtures": [
+    {
+      "file": "data/exports/rendered_qa/20261102T233951Z-7c963594c8b4/governed-ocr-table.png",
+      "sha256": "bbee4ec103e16a66b26f772d38c2cf94a85b920366c4f42e960e96e5f66c47b5",
+      "expected_text": "APPLE"
+    },
+    {
+      "file": "backend/tests/fixtures/gis_corpus/usgs_pr_earthquakes_2020-01-06_2020-01-08.geojson",
+      "sha256": "a7c40c01dbf935f63239e6466c0572b9e486f7a2d78972dbdc222947cbcf5901",
+      "expected_feature_count": 30
+    },
+    {
+      "file": "backend/tests/fixtures/gis_corpus/usgs_3dep_pr_elevation_utm20n_64x64.tif",
+      "sha256": "9cc3ba603944b5e6e1a9251082338c1f94783ca376480d19237a3ad4ef789415",
+      "sample_control": {
+        "x": 175260.99213230773,
+        "y": 2017230.0673874696,
+        "value": 132.421630859375,
+        "crs": "EPSG:32620"
+      }
+    },
+    {
+      "kind": "AUTHORED_UNINDEXED_CAPTURES",
+      "snapshots": [
+        {
+          "snapshot_id": "websnap_9e6169be63f8e014",
+          "sha256": "63e22f0b3471733a6db10e9af89f88c2d39d08f5ef983506930562d78ac89842"
+        },
+        {
+          "snapshot_id": "websnap_c69f33f13fb5888f",
+          "sha256": "d7e8e76130b0471e44fc163d137993a82412ee2eb5055e590a7c584f1de4b1db"
+        },
+        {
+          "snapshot_id": "websnap_fe746512a5538618",
+          "sha256": "1800f7943ea105008054e016688546305b449452b4b6eba0713f75006c77c51b"
+        }
+      ],
+      "limitation": "Tests offline indexing recovery, not web acquisition or search quality."
+    },
+    {
+      "kind": "AUTHORED_HTTP_RESEARCH_OBSERVATIONS",
+      "captures": [
+        {
+          "snapshot_id": "websnap_0e6f7f30ec778eb3",
+          "sha256": "dc85d9349086b3b713264d2a4adcff84ce0b18eeca10871313769bb21c37897b"
+        },
+        {
+          "snapshot_id": "websnap_f67cee43e96ecd2e",
+          "sha256": "5292ea7ac120cc33854b27eeb1695a08080d72de9a02b88a13790506c8a87d98"
+        }
+      ],
+      "limitation": "Two captured local HTTP documents, including instruction-bearing text. Source servers stop before comparison; this is not live-web or model semantic proof."
+    }
+  ],
+  "build_binding": {
+    "command": "npm run build",
+    "source_head_sha": "7c963594c8b450c433c249ab7e5ac3236cb83700",
+    "frontend_inputs": [
+      {
+        "file": "frontend/.npmrc",
+        "bytes": 59,
+        "sha256": "7565382d04653dc25ae01941c92af03c8b8ff29568685eea3faa820265e95911"
+      },
+      {
+        "file": "frontend/index.html",
+        "bytes": 945,
+        "sha256": "9b4d78fc8e0973fd0efbfd5331157feda968b16855ececdce6cd4132981d03ac"
+      },
+      {
+        "file": "frontend/package-lock.json",
+        "bytes": 56751,
+        "sha256": "8257c520df25b314dfa2bfaf6cacd97a5df99f909c0cb640699a99f414e21328"
+      },
+      {
+        "file": "frontend/package.json",
+        "bytes": 408,
+        "sha256": "06d04d85927890d36dc50470f0399d72a8e87ac982f1aab34abded91c3fcdcf9"
+      },
+      {
+        "file": "frontend/public/favicon.png",
+        "bytes": 127083,
+        "sha256": "d4bfa436774febb2e3e9dca2e98f9ce230a9a228cfccf8b972a0381a7665fad9"
+      },
+      {
+        "file": "frontend/src/App.jsx",
+        "bytes": 13890,
+        "sha256": "b3b539ac1db19cf8b3102616e6ca167ce39c8b1c0d56b9cbd4cf4bd285eadf4a"
+      },
+      {
+        "file": "frontend/src/api.js",
+        "bytes": 16649,
+        "sha256": "5f937430434c1ee56f8b3117d91d81688279690955944e90f99fff35cbd5b833"
+      },
+      {
+        "file": "frontend/src/clipboard.js",
+        "bytes": 2076,
+        "sha256": "ab01ff5443723bb0196f4dc649020bcb81d8ad1ff53d238a2cb20b5171c221ba"
+      },
+      {
+        "file": "frontend/src/components/ChatView.jsx",
+        "bytes": 20280,
+        "sha256": "870b588f6c96143ded18af011c51be75b884d22077e80860f2fec22743f1e3bf"
+      },
+      {
+        "file": "frontend/src/components/CleartextNotice.jsx",
+        "bytes": 878,
+        "sha256": "2dfe0bb8dba39e155f9c563fbb326d0de3ed8e767e9c9ebea214ae19eaeca99f"
+      },
+      {
+        "file": "frontend/src/components/Composer.jsx",
+        "bytes": 8690,
+        "sha256": "c61ae46a32f5e10c50607aa1f6a101bc69ff85c9646ee8d9fe01338a32665f8a"
+      },
+      {
+        "file": "frontend/src/components/ConfirmSheet.jsx",
+        "bytes": 1338,
+        "sha256": "4bfc260f776054f8c270d3db89b0dd7000e4deaafb632f6b541ef7827ea7ae8b"
+      },
+      {
+        "file": "frontend/src/components/DirectoryIntake.jsx",
+        "bytes": 7160,
+        "sha256": "45de639dec02821875a4f51ae1de743c9e4ca518ed3ba0478ba5e3f5b548ba42"
+      },
+      {
+        "file": "frontend/src/components/EvidencePanel.jsx",
+        "bytes": 2854,
+        "sha256": "6128418c1ca23b3cdf89a3d11eceaa0d3a311b96122c29ffbe7f4b4935149e2f"
+      },
+      {
+        "file": "frontend/src/components/Icons.jsx",
+        "bytes": 1709,
+        "sha256": "169a7499b455fa40dde1d975f83343171bff62513a0be392f7171cc222100e46"
+      },
+      {
+        "file": "frontend/src/components/MessageActions.jsx",
+        "bytes": 9706,
+        "sha256": "8b2419178b9ce8a7bb133def51429bc1f8f0c34af97e2aa8ed9d8f2ca712b18f"
+      },
+      {
+        "file": "frontend/src/components/RichText.jsx",
+        "bytes": 1442,
+        "sha256": "59ad2505281fe54e08b0b50d628eab1cfcfeace2f5fcc9741a39ed756f7e7031"
+      },
+      {
+        "file": "frontend/src/components/RunBlock.jsx",
+        "bytes": 16487,
+        "sha256": "46241307f20a5f16afea4cb2a0fcc570d10889de4bc7469544ecf5b0c598fef6"
+      },
+      {
+        "file": "frontend/src/components/Sheet.jsx",
+        "bytes": 2973,
+        "sha256": "ae8cb1cc4d39bc119c72f7e94d3300e51de094e730fa593a16f03203529ef179"
+      },
+      {
+        "file": "frontend/src/components/TasksDrawer.jsx",
+        "bytes": 3762,
+        "sha256": "137a3d238e0b7ba1f01f7e4f1c7dde72d0dd9c0d323731c92c32e852716092e2"
+      },
+      {
+        "file": "frontend/src/components/TokenGate.jsx",
+        "bytes": 3985,
+        "sha256": "b98148a98fcc3c5e38054827f4a61030a4b995ec16da079fd8ac0f13f106d6bf"
+      },
+      {
+        "file": "frontend/src/components/workspaces/ArtifactLibrary.jsx",
+        "bytes": 6526,
+        "sha256": "0f374da4eb6d20616bf1a796d0658155c1f2b0620522a244ebaa0086c49d6042"
+      },
+      {
+        "file": "frontend/src/components/workspaces/CaptureRecovery.jsx",
+        "bytes": 3071,
+        "sha256": "1ca48cd6eef1166227c7a1a05c3ba4e43e80274cab8dc64614f0cb86ab8d2742"
+      },
+      {
+        "file": "frontend/src/components/workspaces/GoalWorkspace.jsx",
+        "bytes": 6817,
+        "sha256": "7185729ed9981a804753479ed634dccc26353538b8f6829a9940f1ede7ba4bbb"
+      },
+      {
+        "file": "frontend/src/components/workspaces/MemoryWorkspace.jsx",
+        "bytes": 3665,
+        "sha256": "5afadf5beafa8a0af977ca02fcf2aa543ff31229af30f109ffc866bfc7bae09a"
+      },
+      {
+        "file": "frontend/src/components/workspaces/OCRWorkspace.jsx",
+        "bytes": 7120,
+        "sha256": "e0670ef2d5fa90a0c12846a49a2ce2641d10a64774455a062941f39ea93613ca"
+      },
+      {
+        "file": "frontend/src/components/workspaces/ProvenanceWorkspace.jsx",
+        "bytes": 2802,
+        "sha256": "2407d4e1c4538edd504c7869e3c4557e0e2fbfb02ecc0e47ebffaa79f0ea3ef0"
+      },
+      {
+        "file": "frontend/src/components/workspaces/ReadinessWorkspace.jsx",
+        "bytes": 4979,
+        "sha256": "56963f0f1baf31052def35264413b02e202930316b13a812c727a9f6bc2d73b8"
+      },
+      {
+        "file": "frontend/src/components/workspaces/SettingsWorkspace.jsx",
+        "bytes": 4953,
+        "sha256": "563d46e65dbbf1aaf9e40ed1c37acab8d2a93681caafb0c25977e5b79ba1cdb5"
+      },
+      {
+        "file": "frontend/src/components/workspaces/SkillsWorkspace.jsx",
+        "bytes": 23989,
+        "sha256": "7d05d25a65875d5abcf76e687732bf70a1592edde5593bc37e1d4cade27b822d"
+      },
+      {
+        "file": "frontend/src/components/workspaces/SourcesWorkspace.jsx",
+        "bytes": 6042,
+        "sha256": "c338dea00f74e3a8d7126d9a1b40325dd2b50abbce2a20e69713211f471724fc"
+      },
+      {
+        "file": "frontend/src/components/workspaces/SpecializedWorkspace.jsx",
+        "bytes": 14499,
+        "sha256": "4b5f361ad9f36e2ad5cfdc1f4610e803b298ed5c14b2fc9e20e61ec767df6d41"
+      },
+      {
+        "file": "frontend/src/components/workspaces/TasksWorkspace.jsx",
+        "bytes": 6304,
+        "sha256": "fddaa6a2e06e6ebf977c2044fbccf60329400b092fecc1a512abaa68d6f42e53"
+      },
+      {
+        "file": "frontend/src/components/workspaces/WebResearch.jsx",
+        "bytes": 13740,
+        "sha256": "ecf483d42a882cec8b602782caaeadd45425fe1c90bd0d6cf7a4e1a53cf46ddf"
+      },
+      {
+        "file": "frontend/src/feed.js",
+        "bytes": 4646,
+        "sha256": "8cb1bc38ffdba2c08499a1cbfb560406c39032461dc8fcb8f560b4b269f0b00f"
+      },
+      {
+        "file": "frontend/src/files.js",
+        "bytes": 4754,
+        "sha256": "3dd0e1845e041d422f6e48c3802986595b36fc1859254f1d6d0246d1b5afc3cf"
+      },
+      {
+        "file": "frontend/src/main.jsx",
+        "bytes": 242,
+        "sha256": "832f752c6b6a454a26dbc4f2654f5bd633f2b103516c8c0abac648308c133a7e"
+      },
+      {
+        "file": "frontend/src/styles.css",
+        "bytes": 24096,
+        "sha256": "1ac1ccc6df310cf178efefee031e60957f979aa2b8719a0f51397e40481c06b7"
+      },
+      {
+        "file": "frontend/vite.config.js",
+        "bytes": 1003,
+        "sha256": "85114e381d60e641952224a8b038dadc272277c91e026640bfe421cbeb1f9185"
+      }
+    ],
+    "assets": [
+      {
+        "file": "frontend/dist/assets/index-3fQK4jDS.css",
+        "bytes": 18708,
+        "sha256": "b9b3d3510f3ba919c12c3e507f323a014df71e77f93d94666318aebce9575077"
+      },
+      {
+        "file": "frontend/dist/assets/index-DJoBy0eN.js",
+        "bytes": 346996,
+        "sha256": "8c459bb46e04cee181cde8a9e92776d55b95f026dcda8f1fc8221239d1e9523c"
+      },
+      {
+        "file": "frontend/dist/favicon.png",
+        "bytes": 127083,
+        "sha256": "d4bfa436774febb2e3e9dca2e98f9ce230a9a228cfccf8b972a0381a7665fad9"
+      },
+      {
+        "file": "frontend/dist/index.html",
+        "bytes": 1043,
+        "sha256": "9f68ea3a17d49120cb06d96502f74de76478a121c5656295ac7d2275f7d69899"
+      }
+    ],
+    "served_index_sha256": "9f68ea3a17d49120cb06d96502f74de76478a121c5656295ac7d2275f7d69899"
+  },
+  "limitations": [
+    "Rendered in Playwright webkit; this does not execute the packaged WKWebView window.",
+    "iPhone width is emulated on a desktop browser engine, not rendered by iOS Safari on a phone.",
+    "Tablet layout uses desktop-browser touch emulation, not a physical tablet or its software keyboard.",
+    "Phone access is exercised through a non-loopback address of this machine, not from a physical phone on a real network."
+  ]
+}

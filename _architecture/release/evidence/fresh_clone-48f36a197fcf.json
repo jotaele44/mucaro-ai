@@ -1,0 +1,30 @@
+{
+  "command": [
+    "/Users/jotaele/Developer/worktrees/mucaro-pdf-security-20261102/.pdf-check-venv/bin/python",
+    "scripts/certify_fresh_clone.py",
+    "--ref",
+    "48f36a197fcf291959f791d453d4cacd5fcef247"
+  ],
+  "created_utc": "2026-11-03T06:11:52Z",
+  "head_sha": "48f36a197fcf291959f791d453d4cacd5fcef247",
+  "payload": {
+    "checks": [
+      "clone_ref",
+      "venv",
+      "pip_install",
+      "npm_ci",
+      "release_check",
+      "cli_help",
+      "launcher_self_test",
+      "launcher_smoke_test",
+      "clean_clone_worktree"
+    ],
+    "clone_dir": "/var/folders/0p/s67bd63s0cbdzz4rtd6_sm2m0000gn/T/mucaro-ai-fresh-clone-dxgn8nml/mucaro-ai",
+    "kept": true,
+    "ref": "48f36a197fcf291959f791d453d4cacd5fcef247",
+    "source": "/Users/jotaele/Developer/mucaro-ai-agent-dag-cert"
+  },
+  "receipt_type": "fresh_clone",
+  "schema_version": "mucaro_release_receipt_v1",
+  "status": "FRESH_CLONE_CERT_OK"
+}
