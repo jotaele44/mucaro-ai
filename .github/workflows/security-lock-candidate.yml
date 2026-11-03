@@ -25,7 +25,7 @@ jobs:
       - name: Install the project's pinned uv resolver
         run: |
           python -m pip install "uv==0.12.19" "pip-audit==2.10.1"
-          test "$(uv --version)" = "uv 0.12.19"
+          uv --version | grep -Eq "^uv 0[.]12[.]19([[:space:]]|$)"
       - name: Regenerate all four existing one-click locks
         run: python scripts/lock_python_deps.py --uv "$(command -v uv)"
       - name: Regenerate macOS runtime locks for both CPU architectures
