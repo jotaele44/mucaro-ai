@@ -1651,6 +1651,10 @@ async function nextVectorScenario(browser, base, viewport, contextOptions) {
     const preview = await chooser.locator(".next-vector-prompt").innerText();
     check("next-vector exact prompt preview", viewport, preview.includes("Investigate unresolved gaps") && preview.includes("How does source lineage work?"));
     check("next-vector preview preserves draft", viewport, await page.getByLabel("Message Mucaro").inputValue() === draft);
+    await page.reload();
+    await chooser.waitFor({ timeout: 15000 });
+    check("next-vector composer draft survives page reload", viewport, await page.getByLabel("Message Mucaro").inputValue() === draft);
+    await chooser.getByRole("radio", { name: "Investigate unresolved gaps" }).check();
     // Same JavaScript task, two clicks: second must be ignored by synchronous in-flight guard.
     await chooser.getByRole("button", { name: "Start selected vector" }).evaluate((button) => {
       button.click();
