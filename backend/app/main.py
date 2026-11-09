@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import logging
 import re
+import sqlite3
 from pathlib import Path, PurePath
 
 from fastapi import Depends, FastAPI, File, Header, HTTPException, Request, UploadFile
@@ -22,7 +24,7 @@ from .conversations import (
     list_conversations,
     rename_conversation,
 )
-from .db import init_db, list_payloads, upsert_payload
+from .db import get_connection, init_db, list_payloads, upsert_payload
 from .development_workbench import WorkbenchPlanError, compile_plan as compile_workbench_plan
 from .execution_entry import (
     ExecutionEntryError,
@@ -140,6 +142,16 @@ from .workspaces import list_workspace_profiles, upsert_workspace_profile
 
 SUPPORTED_UPLOAD_SUFFIXES = FOLDER_SUPPORTED_SUFFIXES
 GENERATED_NAME_PATTERN = re.compile(r"^(src_|run_|chunk_)", re.IGNORECASE)
+logger = logging.getLogger(__name__)
+# Recovery failures that mean "the running source no longer matches the source the
+# decision was claimed under". These are expected after a code update and clear by
+# themselves once the source matches again; anything else is an integrity problem.
+EXECUTION_ENTRY_SOURCE_RECOVERY_STATUSES = frozenset(
+    {
+        "ERROR_EXECUTION_ENTRY_SOURCE_DRIFT",
+        "ERROR_EXECUTION_ENTRY_SOURCE_IDENTITY_UNAVAILABLE",
+    }
+)
 
 
 def api_error(status: str, detail: str, *, status_code: int = 400, **extra: object) -> HTTPException:
@@ -214,6 +226,44 @@ class SecurityHeadersMiddleware:
         await self.app(scope, receive, send_with_headers)  # type: ignore[operator]
 
 
+def _claimed_entry_decision_ids(cfg: Settings) -> list[str]:
+    """Read-only list of decisions still CLAIMED, used only to give recovery logs context."""
+    conn = get_connection(cfg.sqlite_path)
+    try:
+        rows = conn.execute(
+            "SELECT decision_id FROM execution_entry_decisions WHERE state = 'CLAIMED' ORDER BY rowid ASC"
+        ).fetchall()
+    except sqlite3.Error:
+        return []
+    finally:
+        conn.close()
+    return [str(row["decision_id"]) for row in rows]
+
+
+def _resume_pending_entry_decisions_at_startup(cfg: Settings) -> None:
+    """Resume decisions stranded in CLAIMED without letting a recovery failure block boot.
+
+    A decision is stranded when the process died between claim and dispatch. If the
+    runtime source commit changed since (any code update), dispatch correctly refuses
+    with ERROR_EXECUTION_ENTRY_SOURCE_DRIFT. That refusal must not stop the server from
+    starting: the decision stays CLAIMED, nothing is dispatched for it, and it is
+    resumed on a later start whose source identity matches the claimed artifact.
+    resume_pending_entry_decisions stops at the first failing decision, so decisions
+    ordered behind it are retried on the next start as well.
+    """
+    try:
+        resume_pending_entry_decisions(cfg)
+    except ExecutionEntryError as exc:
+        log = logger.warning if exc.status in EXECUTION_ENTRY_SOURCE_RECOVERY_STATUSES else logger.error
+        log(
+            "execution-entry startup recovery deferred: status=%s detail=%s still_claimed_decisions=%s; "
+            "these decisions were left in state CLAIMED and are retried on the next start",
+            exc.status,
+            exc.detail,
+            _claimed_entry_decision_ids(cfg),
+        )
+
+
 def create_app(cfg: Settings = settings) -> FastAPI:
     try:
         enforce_startup_security(cfg)
@@ -242,7 +292,7 @@ def create_app(cfg: Settings = settings) -> FastAPI:
     init_db(cfg.sqlite_path)
     reconcile_interrupted_tool_calls(cfg)
     reconcile_runs_on_startup(cfg)
-    resume_pending_entry_decisions(cfg)
+    _resume_pending_entry_decisions_at_startup(cfg)
 
     def resume_for_tool_call(result: dict) -> dict:
         run_id = (result.get("tool_call") or {}).get("run_id")
