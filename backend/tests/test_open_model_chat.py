@@ -70,7 +70,8 @@ class _FakeServer(BaseHTTPRequestHandler):
             return
         user = payload["messages"][-1]["content"]
         if 'chunk_id="' in user:
-            text = f"Lineage binds chunks to sources (chunk_id={user.split('chunk_id="', 1)[1].split('"', 1)[0]})."
+            chunk_id = user.split('chunk_id="', 1)[1].split('"', 1)[0]
+            text = f"Lineage binds chunks to sources (chunk_id={chunk_id})."
         else:
             text = f"Hello from {payload['model']}. How can I help?"
         if payload.get("stream"):
