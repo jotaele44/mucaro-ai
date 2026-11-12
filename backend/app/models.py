@@ -16,8 +16,36 @@ class AskRequest(BaseModel):
     require_offline: bool = False
 
 
+class ConversationModelConfig(BaseModel):
+    """The model a conversation was started with; sent back as run options on each message."""
+
+    model_config = ConfigDict(protected_namespaces=())
+
+    model_provider: str = Field(min_length=1, max_length=80)
+    model_name: str | None = Field(default=None, max_length=200)
+    allow_live: bool = False
+
+
 class ConversationCreateRequest(BaseModel):
     title: str | None = Field(default=None, max_length=120)
+    model: ConversationModelConfig | None = None
+
+
+class ModelServerSettings(BaseModel):
+    base_url: str | None = Field(default=None, max_length=500)
+    model: str | None = Field(default=None, max_length=200)
+    # Write-only. Omit to keep the saved key; send an empty string to clear it.
+    api_key: str | None = Field(default=None, max_length=2000)
+
+
+class ModelSettingsRequest(BaseModel):
+    local: ModelServerSettings | None = None
+    remote: ModelServerSettings | None = None
+
+
+class ModelProbeRequest(BaseModel):
+    base_url: str = Field(min_length=1, max_length=500)
+    api_key: str | None = Field(default=None, max_length=2000)
 
 
 class ConversationUpdateRequest(BaseModel):
