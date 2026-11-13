@@ -55,7 +55,15 @@ def plan_model_route(
     if require_live and not allow_live:
         raise ModelRoutingError("ERROR_MODEL_ROUTING_LIVE_NOT_ALLOWED", "Live routing requires explicit allow_live=true")
 
-    provider_rows = {row["name"]: row for row in list_model_providers(cfg)}
+    preferred_name = normalize_model_provider(preferred_provider) if preferred_provider is not None else None
+    wanted_model = preferred_model.strip() if isinstance(preferred_model, str) and preferred_model.strip() else None
+    if preferred_name is not None and wanted_model is not None:
+        # Readiness is judged for the model that will actually run, not only the configured default.
+        provider_rows = {
+            row["name"]: row for row in list_model_providers(cfg, requested_models={preferred_name: wanted_model})
+        }
+    else:
+        provider_rows = {row["name"]: row for row in list_model_providers(cfg)}
     known = set(provider_rows)
     if allowed_providers is None:
         allowed = sorted(known)
@@ -109,6 +117,7 @@ def plan_model_route(
             {
                 "provider": provider,
                 "default_model": status["default_model"],
+                "resolved_model": status.get("resolved_model"),
                 "live": live,
                 "locality": status.get("locality"),
                 "provider_status": status["status"],
@@ -143,9 +152,10 @@ def plan_model_route(
             selection_reason = "NO_ELIGIBLE_PROVIDER"
 
     selected_provider = selected["provider"] if selected else None
-    selected_model = preferred_model.strip() if isinstance(preferred_model, str) and preferred_model.strip() else (
-        selected["default_model"] if selected else None
-    )
+    selected_model = wanted_model or (selected["default_model"] if selected else None)
+    if selected is not None and selected.get("resolved_model"):
+        # The server's own id for the model (for example "llama3:latest" for "llama3").
+        selected_model = selected["resolved_model"]
     route_status = "MODEL_ROUTE_READY" if selected else "MODEL_ROUTE_BLOCKED"
     failover_order: list[dict[str, Any]] = []
     if selected is not None:

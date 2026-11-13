@@ -399,7 +399,8 @@ approved and audited.
 | `ERROR_PERMISSION_CONFIRMATION_REQUIRED` | a directory grant was requested without `--yes` in a non-interactive terminal |
 | `ERROR_DIRECTORY_PERMISSION_TOO_BROAD` | a directory grant targeted the filesystem root |
 | `ERROR_NO_SOURCES` | `ask` ran before any source chunks were available |
-| `ERROR_NO_RETRIEVAL_CONTEXT` | sources exist but no chunk matches the query |
+| `ERROR_NO_RETRIEVAL_CONTEXT` | sources exist but no chunk matches the query (the chat UI instead lets the chosen model reply, marked `WARN_NO_SOURCES_USED`) |
+| `ERROR_MODEL_ROUTE_BLOCKED` | the chosen model provider cannot run; the detail names the reason (server unreachable, model not installed, remote use not allowed) |
 | `ERROR_NO_VALID_CHUNKS` | available chunks are malformed or empty |
 | `ERROR_PERSISTENT_INDEX_MISSING` | `--strategy persistent` was requested before an index was built |
 | `ERROR_PERSISTENT_INDEX_STALE` | `--strategy persistent` index does not match current chunks |

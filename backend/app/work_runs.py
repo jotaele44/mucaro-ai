@@ -58,7 +58,7 @@ from .response_flow import (
     make_tool_call_part,
     make_tool_result_part,
 )
-from .services import answer_question
+from .services import answer_question, describe_blocked_route
 from .tools import (
     TOOL_REGISTRY,
     ToolRuntimeError,
@@ -598,6 +598,14 @@ def advance_run(run_id: str, cfg: Settings = settings) -> None:
         _dispatch(run["conversation_id"], cfg)
 
 
+# Plain-language detail for statuses that arrive without one; never the status code repeated.
+STATUS_DETAILS = {
+    "ERROR_NO_SOURCES": "No sources have been added to this workspace yet.",
+    "ERROR_NO_RETRIEVAL_CONTEXT": "No local source matches this question.",
+    "ERROR_ANSWER_UNAVAILABLE": "The answer step returned nothing.",
+}
+
+
 def _fail(run_id: str, status: str, detail: str, cfg: Settings) -> None:
     with _Tx(cfg) as conn:
         run = _load(conn, run_id)
@@ -666,6 +674,7 @@ def _phase_start(run: dict[str, Any], cfg: Settings) -> None:
         route = plan_model_route(
             task_type="cited_qa",
             preferred_provider=options.get("model_provider"),
+            preferred_model=options.get("model_name"),
             allow_live=bool(options.get("allow_live")),
             require_offline=bool(options.get("require_offline")),
             cfg=cfg,
@@ -676,8 +685,11 @@ def _phase_start(run: dict[str, Any], cfg: Settings) -> None:
             "selected_model": route["selected_model"],
             "selection_reason": route["selection_reason"],
             "route_sha256": route["route_sha256"],
-            "candidates": [{"provider": row["provider"], "eligible": row["eligible"], "reasons": row["reasons"]} for row in route["candidates"]],
+            "candidates": [{"provider": row["provider"], "eligible": row["eligible"], "reasons": row["reasons"],
+                            "warnings": row.get("warnings", [])} for row in route["candidates"]],
         }
+        if route["status"] != "MODEL_ROUTE_READY":
+            route_event["detail"] = describe_blocked_route(route, route["constraints"].get("preferred_provider"), cfg)
     except (ModelRoutingError, ModelProviderError) as exc:
         route_event = {"status": "MODEL_ROUTE_BLOCKED", "error": getattr(exc, "status", type(exc).__name__)}
     _emit_only(run_id, cfg, "route", route_event)
@@ -913,6 +925,8 @@ def _phase_answer(run: dict[str, Any], cfg: Settings) -> None:
             conversation_context=build_conversation_context(conversation),
             cfg=cfg,
             on_text_delta=stream_delta,
+            # Chat replies even when no source matches; the turn is then marked as using no sources.
+            allow_ungrounded=True,
         )
     except (ModelProviderError, ModelRoutingError, ValueError) as exc:
         status = getattr(exc, "status", None) or str(exc)
@@ -920,7 +934,8 @@ def _phase_answer(run: dict[str, Any], cfg: Settings) -> None:
         return
     if "answer" not in trace:
         status = str(trace.get("status") or "ERROR_ANSWER_UNAVAILABLE")
-        _fail(run_id, status, str(trace.get("detail") or trace.get("warnings") or status), cfg)
+        detail = trace.get("detail") or ", ".join(str(item) for item in trace.get("warnings") or [])
+        _fail(run_id, status, str(detail or STATUS_DETAILS.get(status, "")), cfg)
         return
     try:
         trace["context_usage"] = build_context_usage_status(
@@ -935,7 +950,7 @@ def _phase_answer(run: dict[str, Any], cfg: Settings) -> None:
         return
     events: list[tuple[str, dict[str, Any]]] = [
         ("retrieval", {"strategy": trace.get("retrieval_strategy"), "retrieved_chunk_ids": trace.get("retrieved_chunk_ids", []),
-                       "source_ids": trace.get("source_ids", [])}),
+                       "source_ids": trace.get("source_ids", []), "grounding": trace.get("grounding") or "SOURCES"}),
     ]
     answer = str(trace["answer"])
     if not trace.get("answer_streamed"):

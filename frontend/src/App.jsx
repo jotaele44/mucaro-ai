@@ -263,6 +263,7 @@ export function App() {
             announce={announce}
             modes={modes}
             defaultOptions={options}
+            onDefaultModelChange={(model) => setOptions((current) => ({ ...current, ...model }))}
           />
         )}
         {health.state === "ok" && view === "workbench" && <WorkbenchWorkspace announce={announce} />}

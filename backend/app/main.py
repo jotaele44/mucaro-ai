@@ -23,6 +23,7 @@ from .conversations import (
     get_conversation,
     list_conversations,
     rename_conversation,
+    set_conversation_model,
 )
 from .db import get_connection, init_db, list_payloads, upsert_payload
 from .development_workbench import WorkbenchPlanError, compile_plan as compile_workbench_plan
@@ -57,7 +58,10 @@ from .models import (
     ApprovalRequest,
     AskRequest,
     ConversationCreateRequest,
+    ConversationModelConfig,
     ConversationUpdateRequest,
+    ModelProbeRequest,
+    ModelSettingsRequest,
     DirectoryPermissionRequest,
     ExecutionEntryCreateRequest,
     ExecutionEntryDecisionRequest,
@@ -78,7 +82,8 @@ from .models import (
     ToolDecisionRequest,
     WorkspaceProfileRequest,
 )
-from .model_router import list_model_providers
+from .model_router import ModelProviderError, list_model_providers, model_provider_names, probe_model_server
+from .model_settings import ModelSettingsError, public_model_settings, save_model_settings
 from .multimodal import MULTIMODAL_SUFFIXES
 from .offline import build_offline_manifest
 from .memory import (
@@ -689,7 +694,19 @@ def create_app(cfg: Settings = settings) -> FastAPI:
 
     @app.post("/conversations")
     def create_chat(req: ConversationCreateRequest, _auth: dict = Depends(require_auth)) -> dict:
-        return create_conversation(req.title, cfg)
+        model = req.model.model_dump() if req.model else None
+        if model and model["model_provider"].strip().lower() not in model_provider_names():
+            raise api_error("ERROR_UNSUPPORTED_MODEL_PROVIDER", model["model_provider"])
+        return create_conversation(req.title, cfg, model=model)
+
+    @app.put("/conversations/{conversation_id}/model")
+    def set_chat_model(conversation_id: str, req: ConversationModelConfig, _auth: dict = Depends(require_auth)) -> dict:
+        if req.model_provider.strip().lower() not in model_provider_names():
+            raise api_error("ERROR_UNSUPPORTED_MODEL_PROVIDER", req.model_provider)
+        try:
+            return set_conversation_model(conversation_id, req.model_dump(), cfg)
+        except KeyError as exc:
+            raise api_error("ERROR_CONVERSATION_NOT_FOUND", "Conversation not found.", status_code=404) from exc
 
     @app.get("/conversations/{conversation_id}")
     def conversation(conversation_id: str) -> dict:
@@ -838,7 +855,28 @@ def create_app(cfg: Settings = settings) -> FastAPI:
 
     @app.get("/models")
     def models() -> dict:
-        return {"status": "MODEL_PROVIDERS_OK", "providers": list_model_providers(cfg)}
+        return {
+            "status": "MODEL_PROVIDERS_OK",
+            "providers": list_model_providers(cfg),
+            "settings": public_model_settings(cfg),
+        }
+
+    @app.put("/models/settings")
+    def update_model_settings(req: ModelSettingsRequest, _auth: dict = Depends(require_auth)) -> dict:
+        try:
+            saved = save_model_settings(req.model_dump(exclude_none=True), cfg)
+        except ModelSettingsError as exc:
+            raise api_error(exc.status, exc.detail) from exc
+        return {"status": "MODEL_SETTINGS_SAVED", "settings": saved, "providers": list_model_providers(cfg)}
+
+    @app.post("/models/probe")
+    def probe_models(req: ModelProbeRequest, _auth: dict = Depends(require_auth)) -> dict:
+        try:
+            return probe_model_server(req.base_url, api_key=req.api_key or None, cfg=cfg)
+        except ModelSettingsError as exc:
+            raise api_error(exc.status, exc.detail) from exc
+        except ModelProviderError as exc:
+            raise api_error(exc.status, exc.detail, status_code=403) from exc
 
     @app.get("/offline-manifest")
     def offline_manifest(offline: bool = False) -> dict:
