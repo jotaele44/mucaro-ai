@@ -11,7 +11,6 @@ from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from .auth import auth_status, client_is_remote, is_public_api_path, require_operator_auth, require_remote_token
-from .browser_security import BrowserSecurityMiddleware
 from .config import Settings, settings
 from .error_categories import classify_error
 from .conversations import (
@@ -286,6 +285,7 @@ def create_app(cfg: Settings = settings) -> FastAPI:
         return require_operator_auth(cfg, authorization=authorization, x_mucaro_token=x_mucaro_token)
 
     app = FastAPI(title="Mucaro AI", version="0.1.24", dependencies=[Depends(require_auth_unless_public)])
+    app.add_middleware(SecurityHeadersMiddleware)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=list(cfg.cors_origins),
@@ -293,11 +293,6 @@ def create_app(cfg: Settings = settings) -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
-    # Added after CORS so it runs before it: untrusted origins, rebound hosts and
-    # unauthenticated writes are refused before CORS, routing or body parsing.
-    app.add_middleware(BrowserSecurityMiddleware, cfg=cfg)
-    # Outermost, so the refusals above carry the hardening headers too.
-    app.add_middleware(SecurityHeadersMiddleware)
     cfg.ensure_dirs()
     init_db(cfg.sqlite_path)
     reconcile_interrupted_tool_calls(cfg)

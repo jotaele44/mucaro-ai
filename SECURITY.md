@@ -5,11 +5,9 @@ credential with access to the current user's data. Keep local deployments on
 loopback. Phone or production access requires a strong operator token; use HTTPS
 when requests cross an untrusted network. Configure explicit trusted CORS origins.
 
-The server rejects untrusted browser origins before routing and authenticates
-write requests before parsing their bodies. Tokenless loopback requests require a
-loopback Host header to resist DNS rebinding. Same-origin phone requests still
-require the operator token for protected routes (`docs/PHONE_ACCESS.md`). CLI
-clients may omit Origin.
+When an operator token is configured, protected routes require it, including
+same-origin phone requests (`docs/PHONE_ACCESS.md`). CORS only allows the
+configured origins.
 
 Archive safety rejects path traversal, absolute and backslash paths, symlinks,
 encrypted or duplicated members, executable payloads, and configured size, ratio,
