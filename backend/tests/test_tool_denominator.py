@@ -49,8 +49,6 @@ def test_absent_flagpole_capabilities_keep_certification_open() -> None:
 
     assert report["certification_state"] == "OPEN"
     assert set(report["open_capabilities"]) == {
-        "ci.status.read",
-        "regression.run",
         "vcs.branch_commit",
         "pull_request.open_update",
     }
@@ -69,6 +67,9 @@ def test_runtime_evidence_is_derived_from_governed_requests() -> None:
         assert tools[name]["classification"] == "REQUIRED"
     assert tools["coding.exec"]["evidence_state"] == "EXERCISED"
     assert tools["coding.exec"]["classification"] == "SUPPORTING"
+    for name in ("coding.regression_run", "github.ci_status"):
+        assert tools[name]["evidence_state"] == "EXERCISED", name
+        assert tools[name]["classification"] == "REQUIRED"
     assert all(row["requires_approval"] for row in tools.values())
 
 
@@ -102,7 +103,8 @@ def test_removed_tool_and_approval_regressions_fail_validation(monkeypatch: pyte
         (lambda d: d["required_capabilities"][0].update(state="MAYBE"), "UNKNOWN_STATE:TOOL-01"),
         (lambda d: d["required_capabilities"][0].update(owner_domain="V99"), "UNKNOWN_DOMAIN:TOOL-01"),
         (lambda d: d["required_capabilities"][1].update(satisfied_by=[]), "PRESENT_WITHOUT_TOOL:TOOL-02"),
-        (lambda d: d["required_capabilities"][4].update(satisfied_by=["web.fetch"]), "ABSENT_WITH_TOOL:TOOL-05"),
+        (lambda d: d["required_capabilities"][4].update(state="ABSENT"), "ABSENT_WITH_TOOL:TOOL-05"),
+        (lambda d: d["required_capabilities"][4].update(state="ABSENT", satisfied_by=["web.fetch"]), "ABSENT_WITH_TOOL:TOOL-05"),
         (lambda d: d["supporting_tools"].append("coding.diff"), "DOUBLE_CLASSIFIED_TOOL:coding.diff"),
         (lambda d: d["supporting_tools"].append("web.fetch"), "DOUBLE_CLASSIFIED_TOOL:web.fetch"),
         (lambda d: d["supporting_tools"].remove("web.render"), "UNCLASSIFIED_TOOL:web.render"),

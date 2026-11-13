@@ -8,7 +8,10 @@
       "id": "TOOL-01",
       "capability": "repository.inspect",
       "clause": "Audit all seven federation repositories",
-      "satisfied_by": ["coding.repo_status", "coding.read_file"],
+      "satisfied_by": [
+        "coding.repo_status",
+        "coding.read_file"
+      ],
       "state": "PRESENT",
       "owner_domain": "V13",
       "note": "Read-only repository status and bounded file reads."
@@ -17,7 +20,9 @@
       "id": "TOOL-02",
       "capability": "repository.diff",
       "clause": "fix only independently evidenced defects",
-      "satisfied_by": ["coding.diff"],
+      "satisfied_by": [
+        "coding.diff"
+      ],
       "state": "PRESENT",
       "owner_domain": "V13",
       "note": "Bounded read-only diff with staged, unstaged, and untracked residue."
@@ -26,7 +31,9 @@
       "id": "TOOL-03",
       "capability": "patch.validate",
       "clause": "fix only independently evidenced defects",
-      "satisfied_by": ["coding.patch_check"],
+      "satisfied_by": [
+        "coding.patch_check"
+      ],
       "state": "PRESENT",
       "owner_domain": "V13",
       "note": "Proposal validation without mutation."
@@ -35,7 +42,9 @@
       "id": "TOOL-04",
       "capability": "patch.apply",
       "clause": "fix only independently evidenced defects",
-      "satisfied_by": ["coding.patch_apply"],
+      "satisfied_by": [
+        "coding.patch_apply"
+      ],
       "state": "PRESENT",
       "owner_domain": "V13",
       "note": "Mutation bound to exact HEAD, patch hash, and preimages."
@@ -44,19 +53,23 @@
       "id": "TOOL-05",
       "capability": "ci.status.read",
       "clause": "identify every failing applicable CI gate",
-      "satisfied_by": [],
-      "state": "ABSENT",
+      "satisfied_by": [
+        "github.ci_status"
+      ],
+      "state": "PRESENT",
       "owner_domain": "V13",
-      "note": "The certify github-actions CLI diagnostic is not a governed tool call."
+      "note": "Governed read-only GitHub Actions status with optional exact-head binding."
     },
     {
       "id": "TOOL-06",
       "capability": "regression.run",
       "clause": "run applicable regression gates",
-      "satisfied_by": [],
-      "state": "ABSENT",
+      "satisfied_by": [
+        "coding.regression_run"
+      ],
+      "state": "PRESENT",
       "owner_domain": "V19",
-      "note": "coding_checks.execute_coding_check_suite exists outside the governed tool runtime."
+      "note": "Governed isolated regression suite execution with explicit PASS/FAIL/BLOCKED accounting."
     },
     {
       "id": "TOOL-07",
