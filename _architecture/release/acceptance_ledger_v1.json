@@ -1,6 +1,6 @@
 {
   "schema_version": "mucaro-release-acceptance-ledger/1.0",
-  "updated_utc": "2026-10-25T18:51:00Z",
+  "updated_utc": "2026-11-03T03:02:00Z",
   "rows": [
     {
       "requirement_id": "GOAL-001",
@@ -999,11 +999,17 @@
       "positive_gate": null,
       "negative_gate": null,
       "benchmark": null,
-      "evidence_refs": [],
-      "state": "OPEN",
+      "evidence_refs": [
+        "_architecture/mucaro_v1_denominator_events.json",
+        "_architecture/gis_v1_control_manifest.json",
+        "docs/GIS_V1_SUPPORT_MATRIX.md",
+        "backend/tests/test_gis_eval.py",
+        "backend/tests/test_gis_v1_independent_controls.py"
+      ],
+      "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N10",
-      "notes": "Remote sensing, bathymetry and temporal GIS absent."
+      "notes": "PROVISIONAL: the current capability overlay has GIS-01 through GIS-09 PASS and GIS-10 PROVISIONAL. Exact-head hosted CI plus the frozen GIS V1 control corpus prove bounded horizontal CRS, measurement, clipping/filtering/conversion, topology/vector/raster operations, terrain, hydrology and provenance-oriented map/export receipts. The release contract is broader: remote sensing, bathymetry and temporal GIS remain absent, while broader datum/vertical/time-dependent CRS and independent rendered-map correctness remain explicit residue. PASS is not authorized."
     },
     {
       "requirement_id": "TGT-005",
@@ -1018,11 +1024,17 @@
       "positive_gate": null,
       "negative_gate": null,
       "benchmark": null,
-      "evidence_refs": [],
-      "state": "OPEN",
+      "evidence_refs": [
+        "_architecture/mucaro_v1_denominator_events.json",
+        "_architecture/ocr_v1_corpus_manifest.json",
+        "_architecture/ocr08_structure_benchmark_v1.json",
+        "backend/tests/test_ocr08_structure_live_cert.py",
+        "scripts/certify_ocr08_structure_live.py"
+      ],
+      "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N08",
-      "notes": "Tables/forms absent; OCR not wired into ingestion."
+      "notes": "PROVISIONAL: the current OCR overlay has OCR-01/02/07/08 PASS, OCR-03/04/05/06 PROVISIONAL, and OCR-09/10 OPEN. Current-main live Tesseract replay certifies bounded printed multi-column, rectangular-table and colon-form reconstruction with fail-closed ambiguity handling, page lineage and source-coordinate evidence. Residue remains for calibrated confidence/layout quality, multilingual breadth, difficult scans, handwriting support policy/performance and a representative real-world certification corpus. PASS is not authorized."
     },
     {
       "requirement_id": "TGT-006",
@@ -1058,11 +1070,16 @@
       "positive_gate": null,
       "negative_gate": null,
       "benchmark": null,
-      "evidence_refs": [],
-      "state": "OPEN",
+      "evidence_refs": [
+        "_architecture/mucaro_v1_denominator_events.json",
+        "_architecture/coding_regression_manifest.json",
+        "scripts/certify_coding_regression_corpus.py",
+        "scripts/certify_coding_lifecycle_live.py"
+      ],
+      "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N12",
-      "notes": ""
+      "notes": "PROVISIONAL: the current coding overlay has CODE-01/03/04/05/06/07/08 PASS and CODE-02/09/10 PROVISIONAL. Exact hosted evidence covers repository inspection, dirty-state conservation, patch/diff receipts, sandboxed mutation, governed check execution and line-bound review. The broader software-engineering contract still lacks fully closed generalized coding-agent/session semantics and the remaining CODE-09/10 lifecycle/corpus residue; therefore representative editing/debugging/refactoring/recovery coverage is not yet sufficient for PASS."
     },
     {
       "requirement_id": "TGT-008",
@@ -1886,12 +1903,18 @@
       "dependencies": [],
       "positive_gate": null,
       "negative_gate": null,
-      "benchmark": null,
-      "evidence_refs": [],
-      "state": "OPEN",
+      "benchmark": "_architecture/gis_v1_control_manifest.json",
+      "evidence_refs": [
+        "_architecture/mucaro_v1_denominator_events.json",
+        "_architecture/gis_v1_control_manifest.json",
+        "docs/GIS_V1_SUPPORT_MATRIX.md",
+        "backend/tests/test_gis_eval.py",
+        "backend/tests/test_gis_v1_independent_controls.py"
+      ],
+      "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N10",
-      "notes": ""
+      "notes": "PROVISIONAL: the frozen GIS V1 control corpus and exact-head 70/70 GIS evaluation close bounded CRS/transformation, geometry, invalid/null states, topology, joins/cardinality, vector/raster operations, terrain, hydrology and provenance checks with arithmetic closure. MATRIX-005 still explicitly requires applicable temporal-data and bathymetry coverage, and the current GIS support matrix preserves those as nonclaims. PASS is not authorized."
     },
     {
       "requirement_id": "MATRIX-006",
@@ -1904,12 +1927,18 @@
       "dependencies": [],
       "positive_gate": null,
       "negative_gate": null,
-      "benchmark": null,
-      "evidence_refs": [],
-      "state": "OPEN",
+      "benchmark": "_architecture/ocr_v1_corpus_manifest.json",
+      "evidence_refs": [
+        "_architecture/mucaro_v1_denominator_events.json",
+        "_architecture/ocr_v1_corpus_manifest.json",
+        "_architecture/ocr08_structure_benchmark_v1.json",
+        "backend/tests/test_ocr08_structure_live_cert.py",
+        "scripts/certify_ocr08_structure_live.py"
+      ],
+      "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N08",
-      "notes": ""
+      "notes": "PROVISIONAL: the 12-case OCR V1 denominator is frozen and OCR-08 now has a separate six-case live Tesseract structure certification with positive and ambiguity-negative cases. The OCR V1 manifest explicitly states that manifest presence freezes the denominator only; applicable case bytes, hashes, expected observations, execution receipts, arithmetic closure and mismatch adjudication must exist before certification. OCR-09 difficult-scan/handwriting coverage and OCR-10 representative-corpus closure remain OPEN. PASS is not authorized."
     },
     {
       "requirement_id": "MATRIX-007",
@@ -1971,12 +2000,17 @@
       "dependencies": [],
       "positive_gate": null,
       "negative_gate": null,
-      "benchmark": null,
-      "evidence_refs": [],
-      "state": "OPEN",
+      "benchmark": "_architecture/coding_regression_manifest.json",
+      "evidence_refs": [
+        "_architecture/mucaro_v1_denominator_events.json",
+        "_architecture/coding_regression_manifest.json",
+        "scripts/certify_coding_regression_corpus.py",
+        "scripts/certify_coding_lifecycle_live.py"
+      ],
+      "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N12",
-      "notes": ""
+      "notes": "PROVISIONAL: the coding regression manifest and hosted certification close substantial positive/negative coverage for repository inspection, mutation safety, test/check execution, review evidence, command failures and rollback/state preservation. CODE-R13, CODE-R17 and CODE-R19 remain provisional, with remote push/PR authority and full coding-scope certification separately unresolved. The release benchmark also still needs complete representative modification/debugging/regression-repair/refactoring/malformed-input coverage as one closed denominator before PASS."
     },
     {
       "requirement_id": "MATRIX-010",

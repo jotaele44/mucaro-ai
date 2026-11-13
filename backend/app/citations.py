@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 SNIPPET_LIMIT = 320
+NO_SOURCES_USED = "NO_SOURCES_USED"
 
 
 def score_confidence(cited_chunk_ids: list[str], source_ids: list[str], retrieval_exists: bool) -> float:
@@ -64,7 +65,11 @@ def validate_citations(answer_trace: dict[str, Any]) -> dict[str, Any]:
     cited = set(answer_trace.get("cited_chunk_ids", []))
     citation_records = answer_trace.get("cited_chunks", [])
     flags = list(answer_trace.get("validation_flags", []))
-    if not cited:
+    # A reply given when no local source matched carries no evidence, and says so instead of failing.
+    no_sources = answer_trace.get("grounding") == NO_SOURCES_USED and not retrieved
+    if no_sources and not cited:
+        flags.append("WARN_NO_SOURCES_USED")
+    elif not cited:
         flags.append("ERROR_UNCITED_ANSWER")
     missing = sorted(cited - retrieved)
     if missing:
@@ -77,5 +82,9 @@ def validate_citations(answer_trace: dict[str, Any]) -> dict[str, Any]:
         if untraced:
             flags.append("ERROR_CITED_CHUNK_NOT_TRACED")
     answer_trace["validation_flags"] = sorted(set(flags))
-    answer_trace["citation_status"] = "CITATION_OK" if not any(f.startswith("ERROR_") for f in flags) else "CITATION_ERROR"
+    if any(f.startswith("ERROR_") for f in flags):
+        answer_trace["citation_status"] = "CITATION_ERROR"
+    else:
+        # Never CITATION_OK without a citation: an uncited reply has its own status.
+        answer_trace["citation_status"] = NO_SOURCES_USED if no_sources else "CITATION_OK"
     return answer_trace

@@ -430,3 +430,24 @@ def test_write_status_doc_inserts_then_replaces_only_the_block(tmp_path):
     write_status_doc(tmp_path, {**status, "residue": {"open": []}})
     second = doc.read_text(encoding="utf-8")
     assert second.count(STATUS_BLOCK_BEGIN) == 1 and "Hand-written history." in second and "`X-1`" not in second
+
+
+def test_stale_subsystem_rows_are_provisional_not_pass():
+    ledger = _load(REPO_ROOT, "acceptance")
+    rows = {row["requirement_id"]: row for row in ledger["rows"]}
+    expected = {
+        "TGT-004": ("GIS-10 PROVISIONAL", "remote sensing"),
+        "MATRIX-005": ("70/70 GIS evaluation", "bathymetry"),
+        "TGT-005": ("OCR-09/10 OPEN", "difficult scans"),
+        "MATRIX-006": ("12-case OCR V1 denominator", "mismatch adjudication"),
+        "TGT-007": ("CODE-09/10", "not yet sufficient for PASS"),
+        "MATRIX-009": ("CODE-R13", "before PASS"),
+    }
+    for requirement_id, residues in expected.items():
+        row = rows[requirement_id]
+        assert row["state"] == "PROVISIONAL"
+        assert row["implementation_state"] == "PARTIAL"
+        assert row["evidence_refs"]
+        assert row["blocker_id"] is None
+        for residue in residues:
+            assert residue in row["notes"]

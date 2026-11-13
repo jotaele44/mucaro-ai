@@ -1323,3 +1323,44 @@ html {
     min-width: 44px;
   }
 }
+
+/* Model setup: provider, server address and model for a chat. */
+.model-setup {
+  text-align: left;
+  gap: 10px;
+  min-width: 0;
+}
+
+.empty-state .model-setup {
+  max-width: 620px;
+  margin: 20px auto 0;
+}
+
+.model-choices {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.model-server {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: flex-end;
+}
+
+.model-server .field {
+  flex: 1 1 220px;
+}
+
+.model-state {
+  margin: 0;
+}
+
+.model-button {
+  max-width: 45%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border-color: var(--border);
+}

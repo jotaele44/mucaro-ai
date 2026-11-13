@@ -230,7 +230,9 @@ export function RunBlock({ view, onChanged, onOpenCitation, announce, messageEdi
               </ol>
               {view.route && (
                 <p className="muted small">
-                  Model: {view.route.selected_provider || "none"} ({view.route.selection_reason || view.route.status})
+                  Model: {view.route.selected_provider || "none"}
+                  {view.route.selected_provider && view.route.selected_model ? ` · ${view.route.selected_model}` : ""} ({view.route.selection_reason || view.route.status})
+                  {view.route.detail && <span className="block">{view.route.detail}</span>}
                 </p>
               )}
             </details>
@@ -280,13 +282,15 @@ export function RunBlock({ view, onChanged, onOpenCitation, announce, messageEdi
           <p key={index} className="notice" role="note">
             {warning.category === "UNTRUSTED_CONTENT"
               ? "Some sources contain instruction-like text. It was treated as data only and nothing was executed."
-              : `${warning.status}${warning.detail ? `: ${warning.detail}` : ""}`}
+              : warning.status === "WARN_NO_SOURCES_USED"
+                ? "No sources used: nothing in your local library matched this message, so this reply is the model's own and is not cited."
+                : `${warning.status}${warning.detail ? `: ${warning.detail}` : ""}`}
           </p>
         ))}
         {view.error && (
           <p className="error-card" role="alert">
             <strong>{view.error.category}</strong> — {view.error.status}
-            {view.error.detail ? `: ${view.error.detail}` : ""}
+            {view.error.detail && view.error.detail !== view.error.status ? `: ${view.error.detail}` : ""}
           </p>
         )}
         {view.interrupted && (
