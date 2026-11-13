@@ -78,7 +78,9 @@
     }
   ],
   "supporting_tools": [
+    "gis.inspect",
     "memory.list",
+    "ocr.analyze_image",
     "product.audit",
     "source_library.status",
     "web.fetch",
