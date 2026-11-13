@@ -159,9 +159,10 @@ with the conversation-first UI. Method: static reading of all of `frontend/src`,
 then live measurement in Chromium 141 device emulation against a real backend,
 with a small fault-injecting proxy for lost responses, silent streams and
 refused streams. Evidence tiers as above; there is no T3 source. **Not
-observed:** a physical iPhone or Android phone, and WebKit (it is not installed
-in the audit environment, and the hosted runners that would run it are not
-executing jobs, see `BLK-ACTIONS-001`).
+observed:** a physical iPhone or Android phone, or an on-device Safari/WebKit
+session. GitHub-hosted runner admission later recovered
+(`BLK-ACTIONS-001` is RESOLVED); hosted WebKit execution is therefore
+available evidence, but it is not physical-device evidence.
 
 ### Regression ledger: the 2026-09-25 findings against the current UI
 
@@ -252,5 +253,5 @@ notch, edge-swipe back, HEIC upload, VoiceOver through a sheet, resume after a
 - **L9** A pairing code exchanged for a per-device token, revocable in Settings, would replace typing a 43-character token.
 - **L10** The token check has no failed-attempt throttling.
 - **L11** A QR code for the phone link needs a dependency decision (the runtime graph is hash-locked).
-- **L12** Whether WebKit's device emulation reports `(pointer: coarse)` is unknown; the touch-keyboard check forces the report so it does not depend on it. With no executing CI runner there is no WebKit evidence at all.
+- **L12** Whether hosted Playwright WebKit device emulation reports `(pointer: coarse)` identically to physical iPadOS Safari remains unknown; the touch-keyboard check forces the report so it does not depend on it. Hosted WebKit now executes after runner admission recovered, but it is not on-device Safari/WebKit evidence.
 - **L13** On an iPad with a hardware keyboard the primary pointer is still coarse, so Return adds a line (Cmd or Ctrl+Enter, or the Send button, sends). `any-pointer: fine` could refine this, but its behaviour on iPadOS is unverified.
