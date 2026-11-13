@@ -1,0 +1,288 @@
+{
+  "schema_version": "mucaro-coherent-architecture/1.0",
+  "requirement_id": "TGT-038",
+  "title": "Coherent architecture",
+  "categories": [
+    {
+      "category": "AI",
+      "canonical_surface": "backend/app/services.py:answer_question",
+      "implementation_refs": [
+        "backend/app/services.py",
+        "backend/app/model_routing_policy.py",
+        "backend/app/model_router.py",
+        "backend/app/permission_engine.py"
+      ],
+      "shared_contracts": [
+        "PERMISSION",
+        "EXECUTION",
+        "CITATION",
+        "MODEL_ROUTING"
+      ],
+      "tool_registry_bridges": [],
+      "evidence_refs": [
+        "backend/tests/test_model_permission.py",
+        "backend/tests/test_services.py"
+      ],
+      "boundary": "Answer execution routes through the shared model-routing, permission, retrieval/citation, and answer-trace boundaries."
+    },
+    {
+      "category": "FILES",
+      "canonical_surface": "backend/app/ingestion.py:ingest_file",
+      "implementation_refs": [
+        "backend/app/ingestion.py",
+        "backend/app/permissions.py",
+        "backend/app/parser.py"
+      ],
+      "shared_contracts": [
+        "SOURCE",
+        "PERMISSION",
+        "PROVENANCE"
+      ],
+      "tool_registry_bridges": [
+        "source_library.status"
+      ],
+      "evidence_refs": [
+        "backend/tests/test_permissions.py",
+        "backend/tests/test_ingestion.py"
+      ],
+      "boundary": "Filesystem intake uses directory permission, parsed-source identity, hashes, and source/chunk persistence."
+    },
+    {
+      "category": "OCR",
+      "canonical_surface": "backend/app/tools.py:ocr.analyze_image",
+      "implementation_refs": [
+        "backend/app/tools.py",
+        "backend/app/ocr_analysis.py"
+      ],
+      "shared_contracts": [
+        "PERMISSION",
+        "EXECUTION",
+        "PROVENANCE",
+        "ARTIFACT"
+      ],
+      "tool_registry_bridges": [
+        "ocr.analyze_image"
+      ],
+      "evidence_refs": [
+        "backend/tests/test_tools.py",
+        "backend/tests/test_permission_coverage.py",
+        "backend/tests/test_ocr_analysis.py"
+      ],
+      "boundary": "The governed tool bridge binds tool approval plus filesystem.read to the existing subprocess-gated OCR receipt producer."
+    },
+    {
+      "category": "RETRIEVAL",
+      "canonical_surface": "backend/app/services.py:answer_question",
+      "implementation_refs": [
+        "backend/app/services.py",
+        "backend/app/retrieval.py",
+        "backend/app/citations.py"
+      ],
+      "shared_contracts": [
+        "SOURCE",
+        "CITATION",
+        "EXECUTION"
+      ],
+      "tool_registry_bridges": [],
+      "evidence_refs": [
+        "backend/tests/test_services.py",
+        "backend/tests/test_retrieval.py"
+      ],
+      "boundary": "Retrieval is consumed through answer execution and emits source-bound citation/answer-trace evidence rather than a sidecar result."
+    },
+    {
+      "category": "GIS",
+      "canonical_surface": "backend/app/tools.py:gis.inspect",
+      "implementation_refs": [
+        "backend/app/tools.py",
+        "backend/app/gis_processing.py",
+        "backend/app/capability_contracts.py"
+      ],
+      "shared_contracts": [
+        "PERMISSION",
+        "EXECUTION",
+        "PROVENANCE",
+        "ARTIFACT"
+      ],
+      "tool_registry_bridges": [
+        "gis.inspect"
+      ],
+      "evidence_refs": [
+        "backend/tests/test_tools.py",
+        "backend/tests/test_gis_processing.py",
+        "backend/tests/test_capability_contracts.py"
+      ],
+      "boundary": "The governed tool bridge binds tool approval and filesystem.read to provenance-bound GIS inspection receipts."
+    },
+    {
+      "category": "WEB",
+      "canonical_surface": "backend/app/tools.py:web.fetch",
+      "implementation_refs": [
+        "backend/app/tools.py",
+        "backend/app/web_browsing.py",
+        "backend/app/web_search.py",
+        "backend/app/web_render.py"
+      ],
+      "shared_contracts": [
+        "PERMISSION",
+        "EXECUTION",
+        "SOURCE",
+        "PROVENANCE"
+      ],
+      "tool_registry_bridges": [
+        "web.fetch",
+        "web.fetch_session",
+        "web.search",
+        "web.render"
+      ],
+      "evidence_refs": [
+        "backend/tests/test_tools.py",
+        "backend/tests/test_web_browsing.py",
+        "backend/tests/test_permission_coverage.py"
+      ],
+      "boundary": "Remote discovery/render/fetch operations use one approval/audit runtime and persist governed snapshots/receipts."
+    },
+    {
+      "category": "CODE",
+      "canonical_surface": "backend/app/tools.py:coding.repo_status",
+      "implementation_refs": [
+        "backend/app/tools.py",
+        "backend/app/coding_workspace.py",
+        "backend/app/coding_patch.py",
+        "backend/app/coding_mutation.py"
+      ],
+      "shared_contracts": [
+        "PERMISSION",
+        "EXECUTION",
+        "PROVENANCE",
+        "ARTIFACT"
+      ],
+      "tool_registry_bridges": [
+        "coding.repo_status",
+        "coding.read_file",
+        "coding.diff",
+        "coding.patch_check",
+        "coding.patch_apply"
+      ],
+      "evidence_refs": [
+        "backend/tests/test_tools.py",
+        "backend/tests/test_coding_workspace.py",
+        "backend/tests/test_permission_coverage.py"
+      ],
+      "boundary": "Repository inspection and mutation use the common tool-call approval/audit lifecycle plus V06 filesystem/git permissions."
+    },
+    {
+      "category": "DATA",
+      "canonical_surface": "backend/app/ingestion.py:get_sources",
+      "implementation_refs": [
+        "backend/app/ingestion.py",
+        "backend/app/db.py",
+        "backend/app/vector_index.py"
+      ],
+      "shared_contracts": [
+        "SOURCE",
+        "PROVENANCE",
+        "EXECUTION"
+      ],
+      "tool_registry_bridges": [
+        "source_library.status"
+      ],
+      "evidence_refs": [
+        "backend/tests/test_ingestion.py",
+        "backend/tests/test_api.py"
+      ],
+      "boundary": "Canonical local source/chunk/index state is persisted behind shared source identity and exposed through the governed source-library status surface."
+    },
+    {
+      "category": "TOOLS",
+      "canonical_surface": "backend/app/tools.py:request_tool_call",
+      "implementation_refs": [
+        "backend/app/tools.py"
+      ],
+      "shared_contracts": [
+        "PERMISSION",
+        "EXECUTION",
+        "PROVENANCE"
+      ],
+      "tool_registry_bridges": [],
+      "evidence_refs": [
+        "backend/tests/test_tools.py",
+        "backend/tests/test_contracts.py"
+      ],
+      "boundary": "All registered tools share pending approval, immutable argument digest, atomic execution claim, timeout, failure, and hash-chained audit semantics."
+    },
+    {
+      "category": "MEMORY",
+      "canonical_surface": "backend/app/memory_policy.py:select_memory_context",
+      "implementation_refs": [
+        "backend/app/memory.py",
+        "backend/app/memory_policy.py",
+        "backend/app/tools.py"
+      ],
+      "shared_contracts": [
+        "MEMORY",
+        "EXECUTION"
+      ],
+      "tool_registry_bridges": [
+        "memory.list"
+      ],
+      "evidence_refs": [
+        "backend/tests/test_memory_policy.py",
+        "backend/tests/test_tools.py"
+      ],
+      "boundary": "Explicit memory is selected through the memory contract/policy and exposed read-only through the common governed tool runtime."
+    },
+    {
+      "category": "EVIDENCE",
+      "canonical_surface": "backend/app/provenance.py",
+      "implementation_refs": [
+        "backend/app/provenance.py",
+        "backend/app/capability_contracts.py",
+        "backend/app/release_receipts.py"
+      ],
+      "shared_contracts": [
+        "PROVENANCE",
+        "CERTIFICATION",
+        "SOURCE"
+      ],
+      "tool_registry_bridges": [],
+      "evidence_refs": [
+        "backend/tests/test_capability_contracts.py",
+        "backend/tests/test_contracts.py"
+      ],
+      "boundary": "Source/result claims are tied to hashes, provenance records, capability evidence contracts, and release receipts rather than subsystem-local assertions."
+    },
+    {
+      "category": "ARTIFACTS",
+      "canonical_surface": "backend/app/artifact_identity.py",
+      "implementation_refs": [
+        "backend/app/artifact_identity.py",
+        "backend/app/exports.py"
+      ],
+      "shared_contracts": [
+        "ARTIFACT",
+        "PROVENANCE",
+        "SOURCE"
+      ],
+      "tool_registry_bridges": [],
+      "evidence_refs": [
+        "backend/tests/test_artifact_identity.py",
+        "backend/tests/test_services.py"
+      ],
+      "boundary": "Generated outputs use shared artifact identity/provenance and export surfaces instead of ad-hoc unnamed files."
+    }
+  ],
+  "invariants": [
+    "exactly the 12 TGT-038 categories are represented once",
+    "every category names a canonical governed surface",
+    "every implementation and evidence reference resolves inside the repository",
+    "every declared shared contract family exists in the canonical contract registry",
+    "every declared tool bridge exists in the single TOOL_REGISTRY",
+    "GIS and OCR each have exactly one canonical tool-registry bridge"
+  ],
+  "limitations": [
+    "This matrix proves source architecture wiring, not executed benchmark quality.",
+    "A category may use the common architecture without every internal operation being a public tool.",
+    "TGT-038 remains non-PASS until this matrix and the stacked V06/tool regressions execute on a real runner."
+  ]
+}

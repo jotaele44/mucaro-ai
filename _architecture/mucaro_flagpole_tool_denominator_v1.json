@@ -98,7 +98,9 @@
   "supporting_tools": [
     "coding.pr_request",
     "coding.exec",
+    "gis.inspect",
     "memory.list",
+    "ocr.analyze_image",
     "product.audit",
     "source_library.status",
     "web.fetch",

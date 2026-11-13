@@ -65,6 +65,7 @@ _TOOL_LOCAL_DEPENDENCIES: dict[str, tuple[str, str]] = {
     "coding.pr_request": ("binary", "git"),
     "github.pr_open_update": ("binary", "gh"),
     "github.ci_status": ("binary", "gh"),
+    "ocr.analyze_image": ("binary", "tesseract"),
     "web.render": ("python_module", "playwright"),
 }
 
