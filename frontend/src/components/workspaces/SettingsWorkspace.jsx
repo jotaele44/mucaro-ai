@@ -1,18 +1,18 @@
 import React, { useEffect, useState } from "react";
 import { api } from "../../api.js";
+import { CleartextNotice } from "../CleartextNotice.jsx";
+import { ModelSetup } from "../ModelSetup.jsx";
 
 // One settings home (TGT-033): model, retrieval, access token and offline capability view.
 export function SettingsWorkspace({ options, onOptionsChange, announce }) {
-  const [models, setModels] = useState([]);
   const [manifest, setManifest] = useState(null);
   const [config, setConfig] = useState(null);
   const [token, setToken] = useState(api.getOperatorToken());
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    Promise.all([api.models(), api.offlineManifest(), api.config()])
-      .then(([m, o, c]) => {
-        setModels(m.providers || []);
+    Promise.all([api.offlineManifest(), api.config()])
+      .then(([o, c]) => {
         setManifest(o);
         setConfig(c);
       })
@@ -27,29 +27,13 @@ export function SettingsWorkspace({ options, onOptionsChange, announce }) {
       </header>
       {error && <p className="error-card" role="alert">{error.status}: {error.message}</p>}
 
-      <fieldset className="panel">
-        <legend>Answer model</legend>
-        {models.map((model) => (
-          <label key={model.name} className="option">
-            <input
-              type="radio"
-              name="model"
-              value={model.name}
-              checked={(options.model_provider || "mock") === model.name}
-              onChange={() => onOptionsChange({ ...options, model_provider: model.name, allow_live: model.locality === "remote" ? options.allow_live : false })}
-            />
-            <span className="grow">
-              <strong>{model.name}</strong> <span className="muted small">({model.locality}{model.status !== "MODEL_PROVIDER_READY" ? ` · ${model.status.replace("MODEL_PROVIDER_", "").toLowerCase()}` : ""})</span>
-              <span className="muted small block">{model.description}</span>
-              {model.warnings?.length > 0 && <span className="small block warning-inline">{model.warnings.join(", ")}</span>}
-            </span>
-          </label>
-        ))}
-        <label className="switch">
-          <input type="checkbox" checked={Boolean(options.allow_live)} onChange={(event) => onOptionsChange({ ...options, allow_live: event.target.checked })} />
-          <span>Allow sending question and source excerpts to a remote model when one is selected</span>
-        </label>
-      </fieldset>
+      <ModelSetup
+        legend="Default model for new chats"
+        value={{ model_provider: options.model_provider || "mock", model_name: options.model_name || null, allow_live: Boolean(options.allow_live) }}
+        onChange={(model) => onOptionsChange({ ...options, ...model })}
+        announce={announce}
+      />
+      <p className="muted small">Each chat keeps the model it was started with; change it from the chat's Model button.</p>
 
       <fieldset className="panel">
         <legend>Retrieval</legend>
@@ -63,6 +47,7 @@ export function SettingsWorkspace({ options, onOptionsChange, announce }) {
 
       <fieldset className="panel">
         <legend>Local access token</legend>
+        <CleartextNotice />
         {api.tokenIsLaunchManaged() ? (
           <p className="muted small">The Mucaro app created a fresh token for this launch and uses it automatically. Nothing to set here.</p>
         ) : (
@@ -72,7 +57,7 @@ export function SettingsWorkspace({ options, onOptionsChange, announce }) {
               className="inline-form"
               onSubmit={(event) => {
                 event.preventDefault();
-                api.setOperatorToken(token);
+                api.setOperatorToken(token, { remember: true });
                 announce("Token saved for this device.");
               }}
             >

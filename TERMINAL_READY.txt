@@ -1,0 +1,68 @@
+MÚCARO AI — TERMINAL_READY
+TERMINAL_READY_VERSION: 1
+Artifact execution: NOT_APPLICABLE
+Purpose: root quick-start index for repeatable development, testing, security, and release verification.
+
+RULES
+Run commands from the repository root.
+Run each command as an individual command.
+Do not treat command success as release certification.
+Do not reuse a receipt from a different Git HEAD as current-head certification.
+Do not delete or overwrite historical evidence to make a later state appear cleaner.
+Generated release artifacts and source revisions are separate identities.
+
+TASK_FILES
+terminal_ready/01_DEVELOPMENT.txt
+terminal_ready/02_SECURITY.txt
+terminal_ready/03_RELEASE.txt
+terminal_ready/04_RECOVERY.txt
+
+MACOS / LINUX — QUICK START
+git status --short
+git rev-parse HEAD
+python3 scripts/preflight.py --strict-imports
+python3 -m pytest backend/tests -q
+python3 scripts/validate_json.py
+python3 scripts/release_check.py
+python3 scripts/certify_mucaro_100.py --format text
+
+WINDOWS POWERSHELL — QUICK START
+git status --short
+git rev-parse HEAD
+py -3.12 scripts/preflight.py --strict-imports
+py -3.12 -m pytest backend/tests -q
+py -3.12 scripts/validate_json.py
+py -3.12 scripts/release_check.py
+py -3.12 scripts/certify_mucaro_100.py --format text
+
+SMOKE TESTS
+python3 scripts/launch_app.py --smoke-test --no-browser
+py -3.12 scripts/launch_app.py --smoke-test --no-browser
+
+STRICT RELEASE-GRADE SCORE CHECK
+python3 scripts/certify_mucaro_100.py --strict --format text
+py -3.12 scripts/certify_mucaro_100.py --strict --format text
+
+ARTIFACT PATH / SHA-256 CHECKS
+Use the exact artifact path printed by the build or handoff command.
+macOS/Linux: shasum -a 256 <artifact-path>
+Windows PowerShell: certutil -hashfile <artifact-path> SHA256
+Compare the observed digest with the exact manifest/receipt digest. A mismatch is FAIL, not a warning.
+
+FAILURE HANDLING
+Missing dependency or unavailable required runtime = BLOCKED until independently resolved.
+Test or validation failure = FAIL for that gate; preserve the output.
+Checksum mismatch = FAIL; do not relabel or regenerate historical bytes as proof of identity.
+Dirty worktree during an exact-head certification = STOP and classify the changed paths.
+Network-dependent capability while offline = explicit unavailable/denied state, never silent success.
+Partial install/migration failure = preserve logs and restore only from a verified backup or defined rollback path.
+After a downstream failure, reuse already-passed upstream artifacts unless an input or falsifier changed.
+
+EXPECTED TERMINAL MARKERS
+PREFLIGHT_OK
+JSON_OK
+RELEASE_CHECK_OK
+MUCARO_100_PROVISIONAL or MUCARO_100_CERTIFIED
+
+CERTIFICATION BOUNDARY
+MUCARO_100_CERTIFIED requires the executable score contract to close both canonical denominators. No lower-level marker substitutes for that terminal condition.

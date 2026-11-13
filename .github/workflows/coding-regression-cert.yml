@@ -1,0 +1,121 @@
+name: Coding Regression Certification
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "backend/app/coding_*.py"
+      - "backend/tests/test_coding_*.py"
+      - "scripts/certify_coding_*.py"
+      - "scripts/coding_mutation_probe_inner.py"
+      - "_architecture/coding_regression_manifest.json"
+      - "docker/coding.Dockerfile"
+      - ".github/workflows/coding-regression-cert.yml"
+
+jobs:
+  certify-coding-regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - name: Install Mucaro development dependencies
+        run: python -m pip install -e ".[dev]"
+
+      - name: Preflight governed branch commit PR-request lifecycle
+        env:
+          MUCARO_CODING_LIFECYCLE_RECEIPT: ${{ runner.temp }}/mucaro-coding-lifecycle-live.json
+        run: python scripts/certify_coding_lifecycle_live.py --output "$MUCARO_CODING_LIFECYCLE_RECEIPT"
+
+      - name: Provision immutable coding probe image
+        id: coding_image
+        run: |
+          docker pull python:3.11-slim
+          IMAGE="$(docker image inspect python:3.11-slim --format '{{index .RepoDigests 0}}')"
+          test -n "$IMAGE"
+          echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
+
+      - name: Certify live isolated coding container
+        env:
+          MUCARO_CODING_IMAGE: ${{ steps.coding_image.outputs.image }}
+          MUCARO_CODING_RECEIPT: ${{ runner.temp }}/mucaro-coding-container-live.json
+        run: python scripts/certify_coding_container_live.py --image "$MUCARO_CODING_IMAGE" --output "$MUCARO_CODING_RECEIPT"
+
+      - name: Build dependency-complete coding image
+        id: coding_full_image
+        run: |
+          BASE_IMAGE="$(docker image inspect python:3.11-slim --format '{{index .RepoDigests 0}}')"
+          test -n "$BASE_IMAGE"
+          docker build --build-arg BASE_IMAGE="$BASE_IMAGE" -f docker/coding.Dockerfile -t "mucaro-coding-full:${GITHUB_SHA}" .
+          IMAGE_ID="$(docker image inspect "mucaro-coding-full:${GITHUB_SHA}" --format '{{.Id}}')"
+          case "$IMAGE_ID" in
+            sha256:????????????????????????????????????????????????????????????????) ;;
+            *) echo "invalid immutable image id: $IMAGE_ID" >&2; exit 2 ;;
+          esac
+          echo "image=$IMAGE_ID" >> "$GITHUB_OUTPUT"
+
+      - name: Certify exact-head test lint type build profile
+        env:
+          MUCARO_CODING_FULL_IMAGE: ${{ steps.coding_full_image.outputs.image }}
+          MUCARO_CODING_FULL_RECEIPT: ${{ runner.temp }}/mucaro-coding-full-profile.json
+        run: python scripts/certify_coding_full_profile.py --image "$MUCARO_CODING_FULL_IMAGE" --output "$MUCARO_CODING_FULL_RECEIPT"
+
+      - name: Certify live sandboxed coding mutation
+        env:
+          MUCARO_CODING_MUTATION_IMAGE: ${{ steps.coding_full_image.outputs.image }}
+          MUCARO_CODING_MUTATION_RECEIPT: ${{ runner.temp }}/mucaro-coding-mutation-live.json
+        run: python scripts/certify_coding_mutation_live.py --image "$MUCARO_CODING_MUTATION_IMAGE" --output "$MUCARO_CODING_MUTATION_RECEIPT"
+
+      - name: Execute exact-head coding-review certification
+        env:
+          MUCARO_CODE_REVIEW_RECEIPT: ${{ runner.temp }}/mucaro-coding-review-live.json
+        run: python scripts/certify_coding_review_live.py --output "$MUCARO_CODE_REVIEW_RECEIPT"
+
+      - name: Execute governed branch commit PR-request lifecycle certification
+        env:
+          MUCARO_CODING_LIFECYCLE_RECEIPT: ${{ runner.temp }}/mucaro-coding-lifecycle-live.json
+        run: python scripts/certify_coding_lifecycle_live.py --output "$MUCARO_CODING_LIFECYCLE_RECEIPT"
+
+      - name: Compare tested tree with pull-request head
+        id: tree
+        if: github.event_name == 'pull_request'
+        env:
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          git fetch --no-tags --depth=1 origin "$PR_HEAD"
+          if [ "$(git rev-parse 'HEAD^{tree}')" = "$(git rev-parse "$PR_HEAD^{tree}")" ]; then
+            echo "equivalent=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "equivalent=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Reconcile frozen 23-row coding regression corpus
+        env:
+          MUCARO_CI_PR_HEAD: ${{ github.event.pull_request.head.sha }}
+          MUCARO_CI_TREE_EQUIVALENT: ${{ steps.tree.outputs.equivalent }}
+          MUCARO_CODING_CORPUS_RECEIPT: ${{ runner.temp }}/mucaro-coding-regression-corpus.json
+        run: |
+          python scripts/certify_coding_regression_corpus.py \
+            --source-head "$GITHUB_SHA" \
+            --container-receipt "${{ runner.temp }}/mucaro-coding-container-live.json" \
+            --full-profile-receipt "${{ runner.temp }}/mucaro-coding-full-profile.json" \
+            --mutation-receipt "${{ runner.temp }}/mucaro-coding-mutation-live.json" \
+            --review-receipt "${{ runner.temp }}/mucaro-coding-review-live.json" \
+            --lifecycle-receipt "${{ runner.temp }}/mucaro-coding-lifecycle-live.json" \
+            --output "$MUCARO_CODING_CORPUS_RECEIPT"
+
+      - name: Upload exact-head coding receipts
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: coding-regression-cert-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            ${{ runner.temp }}/mucaro-coding-container-live.json
+            ${{ runner.temp }}/mucaro-coding-full-profile.json
+            ${{ runner.temp }}/mucaro-coding-mutation-live.json
+            ${{ runner.temp }}/mucaro-coding-review-live.json
+            ${{ runner.temp }}/mucaro-coding-lifecycle-live.json
+            ${{ runner.temp }}/mucaro-coding-regression-corpus.json
+          if-no-files-found: warn
+          archive: true

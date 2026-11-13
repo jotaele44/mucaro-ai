@@ -78,6 +78,26 @@ def test_governed_datum_grid_control_closes_direct_proj_parity() -> None:
     assert abs(y - expected["ballpark_y"]) > 0.9
 
 
+def test_florida_datum_grid_control_closes_direct_proj_parity() -> None:
+    payload, rows = controls()
+    row = rows["CRS-005"]
+    grid_path = ROOT / row["input"]["grid"]
+    grid_bytes = grid_path.read_bytes()
+    expected = row["expected"]
+    pipeline = (
+        "proj=pipeline step proj=unitconvert xy_in=deg xy_out=rad "
+        f"step proj=hgridshift grids={json.dumps(grid_path.as_posix())} "
+        "step proj=unitconvert xy_in=rad xy_out=deg"
+    )
+    transformer = Transformer.from_pipeline(pipeline)
+    lon, lat = transformer.transform(row["input"]["lon"], row["input"]["lat"], errcheck=True)
+
+    assert len(grid_bytes) == expected["grid_bytes"]
+    assert hashlib.sha256(grid_bytes).hexdigest() == expected["grid_sha256"]
+    assert lon == expected["lon"]
+    assert lat == expected["lat"]
+
+
 def test_geodesic_control_closes_against_independent_geographiclib_engine() -> None:
     payload, rows = controls()
     for key in ("GEOD-001", "GEOD-002", "GEOD-003"):
@@ -234,6 +254,7 @@ def test_control_manifest_has_no_unbounded_claims() -> None:
     assert "vertical CRS certification" in payload["explicit_nonclaims"]
     assert "time-dependent coordinate operation certification" in payload["explicit_nonclaims"]
     assert "independent-engine certification of the Puerto Rico datum-grid transformation" in payload["explicit_nonclaims"]
+    assert "independent-engine certification of governed regional datum-grid transformations" in payload["explicit_nonclaims"]
     assert "unbounded antimeridian, polar, or large-geometry certification" in payload["explicit_nonclaims"]
     assert "unbounded depression conditioning, depression breaching, flat routing, watershed delineation, stream extraction, runoff, flood, groundwater, or hydraulic modeling" in payload["explicit_nonclaims"]
-    assert len(payload["controls"]) == 17
+    assert len(payload["controls"]) == 18

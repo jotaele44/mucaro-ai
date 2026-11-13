@@ -62,17 +62,18 @@ def build_security_report(cfg: Settings = settings, *, bind_host: str | None = N
     )
 
     token_length = len(cfg.operator_token or "")
-    if profile == "production":
+    # Production, and any opt-in to a non-loopback bind (phone access), must have a strong token: the service is
+    # then reachable from other devices, and a missing or guessable token would leave it open to the network.
+    strong_token_required = profile == "production" or bool(cfg.allow_public_bind)
+    if strong_token_required:
         token_status = "PASS" if token_length >= MIN_PRODUCTION_TOKEN_CHARS else "FAIL"
     else:
         token_status = "PASS" if cfg.operator_token else "WARN"
-    checks.append(
-        _check(
-            "operator_token",
-            token_status,
-            "configured" if cfg.operator_token else "missing",
-        )
-    )
+    if strong_token_required and 0 < token_length < MIN_PRODUCTION_TOKEN_CHARS:
+        token_detail = f"configured but shorter than {MIN_PRODUCTION_TOKEN_CHARS} characters"
+    else:
+        token_detail = "configured" if cfg.operator_token else "missing"
+    checks.append(_check("operator_token", token_status, token_detail))
 
     cors_origins = list(cfg.cors_origins)
     unsafe_cors = "*" in cors_origins
@@ -120,7 +121,10 @@ def _recommendations(profile: str, failed: list[dict[str, str]], warned: list[di
     if "app_store_production_profile" in names:
         recommendations.append("Use MUCARO_AI_DEPLOYMENT_PROFILE=production for the Mac App Store channel.")
     if "operator_token" in names:
-        recommendations.append("Set MUCARO_AI_OPERATOR_TOKEN to a high-entropy value before production exposure.")
+        recommendations.append(
+            f"Set MUCARO_AI_OPERATOR_TOKEN to a high-entropy value of at least {MIN_PRODUCTION_TOKEN_CHARS} characters "
+            "before production exposure or phone access."
+        )
     if "cors_origins" in names:
         recommendations.append("Set MUCARO_AI_CORS_ORIGINS to explicit trusted browser origins.")
     if "bind_host" in names:

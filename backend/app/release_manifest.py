@@ -23,6 +23,7 @@ DEPENDENCY_LOCKS = (
     "packaging/macos/requirements-macos-arm64.in",
     "packaging/macos/requirements-macos-arm64.lock",
     "packaging/runtime/requirements-macos-x86_64.lock",
+    "packaging/runtime/requirements-macos-arm64.lock",
     "scripts/one_click_pins.env",
     "backend/requirements.txt",
     "frontend/package-lock.json",

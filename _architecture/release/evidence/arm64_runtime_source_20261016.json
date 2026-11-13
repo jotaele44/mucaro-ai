@@ -1,0 +1,54 @@
+{
+  "schema_version": "mucaro-arm64-runtime-source-evidence/1.0",
+  "status": "ARM64_RUNTIME_SOURCE_EVIDENCE_PASS",
+  "observed_utc": "2026-10-16T20:42:17Z",
+  "repository": "jotaele44/mucaro-ai",
+  "certification": {
+    "pull_request": 236,
+    "head_sha": "c1cfa1319e2f5ad3a6a51c2134547de132c46053",
+    "workflow_run_id": 38964103222,
+    "job_id": 117186166374,
+    "conclusion": "success",
+    "artifact_id": 12073128987,
+    "artifact_name": "arm64-runtime-source-c1cfa1319e2f5ad3a6a51c2134547de132c46053",
+    "artifact_sha256": "0710f7e9283e67b14c15925173c94c321bca63a8cfb28a53a359e99489805261"
+  },
+  "source": {
+    "project": "astral-sh/python-build-standalone",
+    "release": "20260901",
+    "asset_name": "cpython-3.13.15+20260901-aarch64-apple-darwin-install_only.tar.gz",
+    "bytes": 25293188,
+    "sha256": "b9054a9d3d54f4cb5573d44907fddb29874b08909bde73f29f2868cf872223ee",
+    "independent_retrieval": true
+  },
+  "archive": {
+    "archive_root": "python",
+    "member_count": 1654,
+    "regular_file_count": 1646,
+    "symlink_count": 8,
+    "total_regular_bytes": 65443266,
+    "logical_members_sha256": "74f3a0af3f4b7d02ed1dec4713ffa2a65c9fac11c7bab3bf95a23235af4ec859",
+    "payload_multiset_sha256": "fa7a654dc80b75c13ed842026b97035e7e52eadc4aeea7a262bfdcc91e6978c0"
+  },
+  "dependency_lock": {
+    "path": "packaging/runtime/requirements-macos-arm64.lock",
+    "bytes": 44071,
+    "sha256": "cf7cea35480de5f416b4cf960ec0892954b97c7111e1665a40daa49b4f4fa457",
+    "resolver": "uv==0.10.0",
+    "python_version": "3.13",
+    "python_platform": "aarch64-apple-darwin",
+    "macosx_deployment_target": "14.0",
+    "wheel_only": true,
+    "hashes_required": true
+  },
+  "adjudication": {
+    "initial_run_id": 38963951002,
+    "initial_failure": "uv Darwin cross-resolution defaulted to macOS 13.0 and rejected pyproj==3.7.2 macOS 14 arm64 wheel",
+    "resolution": "set MACOSX_DEPLOYMENT_TARGET=14.0, matching the declared Mucaro release minimum OS; no dependency version changed"
+  },
+  "limitations": [
+    "This evidence certifies source bytes, archive logical identity, and dependency-lock resolution only.",
+    "It does not certify runtime materialization or an arm64 runtime probe.",
+    "It does not certify packaged lifecycle, clean-host execution, physical-device input, signing or notarization."
+  ]
+}

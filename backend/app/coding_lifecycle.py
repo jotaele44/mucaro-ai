@@ -8,6 +8,8 @@ from typing import Any
 
 from .coding_workspace import CodingWorkspaceError, inspect_repository, resolve_repository
 from .config import Settings, settings
+from .local_tools import resolve_local_tool
+from .permission_engine import PermissionEngineError, PermissionRequest, require
 
 CODING_LIFECYCLE_SCHEMA_VERSION = "mucaro-coding-lifecycle/1.0"
 PROTECTED_BRANCHES = {"main", "master"}
@@ -26,17 +28,20 @@ class CodingLifecycleError(RuntimeError):
 
 
 def _git(repo_root: Path, *args: str, timeout: int = 30) -> subprocess.CompletedProcess[str]:
+    git = resolve_local_tool("git")
+    if not git:
+        raise CodingLifecycleError("ERROR_CODING_GIT_UNAVAILABLE", "Git is not bundled in this Mucaro runtime.")
     try:
         return subprocess.run(
-            ["git", *args],
+            [git, *args],
             cwd=repo_root,
             text=True,
             capture_output=True,
             check=False,
             timeout=timeout,
         )
-    except FileNotFoundError as exc:
-        raise CodingLifecycleError("ERROR_CODING_GIT_UNAVAILABLE", "git executable is not available") from exc
+    except OSError as exc:
+        raise CodingLifecycleError("ERROR_CODING_GIT_UNAVAILABLE", "Bundled Git could not be started.") from exc
     except subprocess.TimeoutExpired as exc:
         raise CodingLifecycleError("ERROR_CODING_LIFECYCLE_TIMEOUT", "git command timed out") from exc
 
@@ -104,6 +109,18 @@ def create_work_branch_transaction(
         context = resolve_repository(repo_root, cfg)
         before = inspect_repository(context.repo_root, cfg=cfg)
     except CodingWorkspaceError as exc:
+        raise CodingLifecycleError(exc.status, exc.detail) from exc
+    try:
+        require(
+            PermissionRequest(
+                capability="git.mutate",
+                subject="coding_lifecycle.create_work_branch",
+                target=str(context.repo_root),
+                origin="operator",
+            ),
+            cfg=cfg,
+        )
+    except PermissionEngineError as exc:
         raise CodingLifecycleError(exc.status, exc.detail) from exc
     branch_name = _validate_branch_name(context.repo_root, branch_name)
     if before["head_sha"] != expected_head_sha:
@@ -173,6 +190,18 @@ def commit_approved_changes(
         context = resolve_repository(repo_root, cfg)
         before = inspect_repository(context.repo_root, cfg=cfg)
     except CodingWorkspaceError as exc:
+        raise CodingLifecycleError(exc.status, exc.detail) from exc
+    try:
+        require(
+            PermissionRequest(
+                capability="git.mutate",
+                subject="coding_lifecycle.commit_approved_changes",
+                target=str(context.repo_root),
+                origin="operator",
+            ),
+            cfg=cfg,
+        )
+    except PermissionEngineError as exc:
         raise CodingLifecycleError(exc.status, exc.detail) from exc
     expected_branch = _validate_branch_name(context.repo_root, expected_branch)
     approved = _validate_paths(approved_paths)
@@ -276,6 +305,18 @@ def build_pull_request_request(
         context = resolve_repository(repo_root, cfg)
         state = inspect_repository(context.repo_root, cfg=cfg)
     except CodingWorkspaceError as exc:
+        raise CodingLifecycleError(exc.status, exc.detail) from exc
+    try:
+        require(
+            PermissionRequest(
+                capability="git.read",
+                subject="coding_lifecycle.build_pull_request_request",
+                target=str(context.repo_root),
+                origin="operator",
+            ),
+            cfg=cfg,
+        )
+    except PermissionEngineError as exc:
         raise CodingLifecycleError(exc.status, exc.detail) from exc
     head_branch = _validate_branch_name(context.repo_root, head_branch)
     base_branch = _validate_branch_name(context.repo_root, base_branch, allow_protected=True)

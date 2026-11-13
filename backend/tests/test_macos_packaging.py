@@ -67,8 +67,18 @@ def test_spec_bundles_resources_that_exist() -> None:
     spec_text = (PACKAGING / "mucaro.spec").read_text(encoding="utf-8")
     for relative in ("schemas", "pyproject.toml", "backend/app/gis_grids", "packaging/macos/desktop_entry.py"):
         assert (ROOT / relative).exists(), relative
-    for fragment in ('ROOT / "schemas"', 'ROOT / "frontend" / "dist"', 'ROOT / "backend" / "app" / "gis_grids"', "desktop_entry.py"):
+    for fragment in (
+        'ROOT / "schemas"',
+        'ROOT / "frontend" / "dist"',
+        'ROOT / "backend" / "app" / "gis_grids"',
+        "desktop_entry.py",
+        "MUCARO_BUILD_IDENTITY_FILE",
+    ):
         assert fragment in spec_text
+    build_text = (ROOT / "scripts" / "build_macos_app.py").read_text(encoding="utf-8")
+    assert '"schema_version": "mucaro-build-identity/1.0"' in build_text
+    assert '"source_head": head' in build_text
+    assert '"MUCARO_BUILD_IDENTITY_FILE": str(build_identity)' in build_text
 
 
 def test_icon_renderer_emits_a_valid_png() -> None:

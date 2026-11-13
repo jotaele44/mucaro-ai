@@ -1,0 +1,177 @@
+name: ARM64 Portable Runtime Materialization Certification
+
+on:
+  pull_request:
+    paths:
+      - "packaging/runtime/macos-arm64.json"
+      - "packaging/runtime/requirements-macos-arm64.lock"
+      - "backend/app/portable_runtime_source.py"
+      - ".github/workflows/arm64-runtime-materialize-cert.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  certify-arm64-runtime-materialization:
+    runs-on: macos-14
+    timeout-minutes: 45
+    env:
+      HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      MANIFEST: packaging/runtime/macos-arm64.json
+      MACOSX_DEPLOYMENT_TARGET: "14.0"
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.HEAD_SHA }}
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+
+      - name: Verify Apple-Silicon host identity
+        run: |
+          set -euo pipefail
+          test "$(uname -s)" = "Darwin"
+          test "$(uname -m)" = "arm64"
+          sw_vers
+          uname -a
+
+      - name: Install hash-locked host certification environment
+        run: |
+          set -euo pipefail
+          python -m venv "$RUNNER_TEMP/cert-venv"
+          "$RUNNER_TEMP/cert-venv/bin/python" -m pip install             --require-hashes --no-deps             -r packaging/macos/requirements-macos-arm64.lock
+
+      - name: Materialize frozen arm64 runtime
+        env:
+          RUNTIME: ${{ runner.temp }}/mucaro-runtime-arm64
+          EVIDENCE: ${{ runner.temp }}/arm64-runtime-materialization-evidence
+        run: |
+          set -euo pipefail
+          mkdir -p "$EVIDENCE"
+          "$RUNNER_TEMP/cert-venv/bin/python" scripts/mucaro.py package portable-runtime             --manifest "$MANIFEST"             --output-dir "$RUNTIME"             --format json             | tee "$EVIDENCE/materialize.json"
+          cp "$RUNTIME/runtime-provenance.json" "$EVIDENCE/runtime-provenance.json"
+
+      - name: Independently verify materialized runtime
+        env:
+          RUNTIME: ${{ runner.temp }}/mucaro-runtime-arm64
+          EVIDENCE: ${{ runner.temp }}/arm64-runtime-materialization-evidence
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/cert-venv/bin/python" scripts/mucaro.py package portable-runtime             --manifest "$MANIFEST"             --verify "$RUNTIME"             --format json             | tee "$EVIDENCE/verify.json"
+
+          "$RUNTIME/bin/python3" -s -P -B - <<'PY' | tee "$EVIDENCE/independent-probe.json"
+          import importlib
+          import json
+          import platform
+          import site
+          import sys
+
+          required = [
+              "fastapi",
+              "jsonschema",
+              "pydantic",
+              "pypdf",
+              "pyproj",
+              "rasterio",
+              "shapely",
+              "starlette",
+              "uvicorn",
+          ]
+          for name in required:
+              importlib.import_module(name)
+          payload = {
+              "executable": sys.executable,
+              "platform": sys.platform,
+              "machine": platform.machine(),
+              "python_version": platform.python_version(),
+              "required_imports": required,
+              "user_site_present": site.getusersitepackages() in sys.path,
+          }
+          print(json.dumps(payload, indent=2, sort_keys=True))
+          if payload["platform"] != "darwin":
+              raise SystemExit("expected darwin")
+          if payload["machine"] != "arm64":
+              raise SystemExit("expected arm64")
+          if payload["python_version"] != "3.13.15":
+              raise SystemExit("expected Python 3.13.15")
+          if payload["user_site_present"]:
+              raise SystemExit("host user-site leaked into runtime")
+          PY
+
+      - name: Bind materialization receipt to exact head
+        env:
+          RUNTIME: ${{ runner.temp }}/mucaro-runtime-arm64
+          EVIDENCE: ${{ runner.temp }}/arm64-runtime-materialization-evidence
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/cert-venv/bin/python" - "$RUNTIME" "$EVIDENCE" <<'PY'
+          import hashlib
+          import json
+          import os
+          import pathlib
+          import platform
+          import subprocess
+          import sys
+
+          runtime = pathlib.Path(sys.argv[1])
+          evidence = pathlib.Path(sys.argv[2])
+          materialize = json.loads((evidence / "materialize.json").read_text())
+          verify = json.loads((evidence / "verify.json").read_text())
+          provenance = json.loads((evidence / "runtime-provenance.json").read_text())
+          probe = json.loads((evidence / "independent-probe.json").read_text())
+
+          if materialize["status"] != "PORTABLE_RUNTIME_VERIFIED":
+              raise SystemExit("materialization did not verify")
+          if verify["status"] != "PORTABLE_RUNTIME_VERIFIED":
+              raise SystemExit("independent verification failed")
+          if materialize["runtime_tree"] != verify["runtime_tree"]:
+              raise SystemExit("runtime tree drift between materialize and verify")
+          if provenance["runtime_tree"] != verify["runtime_tree"]:
+              raise SystemExit("runtime provenance tree mismatch")
+          if probe["machine"] != "arm64" or probe["platform"] != "darwin" or probe["python_version"] != "3.13.15":
+              raise SystemExit("independent runtime identity mismatch")
+
+          manifest_path = pathlib.Path(os.environ["MANIFEST"])
+          lock_path = pathlib.Path("packaging/runtime/requirements-macos-arm64.lock")
+          receipt = {
+              "schema_version": "mucaro-arm64-runtime-materialization-cert/1.0",
+              "status": "ARM64_RUNTIME_MATERIALIZATION_PASS",
+              "head_sha": os.environ["HEAD_SHA"],
+              "host": {
+                  "platform": platform.system(),
+                  "machine": platform.machine(),
+                  "macos_version": platform.mac_ver()[0],
+              },
+              "source": provenance["source"],
+              "target": provenance["target"],
+              "dependencies": provenance["dependencies"],
+              "runtime_tree": verify["runtime_tree"],
+              "runtime_provenance_sha256": hashlib.sha256(
+                  (evidence / "runtime-provenance.json").read_bytes()
+              ).hexdigest(),
+              "manifest_sha256": hashlib.sha256(manifest_path.read_bytes()).hexdigest(),
+              "dependency_lock_sha256": hashlib.sha256(lock_path.read_bytes()).hexdigest(),
+              "probe": verify["probe"],
+              "independent_probe": probe,
+              "limitations": [
+                  "This receipt certifies runtime materialization and probe on one Apple-Silicon macOS runner.",
+                  "It does not certify portable application install/launch/upgrade/rollback lifecycle.",
+                  "It does not certify clean-host execution, physical input, Developer ID signing or notarization.",
+              ],
+          }
+          out = evidence / "arm64-runtime-materialization-receipt.json"
+          out.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n")
+          print(out.read_text())
+          PY
+
+      - name: Upload exact-head materialization evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: arm64-runtime-materialization-${{ env.HEAD_SHA }}
+          path: ${{ runner.temp }}/arm64-runtime-materialization-evidence
+          if-no-files-found: error
+          archive: true

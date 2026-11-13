@@ -21,6 +21,50 @@ def make_settings(root: Path) -> Settings:
     )
 
 
+def test_current_git_head_reads_checkout_metadata_without_git(monkeypatch, tmp_path: Path) -> None:
+    from backend.app import runtime_identity
+
+    monkeypatch.delenv("MUCARO_SOURCE_HEAD", raising=False)
+    git_dir = tmp_path / ".git"
+    ref = git_dir / "refs" / "heads" / "main"
+    ref.parent.mkdir(parents=True)
+    ref.write_text("c" * 40 + "\n", encoding="utf-8")
+    (git_dir / "HEAD").write_text("ref: refs/heads/main\n", encoding="utf-8")
+
+    assert runtime_identity.current_git_head(tmp_path) == "c" * 40
+
+
+def test_current_git_head_prefers_bound_source_identity(monkeypatch, tmp_path: Path) -> None:
+    from backend.app import runtime_identity
+
+    monkeypatch.setenv("MUCARO_SOURCE_HEAD", "D" * 40)
+    assert runtime_identity.current_git_head(tmp_path) == "d" * 40
+
+
+def test_current_git_head_reads_packaged_build_identity(monkeypatch, tmp_path: Path) -> None:
+    from backend.app import runtime_identity
+
+    monkeypatch.delenv("MUCARO_SOURCE_HEAD", raising=False)
+    (tmp_path / "mucaro_build_identity.json").write_text(
+        '{"schema_version":"mucaro-build-identity/1.0","source_head":"' + "f" * 40 + '"}\n',
+        encoding="utf-8",
+    )
+
+    assert runtime_identity.current_git_head(tmp_path) == "f" * 40
+
+
+def test_current_git_head_reads_packed_refs(monkeypatch, tmp_path: Path) -> None:
+    from backend.app import runtime_identity
+
+    monkeypatch.delenv("MUCARO_SOURCE_HEAD", raising=False)
+    git_dir = tmp_path / ".git"
+    git_dir.mkdir()
+    (git_dir / "HEAD").write_text("ref: refs/heads/main\n", encoding="utf-8")
+    (git_dir / "packed-refs").write_text("# pack-refs with: peeled\n" + "e" * 40 + " refs/heads/main\n", encoding="utf-8")
+
+    assert runtime_identity.current_git_head(tmp_path) == "e" * 40
+
+
 def test_runtime_identity_is_deterministic_for_same_environment(monkeypatch, tmp_path: Path) -> None:
     from backend.app import runtime_identity
 

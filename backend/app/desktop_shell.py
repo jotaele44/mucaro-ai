@@ -265,6 +265,9 @@ def _open_window(url: str, data_dir: Path, *, instance: Path, started: float, on
         # Documented fallback when the native window library is unavailable (not the release path).
         webbrowser.open(url)
         return "SYSTEM_BROWSER_FALLBACK"
+    # Save and Share in the interface download files; pywebview drops downloads unless this is on, and then asks
+    # where to save each one (an NSSavePanel; the sandbox grants the chosen file via files.user-selected.read-write).
+    webview.settings["ALLOW_DOWNLOADS"] = True
     window = webview.create_window(APP_NAME, url=url, width=1280, height=840, min_size=(420, 560))
 
     def on_shown() -> None:

@@ -3,9 +3,9 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import plistlib
 import shlex
 import subprocess
-import sys
 import tomllib
 import zipfile
 from collections import Counter
@@ -44,6 +44,8 @@ REQUIRED_PACKAGE_INPUTS = [
     "packaging/macos/PrivacyInfo.xcprivacy",
     "packaging/runtime/macos-x86_64.json",
     "packaging/runtime/requirements-macos-x86_64.lock",
+    "packaging/runtime/macos-arm64.json",
+    "packaging/runtime/requirements-macos-arm64.lock",
     "frontend/package.json",
     "frontend/package-lock.json",
 ]
@@ -54,7 +56,9 @@ OPTIONAL_GENERATED_OUTPUTS = [
 DISTRIBUTION_MANIFEST_SCHEMA_VERSION = "mucaro_distribution_manifest_v1"
 DISTRIBUTION_MANIFEST_DIR = Path("data") / "exports" / "distribution_manifests"
 MACOS_APP_BUNDLE_SCHEMA_VERSION = "mucaro_macos_app_bundle_v1"
-MACOS_APP_BUNDLE_NAME = "Mucaro AI.app"
+MACOS_APP_BUNDLE_NAME = "Mucaro AI Setup.app"
+MACOS_APP_DISPLAY_NAME = "Mucaro AI Setup"
+MACOS_APP_BUNDLE_ID = "ai.mucaro.source-launcher"
 MACOS_APP_BUNDLE_DIR = Path("data") / "exports" / "desktop_apps"
 REQUIRED_DISTRIBUTION_RECEIPTS = [
     ("local_release", "CERTIFY_RELEASE_OK"),
@@ -181,6 +185,8 @@ def build_desktop_package_manifest(root: Path = ROOT) -> dict[str, Any]:
         "pyproject.toml",
         "packaging/runtime/macos-x86_64.json",
         "packaging/runtime/requirements-macos-x86_64.lock",
+        "packaging/runtime/macos-arm64.json",
+        "packaging/runtime/requirements-macos-arm64.lock",
     ]
     missing = [path for path in required if not (root / path).exists()]
     metadata_error = None
@@ -226,17 +232,18 @@ def build_macos_app_bundle(
     executable_path = macos_dir / "mucaro-ai"
     plist_path = contents / "Info.plist"
     receipt_path = resources_dir / "mucaro-app-receipt.json"
-    runtime_python = python_executable or sys.executable
+    # Kept as an API compatibility argument; setup provisions its own interpreter.
+    del python_executable
 
     checks: list[dict[str, str]] = []
     required_files = [
-        root / "scripts" / "launch_app.py",
-        root / "frontend" / "dist" / "index.html",
+        root / "scripts" / "native_start.sh",
+        root / "scripts" / "one_click.sh",
+        root / "scripts" / "one_click.py",
         root / "pyproject.toml",
     ]
     missing_files = [str(path.relative_to(root)) for path in required_files if not path.exists()]
     checks.append(_check("required_runtime_inputs", "PASS" if not missing_files else "FAIL", "all present" if not missing_files else f"missing={','.join(missing_files)}"))
-    checks.append(_check("python_executable", "PASS" if Path(runtime_python).exists() else "FAIL", runtime_python))
 
     ok, head_sha = _git_output(root, ["rev-parse", "HEAD"])
     checks.append(_check("git_head", "PASS" if ok else "WARN", head_sha or "unavailable"))
@@ -252,31 +259,30 @@ def build_macos_app_bundle(
             "failed_checks": [check["name"] for check in failed],
         }
 
-    launcher = f"""#!/usr/bin/env bash
+    launcher = f"""#!/bin/bash
 set -euo pipefail
 REPO_ROOT={shlex.quote(str(root))}
-PYTHON_EXECUTABLE={shlex.quote(runtime_python)}
 cd "${{REPO_ROOT}}"
-exec "${{PYTHON_EXECUTABLE}}" scripts/launch_app.py "$@"
+exec /bin/bash scripts/native_start.sh "${{REPO_ROOT}}" "$@"
 """
     info_plist = f"""<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
   <key>CFBundleName</key>
-  <string>Mucaro AI</string>
+  <string>{MACOS_APP_DISPLAY_NAME}</string>
   <key>CFBundleDisplayName</key>
-  <string>Mucaro AI</string>
+  <string>{MACOS_APP_DISPLAY_NAME}</string>
   <key>CFBundleExecutable</key>
   <string>mucaro-ai</string>
   <key>CFBundleIdentifier</key>
-  <string>ai.mucaro.local</string>
+  <string>{MACOS_APP_BUNDLE_ID}</string>
   <key>CFBundlePackageType</key>
   <string>APPL</string>
   <key>CFBundleShortVersionString</key>
   <string>{_project_version(root)}</string>
   <key>LSMinimumSystemVersion</key>
-  <string>12.0</string>
+  <string>13.0</string>
   <key>NSHighResolutionCapable</key>
   <true/>
 </dict>
@@ -295,8 +301,8 @@ exec "${{PYTHON_EXECUTABLE}}" scripts/launch_app.py "$@"
         "app_path": str(app_path),
         "bundle_name": MACOS_APP_BUNDLE_NAME,
         "head_sha": head_sha if ok else None,
-        "python_executable": runtime_python,
-        "entrypoint": "scripts/launch_app.py",
+        "python_executable": "provisioned by scripts/one_click.sh",
+        "entrypoint": "scripts/native_start.sh",
         "frontend_dist": "frontend/dist/index.html",
         "scope": "source_bound_local_macos_app_wrapper",
         "limitations": [
@@ -339,6 +345,11 @@ def verify_macos_app_bundle(app_path: Path, *, root: Path = ROOT) -> dict[str, A
     checks: list[dict[str, str]] = [
         _check("app_bundle_exists", "PASS" if app_path.exists() and app_path.is_dir() else "FAIL", str(app_path)),
         _check("bundle_extension", "PASS" if app_path.name.endswith(".app") else "FAIL", app_path.name),
+        _check(
+            "source_bundle_filename",
+            "PASS" if app_path.name == MACOS_APP_BUNDLE_NAME else "FAIL",
+            f"expected={MACOS_APP_BUNDLE_NAME} observed={app_path.name}",
+        ),
         _check("contents_dir", "PASS" if contents.exists() and contents.is_dir() else "FAIL", str(contents)),
         _check("info_plist", "PASS" if plist_path.exists() else "FAIL", str(plist_path)),
         _check("launcher_executable", "PASS" if executable_path.exists() and os.access(executable_path, os.X_OK) else "FAIL", str(executable_path)),
@@ -350,19 +361,76 @@ def verify_macos_app_bundle(app_path: Path, *, root: Path = ROOT) -> dict[str, A
         try:
             receipt = _load_json(receipt_path)
             checks.append(_check("receipt_schema", "PASS" if receipt.get("schema_version") == MACOS_APP_BUNDLE_SCHEMA_VERSION else "FAIL", str(receipt.get("schema_version"))))
-            checks.append(_check("receipt_entrypoint", "PASS" if receipt.get("entrypoint") == "scripts/launch_app.py" else "FAIL", str(receipt.get("entrypoint"))))
+            checks.append(_check("receipt_entrypoint", "PASS" if receipt.get("entrypoint") == "scripts/native_start.sh" else "FAIL", str(receipt.get("entrypoint"))))
+            checks.append(
+                _check(
+                    "receipt_source_bundle_name",
+                    "PASS" if receipt.get("bundle_name") == MACOS_APP_BUNDLE_NAME else "FAIL",
+                    f"expected={MACOS_APP_BUNDLE_NAME} observed={receipt.get('bundle_name')}",
+                )
+            )
+            checks.append(
+                _check(
+                    "receipt_source_scope",
+                    "PASS" if receipt.get("scope") == "source_bound_local_macos_app_wrapper" else "FAIL",
+                    str(receipt.get("scope")),
+                )
+            )
+            checks.append(
+                _check(
+                    "receipt_app_path",
+                    "PASS" if receipt.get("app_path") == str(app_path) else "FAIL",
+                    f"expected={app_path} observed={receipt.get('app_path')}",
+                )
+            )
         except (OSError, json.JSONDecodeError, ValueError) as exc:
             checks.append(_check("receipt_parse", "FAIL", str(exc)))
 
     if plist_path.exists():
-        plist_text = plist_path.read_text(encoding="utf-8", errors="replace")
-        checks.append(_check("plist_executable_binding", "PASS" if "<string>mucaro-ai</string>" in plist_text else "FAIL", "CFBundleExecutable=mucaro-ai"))
-        checks.append(_check("plist_package_type", "PASS" if "<string>APPL</string>" in plist_text else "FAIL", "CFBundlePackageType=APPL"))
+        try:
+            plist = plistlib.loads(plist_path.read_bytes())
+        except (OSError, plistlib.InvalidFileException, ValueError) as exc:
+            checks.append(_check("plist_parse", "FAIL", str(exc)))
+            plist = {}
+        checks.append(
+            _check(
+                "plist_executable_binding",
+                "PASS" if plist.get("CFBundleExecutable") == "mucaro-ai" else "FAIL",
+                f"expected=mucaro-ai observed={plist.get('CFBundleExecutable')}",
+            )
+        )
+        checks.append(
+            _check(
+                "plist_package_type",
+                "PASS" if plist.get("CFBundlePackageType") == "APPL" else "FAIL",
+                f"expected=APPL observed={plist.get('CFBundlePackageType')}",
+            )
+        )
+        checks.append(
+            _check(
+                "plist_source_name",
+                "PASS"
+                if plist.get("CFBundleName") == MACOS_APP_DISPLAY_NAME
+                and plist.get("CFBundleDisplayName") == MACOS_APP_DISPLAY_NAME
+                else "FAIL",
+                (
+                    f"expected={MACOS_APP_DISPLAY_NAME} "
+                    f"name={plist.get('CFBundleName')} display={plist.get('CFBundleDisplayName')}"
+                ),
+            )
+        )
+        checks.append(
+            _check(
+                "plist_source_bundle_id",
+                "PASS" if plist.get("CFBundleIdentifier") == MACOS_APP_BUNDLE_ID else "FAIL",
+                f"expected={MACOS_APP_BUNDLE_ID} observed={plist.get('CFBundleIdentifier')}",
+            )
+        )
 
     if executable_path.exists():
         launcher_text = executable_path.read_text(encoding="utf-8", errors="replace")
         checks.append(_check("launcher_points_to_repo", "PASS" if str(root) in launcher_text else "FAIL", str(root)))
-        checks.append(_check("launcher_points_to_launch_app", "PASS" if "scripts/launch_app.py" in launcher_text else "FAIL", "scripts/launch_app.py"))
+        checks.append(_check("launcher_points_to_native_start", "PASS" if "scripts/native_start.sh" in launcher_text else "FAIL", "scripts/native_start.sh"))
         checks.append(_check("launcher_forwards_arguments", "PASS" if '"$@"' in launcher_text else "FAIL", "bundle executable forwards launch_app arguments"))
 
     failed = [check for check in checks if check["status"] == "FAIL"]

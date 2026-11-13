@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { api } from "../api.js";
+import { ConfirmSheet } from "./ConfirmSheet.jsx";
 
 function errorDetail(err) {
   const detail = err?.payload?.detail;
@@ -16,6 +17,7 @@ export function DirectoryIntake({ onIngested }) {
   const [result, setResult] = useState(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
+  const [revoking, setRevoking] = useState(null);
 
   async function refreshGrants() {
     const payload = await api.directoryPermissions();
@@ -176,10 +178,17 @@ export function DirectoryIntake({ onIngested }) {
               <strong>{grant.canonical_root}</strong>
               <small>{grant.reason || "No reason recorded"} - {grant.granted_by}</small>
             </div>
-            <button className="secondary" onClick={() => revokeGrant(grant)} disabled={busy}>Revoke</button>
+            <button className="secondary" onClick={() => setRevoking(grant)} disabled={busy}>Revoke</button>
           </article>
         ))}
       </div>
+      {revoking && (
+        <ConfirmSheet title="Revoke folder access?" confirmLabel="Revoke access" onConfirm={() => revokeGrant(revoking)} onClose={() => setRevoking(null)}>
+          <p>
+            Mucaro will stop reading files under <strong>{revoking.canonical_root}</strong>. Sources already ingested from it stay in the library.
+          </p>
+        </ConfirmSheet>
+      )}
     </section>
   );
 }

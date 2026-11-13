@@ -1,0 +1,64 @@
+{
+  "benchmark_id": "mucaro-rt10-matrix007-scale-v1.2",
+  "claim_boundary": [
+    "The stress corpus is deterministic and synthetic; it does not replace RT-09 real-world provenance evidence.",
+    "The benchmark certifies the local hybrid retrieval path plus deterministic mock citation construction only.",
+    "Remote-model quality remains governed by its independent live-provider evidence gate.",
+    "Latency is runner-specific and applies only to the frozen hardware/runtime manifestation recorded in the receipt.",
+    "Production-scale means this declared 10,000-chunk local-workstation proxy, not universal internet or enterprise scale."
+  ],
+  "corpus": {
+    "max_chunks": 10000,
+    "scale_levels": [
+      1000,
+      5000,
+      10000
+    ],
+    "source_identity": "one stable synthetic source_id per chunk",
+    "top_k": 5
+  },
+  "execution": {
+    "max_runtime_seconds": 300,
+    "probe_queries_per_scale": 8,
+    "strategy": "hybrid",
+    "warmup_queries": 4
+  },
+  "falsification": [
+    "Any denominator count or threshold drift without a version bump invalidates the claim.",
+    "Any expected-source miss, incomplete ambiguous binding, false no-context result, citation binding error, unsupported source claim, or threshold breach fails certification.",
+    "A later code or dependency head requires a new exact-head execution receipt."
+  ],
+  "query_denominator": {
+    "ambiguous": 16,
+    "answerable": 24,
+    "difficult": 16,
+    "negative": 24,
+    "total": 80
+  },
+  "schema_version": "MUCARO_RT10_SCALE_BENCHMARK/1.2",
+  "scope": "Deterministic local retrieval production-scale proxy and MATRIX-007 quality benchmark; synthetic scale corpus only.",
+  "seed": 20260929,
+  "thresholds": {
+    "max_p95_growth_ratio_1000_to_10000": 20,
+    "max_p95_latency_ms": 5000,
+    "max_peak_rss_mib": 1536,
+    "max_single_query_latency_ms": 10000,
+    "max_unsupported_source_claim_rate": 0,
+    "min_ambiguous_full_hit_rate": 1,
+    "min_citation_completeness": 1,
+    "min_citation_correctness": 1,
+    "min_expected_binding_recall": 1,
+    "min_expected_source_hit_rate": 1,
+    "min_faithfulness": 1,
+    "min_negative_query_accuracy": 1,
+    "min_throughput_qps": 0.15
+  },
+  "supersedes_benchmark_id": "mucaro-rt10-matrix007-scale-v1.1",
+  "revision_reason": "Static falsification review before any executed benchmark found that v1.1 difficult queries still contained the exact unique zxq identity token, making them exact-match lookups rather than difficult retrieval cases. V1.2 replaces them with two-clue conjunction queries against deliberate single-clue distractors. No benchmark or pytest step executed under v1 or v1.1; thresholds, scale levels, and query counts are unchanged.",
+  "difficult_query_design": {
+    "targets": "rt10_source_00200 through rt10_source_00215 each contain two rare clue tokens",
+    "distractor_a": "rt10_source_00400 through rt10_source_00415 contain only clue A",
+    "distractor_b": "rt10_source_00500 through rt10_source_00515 contain only clue B",
+    "query_rule": "difficult queries contain both clue tokens and no exact zxq identity token"
+  }
+}

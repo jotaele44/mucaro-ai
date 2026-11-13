@@ -1,0 +1,46 @@
+{
+  "archive_policy": {
+    "max_members": 2000,
+    "max_regular_bytes": 70000000,
+    "member_count": 1654,
+    "regular_file_count": 1646,
+    "symlink_count": 8,
+    "total_regular_bytes": 65443266,
+    "logical_members_sha256": "74f3a0af3f4b7d02ed1dec4713ffa2a65c9fac11c7bab3bf95a23235af4ec859",
+    "payload_multiset_sha256": "fa7a654dc80b75c13ed842026b97035e7e52eadc4aeea7a262bfdcc91e6978c0"
+  },
+  "dependency_lock": "packaging/runtime/requirements-macos-arm64.lock",
+  "id": "cpython-3.13.15-macos-arm64-20260901",
+  "license_evidence": {
+    "embedded_python_license": "lib/python3.13/LICENSE.txt",
+    "python_license_url": "https://docs.python.org/3/license.html",
+    "runtime_project_license_url": "https://github.com/astral-sh/python-build-standalone/blob/20260901/LICENSE"
+  },
+  "required_imports": [
+    "fastapi",
+    "jsonschema",
+    "pydantic",
+    "pypdf",
+    "pyproj",
+    "rasterio",
+    "shapely",
+    "starlette",
+    "uvicorn"
+  ],
+  "schema_version": "mucaro-portable-runtime-source/1.0",
+  "source": {
+    "asset_name": "cpython-3.13.15+20260901-aarch64-apple-darwin-install_only.tar.gz",
+    "bytes": 25293188,
+    "project": "astral-sh/python-build-standalone",
+    "release": "20260901",
+    "sha256": "b9054a9d3d54f4cb5573d44907fddb29874b08909bde73f29f2868cf872223ee",
+    "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20260901/cpython-3.13.15%2B20260901-aarch64-apple-darwin-install_only.tar.gz"
+  },
+  "target": {
+    "archive_root": "python",
+    "machine": "arm64",
+    "platform": "darwin",
+    "python_version": "3.13.15",
+    "runtime_python": "bin/python3"
+  }
+}

@@ -1,5 +1,5 @@
-from pathlib import Path
 import json
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -38,6 +38,24 @@ def make_raster(path: Path) -> Path:
         count=1,
         dtype="int16",
         crs="EPSG:4326",
+        transform=from_origin(0, 2, 1, 1),
+        nodata=-9999,
+    ) as target:
+        target.write(data, 1)
+    return path
+
+
+def make_projected_raster(path: Path) -> Path:
+    data = np.array([[0, 2], [3, -9999]], dtype="int16")
+    with rasterio.open(
+        path,
+        "w",
+        driver="GTiff",
+        width=2,
+        height=2,
+        count=1,
+        dtype="int16",
+        crs="EPSG:3857",
         transform=from_origin(0, 2, 1, 1),
         nodata=-9999,
     ) as target:
@@ -168,3 +186,55 @@ def test_zonal_statistics_close_numeric_and_nodata_accounting(tmp_path: Path) ->
     assert row["population_standard_deviation"] == pytest.approx(1.247219128924647)
     assert row["cell_accounting_closed"] is True
     assert report["invariants"]["cell_accounting_closed"] is True
+
+
+def test_fractional_zonal_statistics_close_planar_coverage_and_weighted_values(tmp_path: Path) -> None:
+    vector = make_vector(tmp_path / "fractional.geojson", crs="EPSG:3857")
+    payload = json.loads(vector.read_text(encoding="utf-8"))
+    payload["features"] = [
+        {
+            "type": "Feature",
+            "id": "fractional-zone",
+            "geometry": {
+                "type": "Polygon",
+                "coordinates": [[[0.5, 0.5], [1.5, 0.5], [1.5, 1.5], [0.5, 1.5], [0.5, 0.5]]],
+            },
+            "properties": {},
+        }
+    ]
+    vector.write_text(json.dumps(payload), encoding="utf-8")
+
+    report = compute_zonal_statistics(
+        vector,
+        make_projected_raster(tmp_path / "fractional.tif"),
+        cfg=make_settings(tmp_path),
+        inclusion_rule="fractional_coverage",
+    )
+
+    row = report["features"][0]
+    assert report["status"] == "GIS_ZONAL_STATS_OK"
+    assert report["parameters"]["cell_inclusion_rule"] == "fractional_coverage"
+    assert report["parameters"]["weighted_statistics"] is True
+    assert row["covered_cell_count"] == 4
+    assert row["valid_cell_count"] == 3
+    assert row["nodata_cell_count"] == 1
+    assert row["covered_area"] == pytest.approx(1.0)
+    assert row["valid_coverage_area"] == pytest.approx(0.75)
+    assert row["nodata_coverage_area"] == pytest.approx(0.25)
+    assert row["coverage_fraction_sum"] == pytest.approx(1.0)
+    assert row["sum"] == pytest.approx(1.25)
+    assert row["mean"] == pytest.approx(1.25 / 0.75)
+    assert row["median"] == pytest.approx(2.0)
+    assert row["coverage_accounting_closed"] is True
+    assert report["invariants"]["coverage_accounting_closed"] is True
+
+
+def test_fractional_zonal_statistics_rejects_geographic_area_units(tmp_path: Path) -> None:
+    with pytest.raises(GISProcessingError) as exc:
+        compute_zonal_statistics(
+            make_vector(tmp_path / "geographic.geojson"),
+            make_raster(tmp_path / "geographic.tif"),
+            cfg=make_settings(tmp_path),
+            inclusion_rule="fractional_coverage",
+        )
+    assert exc.value.status == "ERROR_GIS_VECTOR_RASTER_FRACTIONAL_CRS"

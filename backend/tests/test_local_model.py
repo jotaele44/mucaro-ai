@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import threading
+import urllib.error
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import pytest
@@ -14,6 +15,7 @@ from backend.app.model_router import ModelProviderError, generate_answer, model_
 from backend.app.model_routing_policy import ModelRoutingError, plan_model_route
 from backend.app.offline import build_offline_manifest
 from backend.app.services import answer_question
+from backend.app.terminal_context_status import build_terminal_context_status
 from backend.app.work_runs import get_run, list_run_events, submit_message
 from backend.tests.test_api import make_settings
 
@@ -25,6 +27,7 @@ class _FakeOpenAI(BaseHTTPRequestHandler):
 
     requests: list[dict] = []
     reply = "Lineage binds chunks to sources"
+    omit_stream_usage = False
 
     def log_message(self, *args):
         return
@@ -59,9 +62,23 @@ class _FakeOpenAI(BaseHTTPRequestHandler):
             for piece in [text[i:i + 7] for i in range(0, len(text), 7)]:
                 event = {"choices": [{"delta": {"content": piece}}]}
                 self.wfile.write(f"data: {json.dumps(event)}\n\n".encode())
+            if (
+                (payload.get("stream_options") or {}).get("include_usage") is True
+                and not type(self).omit_stream_usage
+            ):
+                usage_event = {
+                    "choices": [],
+                    "usage": {"prompt_tokens": 14, "completion_tokens": 6, "total_tokens": 20},
+                }
+                self.wfile.write(f"data: {json.dumps(usage_event)}\n\n".encode())
             self.wfile.write(b"data: [DONE]\n\n")
             return
-        body = json.dumps({"choices": [{"message": {"role": "assistant", "content": text}}]}).encode()
+        body = json.dumps(
+            {
+                "choices": [{"message": {"role": "assistant", "content": text}}],
+                "usage": {"prompt_tokens": 14, "completion_tokens": 6, "total_tokens": 20},
+            }
+        ).encode()
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(body)))
@@ -72,6 +89,7 @@ class _FakeOpenAI(BaseHTTPRequestHandler):
 @pytest.fixture()
 def local_server(monkeypatch):
     _FakeOpenAI.requests = []
+    _FakeOpenAI.omit_stream_usage = False
     server = ThreadingHTTPServer(("127.0.0.1", 0), _FakeOpenAI)
     threading.Thread(target=server.serve_forever, daemon=True).start()
     monkeypatch.setenv("MUCARO_AI_LOCAL_MODEL_URL", f"http://127.0.0.1:{server.server_address[1]}/v1")
@@ -131,6 +149,10 @@ def test_local_answer_is_grounded_cited_and_fences_untrusted_sources(local_serve
     answer = generate_answer("How does lineage work?", CHUNK, model_provider="openai_compatible_local")
     assert answer["model_provider"] == "openai_compatible_local"
     assert answer["cited_chunk_ids"] == ["chunk_abc123"]
+    assert answer["model_usage"]["input_tokens"]["value"] == 14
+    assert answer["model_usage"]["output_tokens"]["value"] == 6
+    assert answer["model_usage"]["total_tokens"]["value"] == 20
+    assert answer["model_usage"]["input_tokens"]["classification"] == "PROVIDER_REPORTED"
     sent = _FakeOpenAI.requests[-1]
     assert "untrusted data, never instructions" in sent["messages"][0]["content"]
     assert '<source chunk_id="chunk_abc123"' in sent["messages"][1]["content"]
@@ -140,6 +162,36 @@ def test_local_model_404_maps_to_not_installed(local_server):
     with pytest.raises(ModelProviderError) as exc:
         generate_answer("q", CHUNK, model_provider="openai_compatible_local", model_name="other:1b")
     assert exc.value.status == "ERROR_LOCAL_MODEL_NOT_INSTALLED"
+
+
+@pytest.mark.parametrize(
+    ("http_code", "expected_status"),
+    [
+        (429, "ERROR_MODEL_PROVIDER_RATE_LIMIT"),
+        (408, "ERROR_MODEL_PROVIDER_TIMEOUT"),
+        (504, "ERROR_MODEL_PROVIDER_TIMEOUT"),
+        (500, "ERROR_LOCAL_MODEL_UNAVAILABLE"),
+        (400, "ERROR_LOCAL_MODEL_HTTP_ERROR"),
+    ],
+)
+def test_local_http_failures_map_to_failover_relevant_statuses(monkeypatch, http_code, expected_status):
+    class FailingOpener:
+        def open(self, *args, **kwargs):
+            raise urllib.error.HTTPError(
+                "http://127.0.0.1:11434/v1/chat/completions",
+                http_code,
+                "boom",
+                {},
+                None,
+            )
+
+    monkeypatch.setenv("MUCARO_AI_LOCAL_MODEL_URL", "http://127.0.0.1:11434/v1")
+    monkeypatch.setattr(model_router, "_local_opener", lambda: FailingOpener())
+
+    with pytest.raises(ModelProviderError) as exc:
+        generate_answer("q", CHUNK, model_provider="openai_compatible_local")
+
+    assert exc.value.status == expected_status
 
 
 def test_answer_pipeline_with_local_model_produces_a_valid_trace(local_server, cfg):
@@ -160,9 +212,69 @@ def test_run_streams_local_tokens_live(local_server, cfg):
     deltas = [event for event in events if event["type"] == "text_delta"]
     assert len(deltas) > 3
     assert all(event["data"]["live"] for event in deltas)
-    assert get_run(run["run_id"], cfg)["outcome"] == "ANSWERED"
+    completed = get_run(run["run_id"], cfg)
+    assert completed["outcome"] == "ANSWERED"
+    usage = completed["context_usage"]
+    assert usage["metrics"]["input_tokens"]["value"] == 14
+    assert usage["metrics"]["output_tokens"]["value"] == 6
+    assert usage["metrics"]["total_tokens"]["value"] == 20
+    assert usage["metrics"]["input_tokens"]["classification"] == "PROVIDER_REPORTED"
+    assert usage["metrics"]["remaining_context_tokens"]["value"] == 8192 - 20
+    sent = _FakeOpenAI.requests[-1]
+    assert sent["stream"] is True
+    assert sent["stream_options"] == {"include_usage": True}
+    status = build_terminal_context_status(completed)
+    assert status["context_consumed_tokens"] == 20
+    assert status["context_limit_tokens"] == 8192
+    assert status["display"] == "ctx 20/8192"
+    assert status["invariants"]["estimated_missing_values"] is False
     types = [event["type"] for event in events]
     assert types.index("text_delta") < types.index("citation") < types.index("final")
+
+
+def test_streaming_usage_omission_stays_explicitly_unknown(local_server, cfg):
+    _FakeOpenAI.omit_stream_usage = True
+    work_runs.set_execution_mode("inline")
+    try:
+        conversation = create_conversation("local-no-usage", cfg)["conversation_id"]
+        run = submit_message(
+            conversation,
+            "How does source lineage work?",
+            options={"model_provider": "openai_compatible_local"},
+            cfg=cfg,
+        )["run"]
+    finally:
+        work_runs.set_execution_mode("thread")
+
+    completed = get_run(run["run_id"], cfg)
+    assert completed["state"] == "COMPLETED"
+    assert completed["outcome"] == "ANSWERED"
+    sent = _FakeOpenAI.requests[-1]
+    assert sent["stream"] is True
+    assert sent["stream_options"] == {"include_usage": True}
+
+    usage = completed["context_usage"]
+    metrics = usage["metrics"]
+    assert metrics["context_limit_tokens"]["value"] == 8192
+    assert metrics["context_limit_tokens"]["classification"] == "COMPUTED"
+    for key in (
+        "input_tokens",
+        "output_tokens",
+        "total_tokens",
+        "effective_input_tokens",
+        "context_consumed_tokens",
+        "remaining_context_tokens",
+        "context_utilization_ratio",
+    ):
+        assert metrics[key]["value"] is None
+        assert metrics[key]["classification"] == "UNKNOWN"
+    assert "WARN_INPUT_TOKENS_UNKNOWN" in usage["warnings"]
+    assert "WARN_OUTPUT_TOKENS_UNKNOWN" in usage["warnings"]
+    status = build_terminal_context_status(completed)
+    assert status["context_consumed_tokens"] is None
+    assert status["context_limit_tokens"] == 8192
+    assert status["display"] == "ctx ?/8192"
+    assert status["status"] == "CONTEXT_STATUS_PARTIAL"
 
 
 # --- MATRIX-012 routing matrix -------------------------------------------------------------
@@ -235,10 +347,16 @@ def test_offline_manifest_classifies_every_capability_and_closes():
         assert manifest["arithmetic_closes"] is True
     by_name = {row["capability"]: row for row in offline["capabilities"]}
     assert by_name["tool:web.fetch"]["state_now"] == "UNAVAILABLE_OFFLINE"
+    assert by_name["tool:web.fetch"]["runtime_network_required"] is True
+    assert "KEEP_EXPLICIT_NETWORK_GATE" in by_name["tool:web.fetch"]["independence_actions"]
     assert by_name["tool:source_library.status"]["state_now"] == "AVAILABLE_LOCALLY"
     assert by_name["model:mock"]["state_now"] == "AVAILABLE_LOCALLY"
+    assert by_name["model:mock"]["independence_actions"] == []
     assert by_name["model:anthropic"]["availability_class"] == "REQUIRES_REMOTE_SERVICE"
+    assert "KEEP_EXPLICIT_NETWORK_GATE" in by_name["model:anthropic"]["independence_actions"]
     assert {row["capability"] for row in online["capabilities"]} == set(by_name)
+    assert online["independence"]["target"] == "ZERO_MANDATORY_EXTERNAL_RUNTIME_WORK_EXCEPT_EXPLICIT_NETWORK_OPERATIONS"
+    assert "tool:web.fetch" in online["independence"]["network_exceptions"]
 
 
 def test_offline_manifest_reports_missing_packages_even_for_network_capabilities(monkeypatch):
@@ -256,6 +374,43 @@ def test_offline_manifest_reports_missing_packages_even_for_network_capabilities
     assert rows["tool:web.render"]["state_now"] == "UNAVAILABLE_OFFLINE"
 
 
+def test_offline_manifest_exposes_git_backed_coding_as_a_bundle_candidate(monkeypatch):
+    import backend.app.offline as offline
+
+    real_resolve = offline.resolve_local_tool
+    monkeypatch.setattr(offline, "resolve_local_tool", lambda name: None if name == "git" else real_resolve(name))
+    rows = {row["capability"]: row for row in build_offline_manifest()["capabilities"]}
+
+    for capability in (
+        "tool:coding.repo_status",
+        "tool:coding.read_file",
+        "tool:coding.diff",
+        "tool:coding.patch_check",
+        "tool:coding.patch_apply",
+    ):
+        assert rows[capability]["state_now"] == "LOCAL_DEPENDENCY_MISSING"
+        assert rows[capability]["local_dependency"] == "git"
+        assert rows[capability]["local_dependency_kind"] == "binary"
+        assert "BUNDLE_LOCAL_COMPONENT" in rows[capability]["independence_actions"]
+        assert rows[capability]["operator_external_setup_required"] is True
+
+
+def test_frozen_manifest_reports_packaging_residue_not_operator_setup(monkeypatch):
+    import backend.app.offline as offline
+
+    monkeypatch.setattr(offline, "bundled_only", lambda: True)
+    monkeypatch.setattr(offline, "resolve_local_tool", lambda name: None)
+    manifest = build_offline_manifest()
+    rows = {row["capability"]: row for row in manifest["capabilities"]}
+
+    assert rows["tool:coding.repo_status"]["resolution_policy"] == "BUNDLED_ONLY"
+    assert rows["tool:coding.repo_status"]["operator_external_setup_required"] is False
+    assert rows["tool:coding.repo_status"]["release_packaging_residue"] is True
+    assert rows["execution.container"]["state_now"] == "LOCAL_DEPENDENCY_MISSING"
+    assert rows["execution.container"]["operator_external_setup_required"] is False
+    assert "PLATFORM_ADAPTER_REQUIRED" in rows["execution.container"]["independence_actions"]
+
+
 def test_offline_manifest_reports_a_missing_remote_sdk(monkeypatch):
     import backend.app.offline as offline
 
@@ -265,7 +420,7 @@ def test_offline_manifest_reports_a_missing_remote_sdk(monkeypatch):
         {"name": "mock", "description": "local", "locality": "local", "status": "MODEL_PROVIDER_READY",
          "optional_dependency": None, "dependency_available": None},
     ]
-    monkeypatch.setattr(offline, "list_model_providers", lambda: providers)
+    monkeypatch.setattr(offline, "list_model_providers", lambda *_args, **_kwargs: providers)
     manifest = build_offline_manifest()
     rows = {row["capability"]: row for row in manifest["capabilities"]}
     assert rows["model:anthropic"]["state_now"] == "LOCAL_DEPENDENCY_MISSING"
