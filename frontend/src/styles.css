@@ -1333,3 +1333,44 @@ html {
 .next-vector-picker .next-vector-option input { flex-shrink: 0; }
 .next-vector-picker .next-vector-option:focus-within { outline: 2px solid currentColor; outline-offset: 2px; border-radius: 0.25rem; }
 .next-vector-picker .next-vector-prompt { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 16rem; overflow: auto; padding: 0.75rem; background: var(--surface-2, rgba(127,127,127,0.1)); border-radius: 0.5rem; font: inherit; font-size: 0.85rem; }
+
+/* Model setup: provider, server address and model for a chat. */
+.model-setup {
+  text-align: left;
+  gap: 10px;
+  min-width: 0;
+}
+
+.empty-state .model-setup {
+  max-width: 620px;
+  margin: 20px auto 0;
+}
+
+.model-choices {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.model-server {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: flex-end;
+}
+
+.model-server .field {
+  flex: 1 1 220px;
+}
+
+.model-state {
+  margin: 0;
+}
+
+.model-button {
+  max-width: 45%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border-color: var(--border);
+}

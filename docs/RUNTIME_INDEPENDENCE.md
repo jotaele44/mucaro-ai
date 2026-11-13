@@ -24,7 +24,7 @@ backend, Floot, GitHub, or any other developer tool on the host.
 | Tesseract + Poppler | Optional host binaries | Bundle optional OCR components where platform/licensing permit |
 | Playwright + Chromium | Optional rendered-browser runtime | Bundle an optional governed rendering engine on supported platforms |
 | Local LLM | External loopback server today | Optional bundled model engine/model pack, while retaining user-selected loopback engines |
-| Remote LLM APIs | Explicit remote provider | Keep as an explicit network exception |
+| Remote LLM APIs | Explicit remote provider (Anthropic, or a user-configured OpenAI-compatible server) that each chat must allow | Keep as an explicit network exception |
 | Web fetch/search/render | Explicit public-network operations | Keep behind the governed network capability gate |
 | GitHub/hosted CI | Development and release governance | Never required by the installed application |
 | Signing/notarization/update delivery | Distribution infrastructure | Never required for ordinary offline execution after install |

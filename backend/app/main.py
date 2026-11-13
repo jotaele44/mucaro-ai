@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import logging
 import re
+import sqlite3
 from pathlib import Path, PurePath
 
 from fastapi import Depends, FastAPI, File, Header, HTTPException, Request, UploadFile
@@ -21,8 +23,9 @@ from .conversations import (
     get_conversation,
     list_conversations,
     rename_conversation,
+    set_conversation_model,
 )
-from .db import init_db, list_payloads, upsert_payload
+from .db import get_connection, init_db, list_payloads, upsert_payload
 from .development_workbench import WorkbenchPlanError, compile_plan as compile_workbench_plan
 from .execution_entry import (
     ExecutionEntryError,
@@ -55,7 +58,10 @@ from .models import (
     ApprovalRequest,
     AskRequest,
     ConversationCreateRequest,
+    ConversationModelConfig,
     ConversationUpdateRequest,
+    ModelProbeRequest,
+    ModelSettingsRequest,
     DirectoryPermissionRequest,
     ExecutionEntryCreateRequest,
     ExecutionEntryDecisionRequest,
@@ -76,7 +82,8 @@ from .models import (
     ToolDecisionRequest,
     WorkspaceProfileRequest,
 )
-from .model_router import list_model_providers
+from .model_router import ModelProviderError, list_model_providers, model_provider_names, probe_model_server
+from .model_settings import ModelSettingsError, public_model_settings, save_model_settings
 from .multimodal import MULTIMODAL_SUFFIXES
 from .offline import build_offline_manifest
 from .memory import (
@@ -140,6 +147,16 @@ from .workspaces import list_workspace_profiles, upsert_workspace_profile
 
 SUPPORTED_UPLOAD_SUFFIXES = FOLDER_SUPPORTED_SUFFIXES
 GENERATED_NAME_PATTERN = re.compile(r"^(src_|run_|chunk_)", re.IGNORECASE)
+logger = logging.getLogger(__name__)
+# Recovery failures that mean "the running source no longer matches the source the
+# decision was claimed under". These are expected after a code update and clear by
+# themselves once the source matches again; anything else is an integrity problem.
+EXECUTION_ENTRY_SOURCE_RECOVERY_STATUSES = frozenset(
+    {
+        "ERROR_EXECUTION_ENTRY_SOURCE_DRIFT",
+        "ERROR_EXECUTION_ENTRY_SOURCE_IDENTITY_UNAVAILABLE",
+    }
+)
 
 
 def api_error(status: str, detail: str, *, status_code: int = 400, **extra: object) -> HTTPException:
@@ -214,6 +231,44 @@ class SecurityHeadersMiddleware:
         await self.app(scope, receive, send_with_headers)  # type: ignore[operator]
 
 
+def _claimed_entry_decision_ids(cfg: Settings) -> list[str]:
+    """Read-only list of decisions still CLAIMED, used only to give recovery logs context."""
+    conn = get_connection(cfg.sqlite_path)
+    try:
+        rows = conn.execute(
+            "SELECT decision_id FROM execution_entry_decisions WHERE state = 'CLAIMED' ORDER BY rowid ASC"
+        ).fetchall()
+    except sqlite3.Error:
+        return []
+    finally:
+        conn.close()
+    return [str(row["decision_id"]) for row in rows]
+
+
+def _resume_pending_entry_decisions_at_startup(cfg: Settings) -> None:
+    """Resume decisions stranded in CLAIMED without letting a recovery failure block boot.
+
+    A decision is stranded when the process died between claim and dispatch. If the
+    runtime source commit changed since (any code update), dispatch correctly refuses
+    with ERROR_EXECUTION_ENTRY_SOURCE_DRIFT. That refusal must not stop the server from
+    starting: the decision stays CLAIMED, nothing is dispatched for it, and it is
+    resumed on a later start whose source identity matches the claimed artifact.
+    resume_pending_entry_decisions stops at the first failing decision, so decisions
+    ordered behind it are retried on the next start as well.
+    """
+    try:
+        resume_pending_entry_decisions(cfg)
+    except ExecutionEntryError as exc:
+        log = logger.warning if exc.status in EXECUTION_ENTRY_SOURCE_RECOVERY_STATUSES else logger.error
+        log(
+            "execution-entry startup recovery deferred: status=%s detail=%s still_claimed_decisions=%s; "
+            "these decisions were left in state CLAIMED and are retried on the next start",
+            exc.status,
+            exc.detail,
+            _claimed_entry_decision_ids(cfg),
+        )
+
+
 def create_app(cfg: Settings = settings) -> FastAPI:
     try:
         enforce_startup_security(cfg)
@@ -242,7 +297,7 @@ def create_app(cfg: Settings = settings) -> FastAPI:
     init_db(cfg.sqlite_path)
     reconcile_interrupted_tool_calls(cfg)
     reconcile_runs_on_startup(cfg)
-    resume_pending_entry_decisions(cfg)
+    _resume_pending_entry_decisions_at_startup(cfg)
 
     def resume_for_tool_call(result: dict) -> dict:
         run_id = (result.get("tool_call") or {}).get("run_id")
@@ -639,7 +694,19 @@ def create_app(cfg: Settings = settings) -> FastAPI:
 
     @app.post("/conversations")
     def create_chat(req: ConversationCreateRequest, _auth: dict = Depends(require_auth)) -> dict:
-        return create_conversation(req.title, cfg)
+        model = req.model.model_dump() if req.model else None
+        if model and model["model_provider"].strip().lower() not in model_provider_names():
+            raise api_error("ERROR_UNSUPPORTED_MODEL_PROVIDER", model["model_provider"])
+        return create_conversation(req.title, cfg, model=model)
+
+    @app.put("/conversations/{conversation_id}/model")
+    def set_chat_model(conversation_id: str, req: ConversationModelConfig, _auth: dict = Depends(require_auth)) -> dict:
+        if req.model_provider.strip().lower() not in model_provider_names():
+            raise api_error("ERROR_UNSUPPORTED_MODEL_PROVIDER", req.model_provider)
+        try:
+            return set_conversation_model(conversation_id, req.model_dump(), cfg)
+        except KeyError as exc:
+            raise api_error("ERROR_CONVERSATION_NOT_FOUND", "Conversation not found.", status_code=404) from exc
 
     @app.get("/conversations/{conversation_id}")
     def conversation(conversation_id: str) -> dict:
@@ -788,7 +855,28 @@ def create_app(cfg: Settings = settings) -> FastAPI:
 
     @app.get("/models")
     def models() -> dict:
-        return {"status": "MODEL_PROVIDERS_OK", "providers": list_model_providers(cfg)}
+        return {
+            "status": "MODEL_PROVIDERS_OK",
+            "providers": list_model_providers(cfg),
+            "settings": public_model_settings(cfg),
+        }
+
+    @app.put("/models/settings")
+    def update_model_settings(req: ModelSettingsRequest, _auth: dict = Depends(require_auth)) -> dict:
+        try:
+            saved = save_model_settings(req.model_dump(exclude_none=True), cfg)
+        except ModelSettingsError as exc:
+            raise api_error(exc.status, exc.detail) from exc
+        return {"status": "MODEL_SETTINGS_SAVED", "settings": saved, "providers": list_model_providers(cfg)}
+
+    @app.post("/models/probe")
+    def probe_models(req: ModelProbeRequest, _auth: dict = Depends(require_auth)) -> dict:
+        try:
+            return probe_model_server(req.base_url, api_key=req.api_key or None, cfg=cfg)
+        except ModelSettingsError as exc:
+            raise api_error(exc.status, exc.detail) from exc
+        except ModelProviderError as exc:
+            raise api_error(exc.status, exc.detail, status_code=403) from exc
 
     @app.get("/offline-manifest")
     def offline_manifest(offline: bool = False) -> dict:

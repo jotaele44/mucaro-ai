@@ -8,6 +8,7 @@ import { EvidencePanel } from "./EvidencePanel.jsx";
 import { ExecutionEntryCard } from "./ExecutionEntryCard.jsx";
 import { NextVectorPicker } from "./NextVectorPicker.jsx";
 import { EditableMessage } from "./MessageActions.jsx";
+import { ModelSetup, modelLabel } from "./ModelSetup.jsx";
 import { RunBlock } from "./RunBlock.jsx";
 import { Sheet } from "./Sheet.jsx";
 
@@ -85,8 +86,17 @@ function ConversationMenu({ conversation, onRename, onDelete, onOpenTasks, annou
   );
 }
 
-export function ChatView({ reconnect = 0, conversationId, onConversationCreated, onConversationsChanged, onOpenTasks, announce, modes, defaultOptions }) {
+const modelOf = (options) => ({
+  model_provider: options?.model_provider || "mock",
+  model_name: options?.model_name || null,
+  allow_live: Boolean(options?.allow_live),
+});
+
+export function ChatView({ reconnect = 0, conversationId, onConversationCreated, onConversationsChanged, onOpenTasks, announce, modes, defaultOptions, onDefaultModelChange }) {
   const [conversation, setConversation] = useState(null);
+  // The model for a chat that has not started yet; it becomes the conversation's model on the first message.
+  const [draftModel, setDraftModel] = useState(() => modelOf(defaultOptions));
+  const [modelOpen, setModelOpen] = useState(false);
   const [runs, setRuns] = useState(new Map());
   const [summaries, setSummaries] = useState([]);
   const [mode, setMode] = useState("ask");
@@ -208,6 +218,7 @@ export function ChatView({ reconnect = 0, conversationId, onConversationCreated,
     setConversation(null);
     setEntryContext(null);
     setError(null);
+    setModelOpen(false);
     if (!conversationId) return;
     setLoading(true);
     refresh()
@@ -242,6 +253,8 @@ export function ChatView({ reconnect = 0, conversationId, onConversationCreated,
         .sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1)),
     [runs],
   );
+  // A chat started before models were chosen per chat follows the Settings default.
+  const chatModel = conversationId ? modelOf(conversation?.model || defaultOptions) : draftModel;
   const legacyTurns = (conversation?.turns || []).filter((turn) => !turn.work_run_id);
   const messageEdits = conversation?.message_edits || {};
   const activeRun = views.find((view) => ["RUNNING", "AWAITING_APPROVAL", "AWAITING_INPUT"].includes(view.state));
@@ -270,9 +283,12 @@ export function ChatView({ reconnect = 0, conversationId, onConversationCreated,
     try {
       let id = conversationId;
       const creating = !id;
-      if (creating) id = (await api.createConversation(prompt.slice(0, 60))).conversation_id;
+      if (creating) {
+        id = (await api.createConversation(prompt.slice(0, 60), draftModel)).conversation_id;
+        onDefaultModelChange?.(draftModel); // the next new chat starts from this choice
+      }
       const key = suppliedIdempotencyKey || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-      const result = await api.sendMessage(id, { prompt, mode: modeOverride || mode, idempotency_key: key, options: defaultOptions });
+      const result = await api.sendMessage(id, { prompt, mode: modeOverride || mode, idempotency_key: key, options: { ...defaultOptions, ...chatModel } });
       // Switch to a new conversation only after its first run exists, so the reload sees and follows it.
       if (creating) onConversationCreated(id);
       else {
@@ -349,6 +365,20 @@ export function ChatView({ reconnect = 0, conversationId, onConversationCreated,
     return result.message_edit;
   }
 
+  async function changeModel(next) {
+    if (!conversationId) {
+      setDraftModel(next);
+      return;
+    }
+    setConversation((current) => (current ? { ...current, model: next } : current));
+    try {
+      await api.setConversationModel(conversationId, next);
+      onConversationsChanged();
+    } catch (err) {
+      setError(err);
+    }
+  }
+
   const empty = !loading && !views.length && !legacyTurns.length && !entryContext?.entry;
   return (
     <section className="chat" aria-label="Conversation">
@@ -357,6 +387,11 @@ export function ChatView({ reconnect = 0, conversationId, onConversationCreated,
           <h1>{conversation?.title || "New conversation"}</h1>
           <p className="muted small">Local workspace · answers cite your sources</p>
         </div>
+        {conversationId && (
+          <button type="button" className="ghost-button model-button" aria-expanded={modelOpen} onClick={() => setModelOpen((open) => !open)}>
+            Model: {modelLabel(chatModel)}
+          </button>
+        )}
         {conversation && (
           <ConversationMenu
             conversation={conversation}
@@ -389,10 +424,12 @@ export function ChatView({ reconnect = 0, conversationId, onConversationCreated,
             onResume={resumeExecutionEntry}
           />
         )}
+        {conversationId && modelOpen && <ModelSetup value={chatModel} onChange={changeModel} announce={announce} />}
         {empty && (
           <div className="empty-state">
             <h2>What should Mucaro work on?</h2>
             <p className="muted">Ask about your sources, or use a command such as <code>/status</code> or <code>/fetch https://…</code>. Actions always ask before they run unless you choose Auto for local read-only tools.</p>
+            {!conversationId && <ModelSetup value={draftModel} onChange={changeModel} announce={announce} />}
           </div>
         )}
         {legacyTurns.map((turn, index) => {
