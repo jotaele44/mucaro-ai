@@ -44,6 +44,7 @@ PACKAGE_LOCK = ROOT / "frontend" / "package-lock.json"
 DISPOSITIONS = ROOT / "_architecture" / "release" / "security" / "static_security_dispositions_v1.json"
 STATIC_TARGETS = ["backend/app", "packaging", "scripts"]
 SECURITY_REGRESSIONS = [
+    "backend/tests/test_browser_security.py",
     "backend/tests/test_api_auth_boundary.py",
     "backend/tests/test_ingestion_safety.py",
     "backend/tests/test_prompt_injection.py",

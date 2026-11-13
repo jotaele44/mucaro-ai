@@ -108,8 +108,11 @@ def test_no_window_service_enforces_the_launch_token_and_single_instance(tmp_pat
         security = json.loads(instance_path.read_text(encoding="utf-8"))["security"]
         assert security == {"status": "SECURITY_OK", "production_ready": True, "deployment_profile": "production", "cors_origins": [base], "failing": []}
         own = _cors_origin(f"{base}/health", base)
-        foreign = _cors_origin(f"{base}/health", "http://localhost:5173")
-        assert own == base and foreign is None
+        assert own == base
+        with pytest.raises(urllib.error.HTTPError) as foreign:
+            _cors_origin(f"{base}/health", "http://localhost:5173")
+        assert foreign.value.code == 403
+        assert foreign.value.headers.get("access-control-allow-origin") is None
 
         second = subprocess.run(_shell("--smoke", "--data-dir", str(data_dir)), cwd=tmp_path, env=_env(), capture_output=True, text=True, timeout=120, check=False)
         assert second.returncode == desktop_shell.EXIT_ALREADY_RUNNING
