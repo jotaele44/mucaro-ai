@@ -75,10 +75,13 @@
       "id": "TOOL-07",
       "capability": "vcs.branch_commit",
       "clause": "open or update PRs where authorized",
-      "satisfied_by": [],
-      "state": "ABSENT",
+      "satisfied_by": [
+        "coding.branch_create",
+        "coding.commit"
+      ],
+      "state": "PRESENT",
       "owner_domain": "V13",
-      "note": "No governed branch or commit mutation tool."
+      "note": "Governed branch creation and exact candidate-set commit mutation are exposed through the approval-gated tool runtime."
     },
     {
       "id": "TOOL-08",
