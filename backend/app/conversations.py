@@ -27,7 +27,9 @@ def _title_from_query(query: str) -> str:
     return compact[:64] or DEFAULT_TITLE
 
 
-def create_conversation(title: str | None = None, cfg: Settings = settings) -> dict[str, Any]:
+def create_conversation(
+    title: str | None = None, cfg: Settings = settings, model: dict[str, Any] | None = None
+) -> dict[str, Any]:
     cfg.ensure_dirs()
     init_db(cfg.sqlite_path)
     now = utc_now()
@@ -40,8 +42,30 @@ def create_conversation(title: str | None = None, cfg: Settings = settings) -> d
         "turns": [],
         "message_edits": {},
     }
+    if model and model.get("model_provider"):
+        conversation["model"] = _model_choice(model)
     upsert_payload("conversations", "conversation_id", conversation, cfg.sqlite_path)
     return conversation
+
+
+def _model_choice(model: dict[str, Any]) -> dict[str, Any]:
+    # The model chosen for this chat; the client sends it back as run options on each message.
+    return {
+        "model_provider": str(model["model_provider"]).strip().lower(),
+        "model_name": (str(model.get("model_name") or "").strip() or None),
+        "allow_live": bool(model.get("allow_live")),
+    }
+
+
+def set_conversation_model(conversation_id: str, model: dict[str, Any], cfg: Settings = settings) -> dict[str, Any]:
+    with _CONVERSATION_LOCK:
+        conversation = get_conversation(conversation_id, cfg)
+        if conversation is None:
+            raise KeyError(conversation_id)
+        conversation["model"] = _model_choice(model)
+        conversation["updated_at"] = utc_now()
+        upsert_payload("conversations", "conversation_id", conversation, cfg.sqlite_path)
+        return conversation
 
 
 def list_conversations(cfg: Settings = settings) -> list[dict[str, Any]]:
@@ -57,6 +81,7 @@ def list_conversations(cfg: Settings = settings) -> list[dict[str, Any]]:
                 "created_at": conversation.get("created_at"),
                 "updated_at": conversation.get("updated_at"),
                 "turn_count": len(turns),
+                "model": conversation.get("model"),
                 "last_status": turns[-1].get("status") if turns else "EMPTY",
             }
         )
