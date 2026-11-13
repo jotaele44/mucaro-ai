@@ -1,6 +1,6 @@
 # Desktop Launcher Mode
 
-> **Source setup, not a release artifact.** Double-click the tracked `Mucaro AI.app` beside
+> **Source setup, not a release artifact.** Double-click the tracked `Mucaro AI Setup.app` beside
 > `pyproject.toml` on macOS. It runs setup quietly and opens a native window without Terminal or
 > a browser. Release-grade certification requires two packaged lanes,
 > and neither is this launcher:
@@ -17,7 +17,7 @@ Desktop Launcher Mode lets Mucaro AI run with one command.
 ## Legacy console setup and launch
 
 `Mucaro AI.command` (macOS) and `Mucaro AI.cmd` (Windows) set up everything on first use and then
-run `scripts/launch_app.py --auto-port --exit-if-running`. `Mucaro AI.app` and `Mucaro AI.exe` run
+run `scripts/launch_app.py --auto-port --exit-if-running`. `Mucaro AI Setup.app` and `Mucaro AI.exe` run
 the same setup silently and add `--native` (own window, no browser). See `docs/ONE_CLICK_SETUP.md`.
 
 Launcher options used by the double-click files:
@@ -48,7 +48,7 @@ MACOS_APP_BUNDLE_READY
 The generated app is:
 
 ```text
-data/exports/desktop_apps/Mucaro AI.app
+data/exports/desktop_apps/Mucaro AI Setup.app
 ```
 
 Double-clicking that app runs `scripts/native_start.sh`, which redirects output into logs and
@@ -59,7 +59,7 @@ launch produces one dialog and leaves its log available for troubleshooting.
 Verify an existing bundle with:
 
 ```bash
-python scripts/package_desktop.py --verify-app "data/exports/desktop_apps/Mucaro AI.app"
+python scripts/package_desktop.py --verify-app "data/exports/desktop_apps/Mucaro AI Setup.app"
 ```
 
 Expected marker:

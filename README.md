@@ -4,7 +4,7 @@ Local-first prototype for a custom LLM workflow with file ingestion, source line
 
 ## Quick start
 
-**Double-click `Mucaro AI.app` (macOS) or `Mucaro AI.exe` (Windows) in this checkout.** It runs
+**Double-click `Mucaro AI Setup.app` (macOS) or `Mucaro AI.exe` (Windows) in this checkout.** It runs
 setup quietly and opens Mucaro in its own native window. Keep it next to `pyproject.toml`; move
 the whole folder together. No Terminal, console or browser opens. `Mucaro AI.command` and
 `Mucaro AI.cmd` are legacy console launchers. On Windows the window needs the Microsoft Edge
@@ -109,6 +109,18 @@ python scripts/launch_app.py            # or python scripts/dev_start.py for hot
 
 ## Optional environment variables
 
+### Choosing a model
+
+Starting a new chat shows **Model for this chat**: pick a model on this computer, a model on
+another server, Claude, or no model. For a model server, enter its address, choose
+**Detect models** and pick any model it lists. Each chat keeps its model (change it from the
+chat's **Model** button); Settings holds the default for new chats. The server address and
+any API key are saved on the computer that runs Mucaro; the key is never shown again.
+
+A message that matches none of your sources is still answered by the chat's model and is
+marked **No sources used**; it is never presented as a cited answer. `mucaro ask` and
+`POST /ask` stay strict and return `ERROR_NO_RETRIEVAL_CONTEXT`.
+
 Copy `.env.example` to `.env` and fill only what you need. `scripts/launch_app.py`
 and `scripts/dev_start.py` load `.env` automatically (shell-exported values win);
 when running `uvicorn` or `mucaro serve` directly, export the variables in your
@@ -118,6 +130,8 @@ shell instead.
 - `MUCARO_AI_LIVE_MODE=1`: permits live Anthropic calls. Default is deterministic mock mode.
 - `MUCARO_AI_MODEL_PROVIDER`: default model provider. Default is `mock`.
 - `MUCARO_AI_MODEL`: model name for live mode.
+- `MUCARO_AI_LOCAL_MODEL_URL`, `MUCARO_AI_LOCAL_MODEL`: defaults for a model served on this computer through an OpenAI-compatible API (Ollama, LM Studio, llama.cpp). Default URL is `http://127.0.0.1:11434/v1`; with no model named, the first model the server lists is used.
+- `MUCARO_AI_REMOTE_MODEL_URL`, `MUCARO_AI_REMOTE_MODEL`, `MUCARO_AI_REMOTE_MODEL_API_KEY`: defaults for an OpenAI-compatible server on another machine (vLLM, a remote Ollama, a hosted open-model endpoint). Content is sent there only for chats that allow it.
 - `MUCARO_AI_MODEL_EFFORT`: how much the live Anthropic model thinks before it answers: `low` (default, fastest first word), `medium`, `high`, `xhigh`, `max`, or `default` to leave it to the model. It is sent only to models that accept it.
 - `MUCARO_AI_MAX_UPLOAD_BYTES`: API upload limit. Default is 25 MB.
 - `MUCARO_AI_SQLITE_WAL=0`: keep SQLite's rollback journal instead of WAL (the default), for example when the data directory is on a network share.
@@ -311,7 +325,7 @@ tracked source files, refuses dirty worktrees by default, and records SHA-256
 receipts for the archive and every member.
 
 Use `mucaro package macos-app --format text` to build a local source-bound
-`Mucaro AI.app` under `data/exports/desktop_apps`. Double-clicking that app
+`Mucaro AI Setup.app` under `data/exports/desktop_apps`. Double-clicking that app
 launches this checkout through silent setup and opens the native window. It provisions private
 runtimes on first use. This is not yet a portable
 signed installer with embedded runtime, reinstall, upgrade, and rollback

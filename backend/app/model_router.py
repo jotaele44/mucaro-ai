@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 from typing import Any
 from urllib.parse import urlparse
 
+from . import model_settings
 from .config import Settings, settings
 from .injection_guard import neutralize_fence
 from .permission_engine import PermissionEngineError, PermissionRequest, require as require_permission
@@ -82,10 +83,29 @@ MODEL_PROVIDER_SPECS: dict[str, ModelProviderSpec] = {
         context_tokens=8192,
         supports_streaming=True,
     ),
+    "openai_compatible_remote": ModelProviderSpec(
+        name="openai_compatible_remote",
+        default_model="",
+        live=True,
+        requires_live_mode=False,
+        api_key_env=None,
+        optional_dependency=None,
+        description=(
+            "Open model served on another machine through an OpenAI-compatible API (vLLM, Ollama or LM Studio "
+            "on your network, or a hosted open-model endpoint). Questions and source excerpts are sent to that "
+            "server, so each chat must allow it explicitly."
+        ),
+        locality="remote",
+        modalities=("text",),
+        context_tokens=8192,
+        supports_streaming=True,
+    ),
 }
 
 LOCAL_PROVIDER = "openai_compatible_local"
-DEFAULT_LOCAL_MODEL_URL = "http://127.0.0.1:11434/v1"
+REMOTE_PROVIDER = "openai_compatible_remote"
+OPENAI_COMPATIBLE_PROVIDERS = (LOCAL_PROVIDER, REMOTE_PROVIDER)
+DEFAULT_LOCAL_MODEL_URL = model_settings.DEFAULT_LOCAL_MODEL_URL
 _PROBE_CACHE: dict[str, tuple[float, dict[str, Any]]] = {}
 _PROBE_TTL_SECONDS = 5.0
 
@@ -141,24 +161,37 @@ def get_model_provider_spec(model_provider: str | None) -> ModelProviderSpec:
         raise ModelProviderError("ERROR_UNSUPPORTED_MODEL_PROVIDER", provider) from exc
 
 
-def list_model_providers(cfg: Settings = settings) -> list[dict[str, Any]]:
-    return [_provider_status(spec, cfg) for spec in MODEL_PROVIDER_SPECS.values()]
+def list_model_providers(
+    cfg: Settings = settings, requested_models: dict[str, str] | None = None
+) -> list[dict[str, Any]]:
+    """Readiness of every provider. requested_models maps a provider name to the model a caller asked for."""
+    requested = requested_models or {}
+    return [_provider_status(spec, cfg, requested.get(spec.name)) for spec in MODEL_PROVIDER_SPECS.values()]
 
 
 def model_provider_names() -> tuple[str, ...]:
     return tuple(MODEL_PROVIDER_SPECS)
 
 
-def model_provider_status(model_provider: str | None = None, cfg: Settings = settings) -> dict[str, Any]:
-    return _provider_status(get_model_provider_spec(model_provider), cfg)
+def model_provider_status(
+    model_provider: str | None = None, cfg: Settings = settings, model_name: str | None = None
+) -> dict[str, Any]:
+    return _provider_status(get_model_provider_spec(model_provider), cfg, model_name)
 
 
-def local_model_settings() -> dict[str, Any]:
+def local_model_settings(cfg: Settings = settings) -> dict[str, Any]:
     return {
-        "base_url": (os.getenv("MUCARO_AI_LOCAL_MODEL_URL") or DEFAULT_LOCAL_MODEL_URL).rstrip("/"),
-        "model": os.getenv("MUCARO_AI_LOCAL_MODEL") or MODEL_PROVIDER_SPECS[LOCAL_PROVIDER].default_model,
+        **model_settings.local_settings(cfg),
         "timeout_seconds": float(os.getenv("MUCARO_AI_LOCAL_MODEL_TIMEOUT") or 120),
         "context_tokens": int(os.getenv("MUCARO_AI_LOCAL_MODEL_CONTEXT") or MODEL_PROVIDER_SPECS[LOCAL_PROVIDER].context_tokens),
+    }
+
+
+def remote_model_settings(cfg: Settings = settings) -> dict[str, Any]:
+    return {
+        **model_settings.remote_settings(cfg),
+        "timeout_seconds": float(os.getenv("MUCARO_AI_REMOTE_MODEL_TIMEOUT") or 120),
+        "context_tokens": int(os.getenv("MUCARO_AI_REMOTE_MODEL_CONTEXT") or MODEL_PROVIDER_SPECS[REMOTE_PROVIDER].context_tokens),
     }
 
 
@@ -179,24 +212,110 @@ def _local_opener() -> urllib.request.OpenerDirector:
     return urllib.request.build_opener(urllib.request.ProxyHandler({}))
 
 
-def _probe_local_server(base_url: str, model: str) -> dict[str, Any]:
-    key = f"{base_url}|{model}"
+def _is_http_url(url: str) -> bool:
+    parsed = urlparse(url)
+    return parsed.scheme in {"http", "https"} and bool(parsed.hostname)
+
+
+def _remote_opener() -> urllib.request.OpenerDirector:
+    # A server on the network is reached like any other host, through the system proxy when one is set.
+    return urllib.request.build_opener()
+
+
+def _auth_headers(api_key: str | None) -> dict[str, str]:
+    return {"Authorization": f"Bearer {api_key}"} if api_key else {}
+
+
+def match_installed_model(wanted: str, installed: list[str]) -> str | None:
+    """The server's own id for a model name, tolerating case and Ollama's implicit ':latest' tag."""
+    name = wanted.strip()
+    if not name:
+        return None
+    if name in installed:
+        return name
+    lowered = {item.lower(): item for item in installed}
+    for candidate in (name.lower(), f"{name.lower()}:latest", name.lower().removesuffix(":latest")):
+        if candidate in lowered:
+            return lowered[candidate]
+    return None
+
+
+def _probe_server(base_url: str, *, api_key: str | None = None, local: bool = True, timeout: float = 1.5) -> dict[str, Any]:
+    key = f"{base_url}|{hashlib.sha256((api_key or '').encode('utf-8')).hexdigest()[:16]}|{local}"
     cached = _PROBE_CACHE.get(key)
     if cached and time.monotonic() - cached[0] < _PROBE_TTL_SECONDS:
         return cached[1]
     result: dict[str, Any]
+    request = urllib.request.Request(f"{base_url}/models", headers=_auth_headers(api_key))
     try:
-        with _local_opener().open(f"{base_url}/models", timeout=1.5) as response:
+        with (_local_opener() if local else _remote_opener()).open(request, timeout=timeout) as response:
             payload = json.loads(response.read(1_000_000).decode("utf-8", errors="replace"))
-        names = [str(row.get("id")) for row in payload.get("data", []) if isinstance(row, dict)]
-        result = {"reachable": True, "models": names, "model_installed": model in names}
+        rows = payload.get("data") if isinstance(payload, dict) else payload
+        names = [str(row.get("id")) for row in (rows or []) if isinstance(row, dict) and row.get("id")]
+        result = {"reachable": True, "models": names}
+    except urllib.error.HTTPError as exc:
+        result = {"reachable": False, "models": [], "error": f"HTTP {exc.code}", "http_status": exc.code}
     except (urllib.error.URLError, OSError, ValueError) as exc:
-        result = {"reachable": False, "models": [], "model_installed": False, "error": type(exc).__name__}
+        result = {"reachable": False, "models": [], "error": type(exc).__name__}
     _PROBE_CACHE[key] = (time.monotonic(), result)
     return result
 
 
-def _provider_status(spec: ModelProviderSpec, cfg: Settings) -> dict[str, Any]:
+def _probe_local_server(base_url: str, model: str) -> dict[str, Any]:
+    probe = _probe_server(base_url, local=True)
+    return {**probe, "model_installed": match_installed_model(model, probe["models"]) is not None}
+
+
+def _resolve_model(
+    requested: str | None, configured: str, explicit: bool, installed: list[str], prefix: str
+) -> tuple[str | None, list[str]]:
+    """Pick the model to run and say why.
+
+    A model the caller or the operator named must be on the server; only the
+    built-in default may be replaced by whatever the server actually has.
+    """
+    wanted = (requested or "").strip() or (configured if explicit else "")
+    if wanted:
+        match = match_installed_model(wanted, installed)
+        return (match, []) if match else (None, [f"{prefix}_MODEL_NOT_INSTALLED:{wanted}"])
+    match = match_installed_model(configured, installed) if configured else None
+    if match:
+        return match, []
+    if installed:
+        return installed[0], [f"{prefix}_MODEL_AUTO_SELECTED:{installed[0]}"]
+    return None, [f"{prefix}_MODEL_NOT_INSTALLED:{configured}" if configured else f"{prefix}_SERVER_LISTS_NO_MODELS"]
+
+
+def probe_model_server(base_url: str, *, api_key: str | None = None, cfg: Settings = settings) -> dict[str, Any]:
+    """List the models an OpenAI-compatible server offers (for the model picker)."""
+    url = model_settings.normalize_base_url(base_url)
+    local = _is_loopback_url(url)
+    try:
+        require_permission(
+            PermissionRequest(
+                capability="model.invoke",
+                subject="model_router.probe_model_server",
+                target=LOCAL_PROVIDER if local else REMOTE_PROVIDER,
+                origin="operator",
+            ),
+            cfg=cfg,
+        )
+    except PermissionEngineError as exc:
+        raise ModelProviderError(exc.status, exc.detail) from exc
+    if not local and api_key is None:
+        api_key = remote_model_settings(cfg)["api_key"] or None
+    probe = _probe_server(url, api_key=api_key if not local else None, local=local, timeout=4.0)
+    return {
+        "status": "MODEL_SERVER_OK" if probe["reachable"] else "MODEL_SERVER_UNREACHABLE",
+        "base_url": url,
+        "locality": "local" if local else "remote",
+        "reachable": probe["reachable"],
+        "models": probe["models"][:200],
+        "error": probe.get("error"),
+    }
+
+
+def _provider_status(spec: ModelProviderSpec, cfg: Settings, requested_model: str | None = None) -> dict[str, Any]:
     live_mode_enabled = os.getenv("MUCARO_AI_LIVE_MODE") == "1"
     api_key_configured = bool(os.getenv(spec.api_key_env)) if spec.api_key_env else None
     dependency_available = (
@@ -216,8 +335,61 @@ def _provider_status(spec: ModelProviderSpec, cfg: Settings) -> dict[str, Any]:
     local: dict[str, Any] | None = None
     default_model = spec.default_model
     context_tokens = spec.context_tokens
+    resolved_model: str | None = None
+    if spec.name == REMOTE_PROVIDER:
+        remote_cfg = remote_model_settings(cfg)
+        default_model = remote_cfg["model"]
+        context_tokens = remote_cfg["context_tokens"]
+        local = {
+            "base_url": remote_cfg["base_url"],
+            "model": remote_cfg["model"],
+            "api_key_configured": bool(remote_cfg["api_key"]),
+            "reachable": None,
+            "installed_models": [],
+        }
+        if not remote_cfg["base_url"]:
+            status = "MODEL_PROVIDER_NOT_READY"
+            warnings.append("REMOTE_MODEL_URL_NOT_SET")
+        elif not _is_http_url(remote_cfg["base_url"]):
+            status = "MODEL_PROVIDER_NOT_READY"
+            warnings.append("REMOTE_MODEL_URL_INVALID")
+        else:
+            if remote_cfg["base_url"].startswith("http://") and not _is_loopback_url(remote_cfg["base_url"]):
+                warnings.append("REMOTE_MODEL_CLEARTEXT_HTTP")
+            try:
+                require_permission(
+                    PermissionRequest(
+                        capability="model.invoke",
+                        subject="model_router.provider_status:openai_compatible_remote",
+                        target=spec.name,
+                        origin="operator",
+                    ),
+                    cfg=cfg,
+                )
+            except PermissionEngineError as exc:
+                status = "MODEL_PROVIDER_NOT_READY"
+                warnings.append(f"MODEL_INVOKE_PERMISSION:{exc.status}")
+            else:
+                probe = _probe_server(remote_cfg["base_url"], api_key=remote_cfg["api_key"] or None, local=False, timeout=4.0)
+                local.update({"reachable": probe["reachable"], "installed_models": probe["models"][:50]})
+                if not probe["reachable"]:
+                    status = "MODEL_PROVIDER_NOT_READY"
+                    warnings.append(
+                        "REMOTE_MODEL_SERVER_REJECTED_KEY"
+                        if probe.get("http_status") in {401, 403}
+                        else "REMOTE_MODEL_SERVER_UNREACHABLE"
+                    )
+                else:
+                    resolved_model, notes = _resolve_model(
+                        requested_model, remote_cfg["model"], remote_cfg["model_explicit"], probe["models"], "REMOTE"
+                    )
+                    warnings.extend(notes)
+                    if resolved_model is None:
+                        status = "MODEL_PROVIDER_NOT_READY"
+                    else:
+                        default_model = resolved_model
     if spec.name == LOCAL_PROVIDER:
-        local_cfg = local_model_settings()
+        local_cfg = local_model_settings(cfg)
         default_model = local_cfg["model"]
         context_tokens = local_cfg["context_tokens"]
         local = {"base_url": local_cfg["base_url"], "model": local_cfg["model"]}
@@ -245,15 +417,22 @@ def _provider_status(spec: ModelProviderSpec, cfg: Settings) -> dict[str, Any]:
                 if not probe["reachable"]:
                     status = "MODEL_PROVIDER_NOT_READY"
                     warnings.append("LOCAL_MODEL_SERVER_UNREACHABLE")
-                elif not probe["model_installed"]:
-                    status = "MODEL_PROVIDER_NOT_READY"
-                    warnings.append(f"LOCAL_MODEL_NOT_INSTALLED:{local_cfg['model']}")
+                else:
+                    resolved_model, notes = _resolve_model(
+                        requested_model, local_cfg["model"], local_cfg["model_explicit"], probe["models"], "LOCAL"
+                    )
+                    warnings.extend(notes)
+                    if resolved_model is None:
+                        status = "MODEL_PROVIDER_NOT_READY"
+                    else:
+                        default_model = resolved_model
     return {
         "locality": spec.locality,
         "modalities": list(spec.modalities),
         "context_tokens": context_tokens,
         "supports_streaming": spec.supports_streaming,
         "local_server": local,
+        "resolved_model": resolved_model,
         "name": spec.name,
         "default_model": default_model,
         "live": spec.live,
@@ -269,6 +448,44 @@ def _provider_status(spec: ModelProviderSpec, cfg: Settings) -> dict[str, Any]:
     }
 
 
+def _provider_token_metric(value: Any, source: str) -> dict[str, Any] | None:
+    if value is None:
+        return None
+    if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+        raise ModelProviderError("ERROR_MODEL_USAGE_INVALID", f"{source} must be a non-negative integer")
+    return {
+        "value": value,
+        "classification": "PROVIDER_REPORTED",
+        "source": source,
+        "basis": [],
+    }
+
+
+def _build_model_usage(
+    *,
+    input_tokens: Any = None,
+    output_tokens: Any = None,
+    cache_creation_input_tokens: Any = None,
+    cache_read_input_tokens: Any = None,
+    total_tokens: Any = None,
+    source_prefix: str,
+) -> dict[str, Any] | None:
+    raw = {
+        "input_tokens": _provider_token_metric(input_tokens, f"{source_prefix}.input_tokens"),
+        "output_tokens": _provider_token_metric(output_tokens, f"{source_prefix}.output_tokens"),
+        "cache_creation_input_tokens": _provider_token_metric(
+            cache_creation_input_tokens,
+            f"{source_prefix}.cache_creation_input_tokens",
+        ),
+        "cache_read_input_tokens": _provider_token_metric(
+            cache_read_input_tokens,
+            f"{source_prefix}.cache_read_input_tokens",
+        ),
+        "total_tokens": _provider_token_metric(total_tokens, f"{source_prefix}.total_tokens"),
+    }
+    usage = {key: value for key, value in raw.items() if value is not None}
+    return usage or None
+
 def generate_answer(
     query: str,
     retrieved_chunks: list[dict[str, Any]],
@@ -280,8 +497,12 @@ def generate_answer(
     memory_context: list[dict[str, Any]] | None = None,
     on_text_delta: Callable[[str], None] | None = None,
     cfg: Settings = settings,
+    ungrounded: bool = False,
 ) -> dict[str, Any]:
+    """Generate an answer. ungrounded=True means no local source matched and the reply carries no evidence."""
     spec = get_model_provider_spec(model_provider)
+    # Passed on only when set, so the grounded call shape stays exactly as it was.
+    extra: dict[str, Any] = {"ungrounded": True} if ungrounded else {}
     if spec.name == LOCAL_PROVIDER:
         _require_model_invoke(spec, cfg)
         return _local_answer(
@@ -291,8 +512,32 @@ def generate_answer(
             conversation_context=conversation_context or [],
             memory_context=memory_context or [],
             on_text_delta=on_text_delta,
+            cfg=cfg,
+            **extra,
+        )
+    if spec.name == REMOTE_PROVIDER:
+        _require_model_invoke(spec, cfg)
+        return _remote_answer(
+            query,
+            retrieved_chunks,
+            model_name=model_name,
+            conversation_context=conversation_context or [],
+            memory_context=memory_context or [],
+            on_text_delta=on_text_delta,
+            cfg=cfg,
+            **extra,
         )
     if spec.name == "mock":
+        if ungrounded:
+            return {
+                "model_provider": "mock",
+                "model_name": model_name or spec.default_model,
+                "answer": (
+                    "No local source matches this message, and the built-in mock answerer can only quote sources. "
+                    "Choose a local or remote model for this chat to talk without sources, or add sources and ask about them."
+                ),
+                "cited_chunk_ids": [],
+            }
         return _mock_answer(
             query,
             retrieved_chunks,
@@ -329,6 +574,7 @@ def generate_answer(
         conversation_context=conversation_context or [],
         memory_context=memory_context or [],
         on_text_delta=on_text_delta,
+        **extra,
     )
 
 
@@ -485,6 +731,7 @@ def _anthropic_answer(
     conversation_context: list[dict[str, Any]],
     memory_context: list[dict[str, Any]],
     on_text_delta: Callable[[str], None] | None = None,
+    ungrounded: bool = False,
 ) -> dict[str, Any]:
     try:
         import anthropic as sdk  # type: ignore
@@ -500,7 +747,7 @@ def _anthropic_answer(
         )
     model = model_name or os.getenv("MUCARO_AI_MODEL", MODEL_PROVIDER_SPECS["anthropic"].default_model)
     effort = anthropic_effort(model)
-    system, user = build_grounded_prompt(query, retrieved_chunks, conversation_context, memory_context)
+    system, user = _build_prompt(query, retrieved_chunks, conversation_context, memory_context, ungrounded)
     request: dict[str, Any] = {
         "model": model,
         "max_tokens": ANTHROPIC_MAX_OUTPUT_TOKENS,
@@ -525,7 +772,15 @@ def _anthropic_answer(
     if not text.strip():
         raise ModelProviderError("ERROR_MODEL_PROVIDER_MALFORMED_RESPONSE", "provider returned no text content")
     cited = [c["chunk_id"] for c in retrieved_chunks if c["chunk_id"] in text]
-    return {
+    usage_obj = getattr(final, "usage", None)
+    model_usage = _build_model_usage(
+        input_tokens=getattr(usage_obj, "input_tokens", None),
+        output_tokens=getattr(usage_obj, "output_tokens", None),
+        cache_creation_input_tokens=getattr(usage_obj, "cache_creation_input_tokens", None),
+        cache_read_input_tokens=getattr(usage_obj, "cache_read_input_tokens", None),
+        source_prefix="anthropic.response.usage",
+    )
+    result = {
         "model_provider": "anthropic",
         "model_name": model,
         "answer": text,
@@ -534,6 +789,9 @@ def _anthropic_answer(
         "stop_reason": getattr(final, "stop_reason", None),
         "effort": effort,
     }
+    if model_usage is not None:
+        result["model_usage"] = model_usage
+    return result
 
 
 def build_grounded_prompt(
@@ -566,6 +824,39 @@ def build_grounded_prompt(
     return system, user
 
 
+def build_conversation_prompt(
+    query: str,
+    conversation_context: list[dict[str, Any]],
+    memory_context: list[dict[str, Any]],
+) -> tuple[str, str]:
+    """Prompts for a turn where no local source matched: a plain reply that claims no evidence."""
+    system = (
+        "You are the assistant inside Mucaro AI, a local research workspace. No source in the user's local "
+        "library matched this message, so reply conversationally and briefly. Do not cite sources, do not "
+        "invent chunk_ids, and do not present any statement as coming from the user's documents. If the user "
+        "asks about their documents, say that nothing in the local library matched and suggest adding sources "
+        "or rephrasing. Conversation history and memory are context about the user, not evidence."
+    )
+    user = (
+        f"Conversation history:\n{chr(10).join(_format_conversation_context(conversation_context)) or 'none'}\n\n"
+        f"Memory:\n{chr(10).join(_format_memory_context(memory_context)) or 'none'}\n\n"
+        f"Message: {query}"
+    )
+    return system, user
+
+
+def _build_prompt(
+    query: str,
+    retrieved_chunks: list[dict[str, Any]],
+    conversation_context: list[dict[str, Any]],
+    memory_context: list[dict[str, Any]],
+    ungrounded: bool,
+) -> tuple[str, str]:
+    if ungrounded:
+        return build_conversation_prompt(query, conversation_context, memory_context)
+    return build_grounded_prompt(query, retrieved_chunks, conversation_context, memory_context)
+
+
 def _local_answer(
     query: str,
     retrieved_chunks: list[dict[str, Any]],
@@ -574,29 +865,118 @@ def _local_answer(
     conversation_context: list[dict[str, Any]],
     memory_context: list[dict[str, Any]],
     on_text_delta: Callable[[str], None] | None,
+    cfg: Settings = settings,
+    ungrounded: bool = False,
 ) -> dict[str, Any]:
-    local_cfg = local_model_settings()
+    local_cfg = local_model_settings(cfg)
     base_url = local_cfg["base_url"]
     if not _is_loopback_url(base_url):
         raise ModelProviderError("ERROR_LOCAL_MODEL_URL_NOT_LOOPBACK", f"Local model URL must be a loopback address: {base_url}")
-    model = model_name or local_cfg["model"]
-    system, user = build_grounded_prompt(query, retrieved_chunks, conversation_context, memory_context)
+    model = _model_for_call(
+        model_name, local_cfg, lambda: _probe_server(base_url, local=True)["models"]
+    )
+    system, user = _build_prompt(query, retrieved_chunks, conversation_context, memory_context, ungrounded)
+    return _openai_compatible_answer(
+        provider=LOCAL_PROVIDER,
+        label="Local",
+        code="LOCAL",
+        base_url=base_url,
+        api_key=None,
+        opener=_local_opener(),
+        timeout=local_cfg["timeout_seconds"],
+        model=model,
+        system=system,
+        user=user,
+        retrieved_chunks=retrieved_chunks,
+        on_text_delta=on_text_delta,
+    )
+
+
+def _remote_answer(
+    query: str,
+    retrieved_chunks: list[dict[str, Any]],
+    *,
+    model_name: str | None,
+    conversation_context: list[dict[str, Any]],
+    memory_context: list[dict[str, Any]],
+    on_text_delta: Callable[[str], None] | None,
+    cfg: Settings = settings,
+    ungrounded: bool = False,
+) -> dict[str, Any]:
+    remote_cfg = remote_model_settings(cfg)
+    base_url = remote_cfg["base_url"]
+    if not base_url or not _is_http_url(base_url):
+        raise ModelProviderError("ERROR_REMOTE_MODEL_URL_NOT_SET", "Set the remote model server URL before using it.")
+    api_key = remote_cfg["api_key"] or None
+    model = _model_for_call(
+        model_name, remote_cfg, lambda: _probe_server(base_url, api_key=api_key, local=False, timeout=4.0)["models"]
+    )
+    if not model:
+        raise ModelProviderError("ERROR_REMOTE_MODEL_NOT_INSTALLED", f"No model is selected and {base_url} lists none.")
+    system, user = _build_prompt(query, retrieved_chunks, conversation_context, memory_context, ungrounded)
+    return _openai_compatible_answer(
+        provider=REMOTE_PROVIDER,
+        label="Remote",
+        code="REMOTE",
+        base_url=base_url,
+        api_key=api_key,
+        opener=_remote_opener(),
+        timeout=remote_cfg["timeout_seconds"],
+        model=model,
+        system=system,
+        user=user,
+        retrieved_chunks=retrieved_chunks,
+        on_text_delta=on_text_delta,
+    )
+
+
+def _model_for_call(model_name: str | None, provider_cfg: dict[str, Any], installed: Callable[[], list[str]]) -> str:
+    """The model id to send: the caller's choice, else the configured one, else what the server has."""
+    if model_name and model_name.strip():
+        return model_name.strip()
+    configured = str(provider_cfg.get("model") or "")
+    if provider_cfg.get("model_explicit"):
+        return configured
+    names = installed()
+    return match_installed_model(configured, names) or (names[0] if names else configured)
+
+
+def _openai_compatible_answer(
+    *,
+    provider: str,
+    label: str,
+    code: str,
+    base_url: str,
+    api_key: str | None,
+    opener: urllib.request.OpenerDirector,
+    timeout: float,
+    model: str,
+    system: str,
+    user: str,
+    retrieved_chunks: list[dict[str, Any]],
+    on_text_delta: Callable[[str], None] | None,
+) -> dict[str, Any]:
     stream = on_text_delta is not None
-    body = json.dumps(
-        {
-            "model": model,
-            "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
-            "temperature": 0.2,
-            "max_tokens": 900,
-            "stream": stream,
-        }
-    ).encode("utf-8")
+    request_payload: dict[str, Any] = {
+        "model": model,
+        "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
+        "temperature": 0.2,
+        "max_tokens": 900,
+        "stream": stream,
+    }
+    if stream:
+        request_payload["stream_options"] = {"include_usage": True}
+    body = json.dumps(request_payload).encode("utf-8")
     request = urllib.request.Request(
-        f"{base_url}/chat/completions", data=body, headers={"Content-Type": "application/json"}, method="POST"
+        f"{base_url}/chat/completions",
+        data=body,
+        headers={"Content-Type": "application/json", **_auth_headers(api_key)},
+        method="POST",
     )
     parts: list[str] = []
+    reported_usage: dict[str, Any] | None = None
     try:
-        with _local_opener().open(request, timeout=local_cfg["timeout_seconds"]) as response:
+        with opener.open(request, timeout=timeout) as response:
             if stream:
                 for raw in response:
                     line = raw.decode("utf-8", errors="replace").strip()
@@ -605,31 +985,63 @@ def _local_answer(
                     data = line[5:].strip()
                     if data == "[DONE]":
                         break
-                    delta = (json.loads(data).get("choices") or [{}])[0].get("delta", {}).get("content") or ""
+                    event = json.loads(data)
+                    usage = event.get("usage")
+                    if isinstance(usage, dict):
+                        reported_usage = _build_model_usage(
+                            input_tokens=usage.get("prompt_tokens"),
+                            output_tokens=usage.get("completion_tokens"),
+                            total_tokens=usage.get("total_tokens"),
+                            source_prefix="openai_compatible.response.usage",
+                        )
+                    delta = ((event.get("choices") or [{}])[0].get("delta") or {}).get("content") or ""
                     if delta:
                         parts.append(delta)
                         on_text_delta(delta)  # type: ignore[misc]
             else:
                 payload = json.loads(response.read(4_000_000).decode("utf-8", errors="replace"))
+                usage = payload.get("usage")
+                if isinstance(usage, dict):
+                    reported_usage = _build_model_usage(
+                        input_tokens=usage.get("prompt_tokens"),
+                        output_tokens=usage.get("completion_tokens"),
+                        total_tokens=usage.get("total_tokens"),
+                        source_prefix="openai_compatible.response.usage",
+                    )
                 parts.append(str(((payload.get("choices") or [{}])[0].get("message") or {}).get("content") or ""))
     except urllib.error.HTTPError as exc:
         if exc.code == 404:
-            status = "ERROR_LOCAL_MODEL_NOT_INSTALLED"
+            status = f"ERROR_{code}_MODEL_NOT_INSTALLED"
+        elif exc.code in {401, 403}:
+            status = f"ERROR_{code}_MODEL_AUTH_REQUIRED"
         elif exc.code == 429:
             status = "ERROR_MODEL_PROVIDER_RATE_LIMIT"
         elif exc.code in {408, 504}:
             status = "ERROR_MODEL_PROVIDER_TIMEOUT"
         elif exc.code >= 500:
-            status = "ERROR_LOCAL_MODEL_UNAVAILABLE"
+            status = f"ERROR_{code}_MODEL_UNAVAILABLE"
         else:
-            status = "ERROR_LOCAL_MODEL_HTTP_ERROR"
-        raise ModelProviderError(status, f"Local model server returned HTTP {exc.code} for model {model}.") from exc
+            status = f"ERROR_{code}_MODEL_HTTP_ERROR"
+        raise ModelProviderError(status, f"{label} model server returned HTTP {exc.code} for model {model}.") from exc
     except (urllib.error.URLError, OSError) as exc:
-        raise ModelProviderError("ERROR_LOCAL_MODEL_UNAVAILABLE", f"Local model server unreachable at {base_url}: {exc}") from exc
-    except (ValueError, KeyError, IndexError) as exc:
-        raise ModelProviderError("ERROR_LOCAL_MODEL_RESPONSE_INVALID", f"Unexpected local model response: {exc}") from exc
+        raise ModelProviderError(
+            f"ERROR_{code}_MODEL_UNAVAILABLE", f"{label} model server unreachable at {base_url}: {exc}"
+        ) from exc
+    except (ValueError, KeyError, IndexError, AttributeError) as exc:
+        raise ModelProviderError(
+            f"ERROR_{code}_MODEL_RESPONSE_INVALID", f"Unexpected {label.lower()} model response: {exc}"
+        ) from exc
     text = "".join(parts).strip()
     if not text:
-        raise ModelProviderError("ERROR_LOCAL_MODEL_EMPTY_RESPONSE", f"Local model {model} returned no text.")
+        raise ModelProviderError(f"ERROR_{code}_MODEL_EMPTY_RESPONSE", f"{label} model {model} returned no text.")
     cited = [c["chunk_id"] for c in retrieved_chunks if c["chunk_id"] in text]
-    return {"model_provider": LOCAL_PROVIDER, "model_name": model, "answer": text, "cited_chunk_ids": cited, "streamed": stream}
+    result = {
+        "model_provider": provider,
+        "model_name": model,
+        "answer": text,
+        "cited_chunk_ids": cited,
+        "streamed": stream,
+    }
+    if reported_usage is not None:
+        result["model_usage"] = reported_usage
+    return result

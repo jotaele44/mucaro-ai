@@ -1,6 +1,6 @@
 """The native Mucaro AI window and the few pieces of user feedback a launch without a Terminal needs.
 
-Used by ``scripts/launch_app.py --native`` (what ``Mucaro AI.app`` and ``Mucaro AI.exe`` run). The
+Used by ``scripts/launch_app.py --native`` (what ``Mucaro AI Setup.app`` and ``Mucaro AI.exe`` run). The
 window is pywebview: WKWebView on macOS, Microsoft Edge WebView2 on Windows. No browser is involved,
 and this module never falls back to one: if the window cannot open, the caller reports it with a
 dialog instead.
@@ -214,7 +214,7 @@ def _name_the_app() -> None:
 
 def _set_dock_icon() -> None:
     """Show the Mucaro AI owl in the Dock while the window is open."""
-    icon = Path(__file__).resolve().parents[1] / "Mucaro AI.app" / "Contents" / "Resources" / "MucaroAI.png"
+    icon = Path(__file__).resolve().parents[1] / "Mucaro AI Setup.app" / "Contents" / "Resources" / "MucaroAI.png"
     with contextlib.suppress(Exception):
         from AppKit import NSApplication, NSImage  # type: ignore[import-not-found]
 

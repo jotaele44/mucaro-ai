@@ -14,11 +14,11 @@ Requirement denominator: 139 (arithmetic closes: yes).
 
 | State | Requirements |
 | --- | ---: |
-| PASS | 61 |
+| PASS | 65 |
 | FAIL | 0 |
-| OPEN | 45 |
+| OPEN | 38 |
 | BLOCKED | 6 |
-| PROVISIONAL | 26 |
+| PROVISIONAL | 29 |
 | NOT_APPLICABLE | 1 |
 
 | Terminal-rule condition | Holds |
@@ -38,14 +38,14 @@ Residue:
 - fail (0): none
 - blocked (5): `MATRIX-018`, `TGT-001`, `TGT-009`, `TGT-026`, `TGT-028`
 - externally blocked (1): `TGT-027`
-- provisional (26): 26 requirements (see `mucaro release scope status`)
-- open (45): 45 requirements (see `mucaro release scope status`)
+- provisional (29): 29 requirements (see `mucaro release scope status`)
+- open (38): 38 requirements (see `mucaro release scope status`)
 - active blockers: `BLK-LLM-001`, `BLK-PHYS-001`, `BLK-SIGN-001`, `BLK-WEB-001`
 - unresolved material contradictions: none
 - open specification bindings: none
 <!-- END GENERATED: release-scope-status -->
 
-Current package version: `0.1.23`.
+Current package version: `0.1.24`.
 
 ## Authoritative Exact-Head Status
 
@@ -232,7 +232,7 @@ Observed success markers:
   current distribution blockers through the supported CLI boundary while
   `scripts/package_desktop.py` remains the desktop-package manifest entrypoint.
 - `mucaro package macos-app` builds or verifies a source-bound local
-  `Mucaro AI.app` bundle under `data/exports/desktop_apps`. The bundle launches
+  `Mucaro AI Setup.app` bundle under `data/exports/desktop_apps`. The bundle launches
   this checkout with the recorded Python executable and delegates to
   `scripts/launch_app.py`; portable signed installer, embedded runtime,
   no-setup reinstall, upgrade, and rollback remain open.
@@ -350,8 +350,9 @@ Observed success markers:
   conditioning with explicit outlet, no-breach, and maximum-depth policy,
   bounded D8 direction/accumulation
   with explicit boundary/sink/flat/tie terminal states, and renderer/layer-bound
-  map-export provenance. `mucaro eval gis` runs 64 committed cases across 25 operations,
-  including 26
+  map-export provenance and projected-planar fractional-coverage zonal statistics
+  with closed coverage areas and weighted summaries. `mucaro eval gis` runs 67
+  committed cases across 25 operations, including 27
   fail-closed negative cases for CRS, dimensions, formats, raster extents,
   vector-raster mismatch, resampling, and export identity, plus bounded
   always-XY axis-order and antimeridian/polar line/polygon controls. The CRS
@@ -365,8 +366,8 @@ Observed success markers:
   transformations, independent-engine datum validation, vertical/time-dependent CRS, broader axis-order and
   large-geometry adjudication beyond the bounded controls, dimension-preserving
   mutation, broader topology/overlay policy,
-  fractional zonal coverage, independent rendered-map validation, larger and
-  more diverse real raster/vector corpora, additional vector/raster formats and
+  independent rendered-map validation, larger and more diverse real raster/vector
+  corpora, additional vector/raster formats and
   terrain algorithms beyond bounded slope/aspect/hillshade, remote sensing,
   hydrology beyond bounded priority-flood conditioning and D8, bathymetry, and
   temporal GIS are proven.

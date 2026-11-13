@@ -9,8 +9,8 @@ from .chunker import chunk_text
 from .config import Settings, settings
 from .contracts import validate_contract
 from .db import delete_chunks_for_source, delete_payload, init_db, upsert_payload
+from .format_registry import SUPPORTED_INGEST_SUFFIXES
 from .injection_guard import scan_text
-from .multimodal import MULTIMODAL_SUFFIXES
 from .parser import ParseError, detect_mime, parse_file
 from .provenance import build_provenance_record
 from .semantic_store import build_semantic_store, get_semantic_store_status
@@ -20,9 +20,6 @@ from .web_browsing import WEB_SNAPSHOT_SCHEMA_VERSION
 
 MANIFEST_NAME = "source_manifest.json"
 CHUNKS_NAME = "document_chunks.json"
-HTML_SUFFIXES = {".html", ".htm"}
-DOCX_SUFFIXES = {".docx"}
-EMAIL_SUFFIXES = {".eml", ".msg"}
 
 
 def _source_path_string(path: Path, cfg: Settings) -> str:
@@ -232,9 +229,7 @@ def ingest_web_snapshot(snapshot_path: Path, cfg: Settings = settings) -> dict[s
     }
 
 
-FOLDER_SUPPORTED_SUFFIXES = (
-    {".txt", ".md", ".csv", ".json", ".pdf", ".zip"} | HTML_SUFFIXES | DOCX_SUFFIXES | EMAIL_SUFFIXES | MULTIMODAL_SUFFIXES
-)
+FOLDER_SUPPORTED_SUFFIXES = SUPPORTED_INGEST_SUFFIXES
 
 
 class IngestLimitError(ValueError):

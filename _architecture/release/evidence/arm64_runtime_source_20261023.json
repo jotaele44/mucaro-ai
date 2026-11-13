@@ -1,0 +1,52 @@
+{
+  "schema_version": "mucaro-arm64-runtime-source-evidence/1.0",
+  "status": "ARM64_RUNTIME_SOURCE_EVIDENCE_PASS",
+  "observed_utc": "2026-10-23T03:04:24Z",
+  "repository": "jotaele44/mucaro-ai",
+  "certification": {
+    "pull_request": 278,
+    "head_sha": "2cf1a05ff7aeb1eaa446e223a446477e8264e1fd",
+    "merged_main_sha": "25b41e33b2d832e582fc2800d52bc07461ebc4ae",
+    "workflow_run_id": 39892977939,
+    "job_id": 120216793173,
+    "conclusion": "success",
+    "artifact_id": 12475507616,
+    "artifact_name": "arm64-runtime-source-2cf1a05ff7aeb1eaa446e223a446477e8264e1fd",
+    "artifact_bytes": 25263906,
+    "artifact_sha256": "620c595f7f5a3927230dbd2f620294e04b2aac91dd4a6bf0907a47d891e6c9ac"
+  },
+  "source": {
+    "project": "astral-sh/python-build-standalone",
+    "release": "20260901",
+    "asset_name": "cpython-3.13.15+20260901-aarch64-apple-darwin-install_only.tar.gz",
+    "bytes": 25293188,
+    "sha256": "b9054a9d3d54f4cb5573d44907fddb29874b08909bde73f29f2868cf872223ee",
+    "independent_retrieval": true
+  },
+  "archive": {
+    "archive_root": "python",
+    "member_count": 1654,
+    "regular_file_count": 1646,
+    "symlink_count": 8,
+    "total_regular_bytes": 65443266,
+    "logical_members_sha256": "74f3a0af3f4b7d02ed1dec4713ffa2a65c9fac11c7bab3bf95a23235af4ec859",
+    "payload_multiset_sha256": "fa7a654dc80b75c13ed842026b97035e7e52eadc4aeea7a262bfdcc91e6978c0"
+  },
+  "dependency_lock": {
+    "path": "packaging/runtime/requirements-macos-arm64.lock",
+    "bytes": 51179,
+    "sha256": "0e1cc8681290c5b52250bea327ebd705ef1877f68ed5345e95d82d7e365192f2",
+    "resolver": "uv==0.10.0",
+    "python_version": "3.13",
+    "python_platform": "aarch64-apple-darwin",
+    "macosx_deployment_target": "14.0",
+    "wheel_only": true,
+    "hashes_required": true
+  },
+  "supersedes_for_current_head": "_architecture/release/evidence/arm64_runtime_source_20261016.json",
+  "limitations": [
+    "This refresh certifies source bytes, archive logical identity, and the current governed arm64 dependency lock at PR #278 head.",
+    "It does not by itself certify runtime materialization or packaged application lifecycle.",
+    "Signing, notarization, clean-host and physical-input evidence remain separate."
+  ]
+}

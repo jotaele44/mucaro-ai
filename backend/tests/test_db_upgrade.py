@@ -32,7 +32,7 @@ def _tables(path):
 def test_upgrade_from_v1_adds_tables_and_preserves_data(tmp_path):
     path = _v1_database(tmp_path / "old.sqlite3")
     init_db(path)
-    assert {"work_runs", "run_events", "interactions", "schema_meta"} <= _tables(path)
+    assert {"work_runs", "run_events", "interactions", "execution_entry_artifacts", "execution_entry_decisions", "schema_meta"} <= _tables(path)
     assert schema_version(path) == SCHEMA_VERSION
     assert list_payloads("conversations", path)[0]["title"] == "Kept"
     init_db(path)  # idempotent

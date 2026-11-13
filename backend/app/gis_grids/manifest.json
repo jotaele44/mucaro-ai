@@ -1,6 +1,6 @@
 {
   "schema_version": "mucaro_gis_grid_manifest_v1",
-  "retrieval_utc": "2026-09-20T02:22:48Z",
+  "retrieval_utc": "2026-10-19T18:35:50Z",
   "network_policy": "offline_only",
   "grids": [
     {
@@ -35,7 +35,44 @@
         "operation_authority": "INVERSE(DERIVED_FROM(EPSG)):1731",
         "accuracy_metres": 2.0,
         "area_of_use": "Puerto Rico and US Virgin Islands - onshore",
-        "bounds": [-67.97, 17.62, -64.51, 18.57]
+        "bounds": [-67.97, 17.62, -64.51, 18.57],
+        "pipeline_template": "proj=pipeline step proj=unitconvert xy_in=deg xy_out=rad step inv proj=hgridshift grids={grid} step proj=lcc lat_0=17.8333333333333 lon_0=-66.4333333333333 lat_1=18.4333333333333 lat_2=18.0333333333333 x_0=200000 y_0=200000 ellps=GRS80"
+      }
+    },
+    {
+      "grid_id": "us_noaa_fl",
+      "filename": "us_noaa_FL.tif",
+      "bytes": 8374,
+      "sha256": "73b385448f09e6c1122a87b5b3137a5b5775585af9445889e0a3a8c4c5951f54",
+      "type": "HORIZONTAL_OFFSET",
+      "source_crs": "EPSG:4269",
+      "target_crs": "EPSG:4152",
+      "area_of_use": "United States (USA) - Florida",
+      "bounds": [-88.125, 23.875, -79.875, 32.125],
+      "source": {
+        "authority": "US National Oceanographic and Atmospheric Administration (NOAA)",
+        "upstream_dataset_url": "https://www.ngs.noaa.gov/PC_PROD/NADCON/NADCON.zip",
+        "proj_cdn_url": "https://cdn.proj.org/us_noaa_FL.tif",
+        "proj_cdn_manifest_url": "https://cdn.proj.org/files.geojson",
+        "proj_data_repository": "https://github.com/OSGeo/PROJ-data",
+        "pinned_file_url": "https://raw.githubusercontent.com/OSGeo/PROJ-data/cdab44864a36a9f3c3e90a36637c5d8a86e624c6/us_noaa/us_noaa_FL.tif",
+        "file_commit_sha": "cdab44864a36a9f3c3e90a36637c5d8a86e624c6"
+      },
+      "license": {
+        "classification": "PUBLIC_DOMAIN",
+        "evidence_url": "https://raw.githubusercontent.com/OSGeo/PROJ-data/cdab44864a36a9f3c3e90a36637c5d8a86e624c6/us_noaa/us_noaa_README.txt",
+        "evidence_sha256": "38561c43f20756a77d33406c54cda8c250d18b6b30bff1e00ff51578e3682723",
+        "evidence_commit_sha": "cdab44864a36a9f3c3e90a36637c5d8a86e624c6"
+      },
+      "allowed_operation": {
+        "source_crs": "EPSG:4269",
+        "target_crs": "EPSG:4152",
+        "operation_name": "NAD83 to NAD83(HARN) (7)",
+        "operation_authority": "DERIVED_FROM(EPSG):1480",
+        "accuracy_metres": 0.05,
+        "area_of_use": "United States (USA) - Florida",
+        "bounds": [-88.125, 23.875, -79.875, 32.125],
+        "pipeline_template": "proj=pipeline step proj=unitconvert xy_in=deg xy_out=rad step proj=hgridshift grids={grid} step proj=unitconvert xy_in=rad xy_out=deg"
       }
     }
   ]

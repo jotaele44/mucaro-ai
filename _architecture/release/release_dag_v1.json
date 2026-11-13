@@ -518,7 +518,7 @@
         "macOS runner packaging receipts"
       ],
       "blocker": "BLK-SIGN-001",
-      "notes": "PyInstaller .app built, verified, installed, opened, relaunched and reinstalled on macOS 14; TGT-029 and INV-023 PASS. Developer ID distribution is BLK-SIGN-001; double-click is BLK-PHYS-001."
+      "notes": "Native PyInstaller .app build/install/LaunchServices/GUI/relaunch evidence is retained. The arm64 portable source/lock plane and native Apple-Silicon runtime materialization/probe are now executed and frozen at PR #278. Remaining portable engineering residue is end-to-end application install/launch/reinstall plus distinct-version upgrade/rollback. Developer ID distribution remains BLK-SIGN-001; literal double-click remains BLK-PHYS-001."
     },
     {
       "node_id": "N21",

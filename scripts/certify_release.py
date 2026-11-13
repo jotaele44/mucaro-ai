@@ -46,7 +46,7 @@ GENERATED_SUFFIXES = {".sqlite", ".sqlite3", ".db", ".pyc"}
 TRACKED_LARGE_FILE_ALLOWLIST = {
     # Deliberate native application asset. Keep the exception path-specific and bounded
     # so unrelated large tracked files still fail closed.
-    "Mucaro AI.app/Contents/Resources/MucaroAI.icns": 3_000_000,
+    "Mucaro AI Setup.app/Contents/Resources/MucaroAI.icns": 3_000_000,
 }
 
 

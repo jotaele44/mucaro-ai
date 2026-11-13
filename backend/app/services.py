@@ -4,7 +4,7 @@ import time
 from collections.abc import Callable
 from typing import Any
 
-from .citations import build_citation_records, score_confidence, validate_citations
+from .citations import NO_SOURCES_USED, build_citation_records, score_confidence, validate_citations
 from .config import Settings, settings
 from .db import ensure_db, upsert_payload
 from .exports import export_answer_trace
@@ -12,7 +12,7 @@ from .ingestion import get_chunks
 from .injection_guard import scan_chunks, scan_text
 from .memory_policy import MemorySelectionError, select_memory_context
 from .model_failover import FailoverPolicy, run_with_failover
-from .model_router import ModelProviderError, generate_answer
+from .model_router import ModelProviderError, generate_answer, model_provider_status
 from .model_routing_policy import ModelRoutingError, plan_model_route
 from .provider_recovery import ProviderRecoveryError, pause_provider_checkpoint
 from .retrieval import retrieve
@@ -20,6 +20,8 @@ from .utils import stable_id, utc_now
 
 MIN_TOP_K = 1
 MAX_TOP_K = 20
+# Retrieval outcomes that mean "nothing to cite", as opposed to a broken index or a bad request.
+NO_EVIDENCE_STATUSES = frozenset({"ERROR_NO_SOURCES", "ERROR_NO_RETRIEVAL_CONTEXT"})
 
 
 def answer_question(
@@ -39,7 +41,14 @@ def answer_question(
     on_text_delta: Callable[[str], None] | None = None,
     checkpoint_id: str | None = None,
     failover_policy: FailoverPolicy | None = None,
+    allow_ungrounded: bool = False,
 ) -> dict[str, Any]:
+    """Answer from local sources.
+
+    allow_ungrounded=True (chat) lets the selected model reply when no source
+    matches; that reply is marked NO_SOURCES_USED and never counts as cited.
+    The default stays strict: no matching source is an error and no model runs.
+    """
     normalized_query = query.strip()
     if not normalized_query:
         raise ValueError("EMPTY_QUERY")
@@ -55,9 +64,11 @@ def answer_question(
     retrieval_started = time.perf_counter()
     retrieval = retrieve(normalized_query, get_chunks(cfg), top_k=top_k, strategy=retrieval_strategy, cfg=cfg)
     retrieval_ms = _elapsed_ms(retrieval_started)
-    if retrieval["status"].startswith("ERROR_"):
+    ungrounded = allow_ungrounded and retrieval["status"] in NO_EVIDENCE_STATUSES
+    if retrieval["status"].startswith("ERROR_") and not ungrounded:
         return retrieval
-    retrieved = retrieval["retrieved_chunks"]
+    retrieved = [] if ungrounded else retrieval["retrieved_chunks"]
+    task_type = "conversation" if ungrounded else "cited_qa"
     try:
         memory_selection = select_memory_context(cfg, items=memory_context)
     except MemorySelectionError as exc:
@@ -72,12 +83,12 @@ def answer_question(
     preferred_provider = model_provider or cfg.default_model_provider
     try:
         model_route = plan_model_route(
-            task_type="cited_qa",
+            task_type=task_type,
             preferred_provider=preferred_provider,
             preferred_model=model_name,
             allow_live=allow_live,
             require_offline=require_offline,
-            require_citations=True,
+            require_citations=not ungrounded,
             allow_offline_failover=allow_mock_fallback,
             cfg=cfg,
         )
@@ -90,12 +101,12 @@ def answer_question(
                 "detail": exc.detail,
             }
         model_route = plan_model_route(
-            task_type="cited_qa",
+            task_type=task_type,
             preferred_provider="mock",
             allowed_providers=["mock"],
             allow_live=False,
             require_offline=True,
-            require_citations=True,
+            require_citations=not ungrounded,
             cfg=cfg,
         )
         model_route["fallback_reason"] = exc.status
@@ -128,12 +139,12 @@ def answer_question(
             }
         if allow_mock_fallback and model_route.get("selected_provider") != "mock":
             model_route = plan_model_route(
-                task_type="cited_qa",
+                task_type=task_type,
                 preferred_provider="mock",
                 allowed_providers=["mock"],
                 allow_live=False,
                 require_offline=True,
-                require_citations=True,
+                require_citations=not ungrounded,
                 cfg=cfg,
             )
             model_route["fallback_reason"] = "PRIMARY_ROUTE_BLOCKED"
@@ -142,7 +153,7 @@ def answer_question(
                 "status": "ERROR_MODEL_ROUTE_BLOCKED",
                 "query": normalized_query,
                 "retrieved_chunks": retrieved,
-                "detail": model_route.get("selection_reason"),
+                "detail": describe_blocked_route(model_route, preferred_provider, cfg),
                 "model_route": model_route,
             }
 
@@ -172,6 +183,7 @@ def answer_question(
                 memory_context=selected_memory_context,
                 on_text_delta=stream_callback,
                 cfg=cfg,
+                **({"ungrounded": True} if ungrounded else {}),
             )
         except ModelProviderError as exc:
             # Once text reaches the caller, another attempt would duplicate user-visible output.
@@ -229,7 +241,11 @@ def answer_question(
         "query": normalized_query,
         "model_provider": model["model_provider"],
         "model_name": model["model_name"],
-        "prompt_template_id": "default_cited_rag_with_history_v1" if conversation_context else "default_cited_rag_v1",
+        "prompt_template_id": (
+            ("conversation_no_sources_with_history_v1" if conversation_context else "conversation_no_sources_v1")
+            if ungrounded
+            else ("default_cited_rag_with_history_v1" if conversation_context else "default_cited_rag_v1")
+        ),
         "conversation_context_turn_count": len(conversation_context or []),
         "memory_context_count": len(selected_memory_context),
         "memory_selection_sha256": memory_selection["selection_sha256"],
@@ -252,6 +268,7 @@ def answer_question(
         "source_ids": source_ids,
         "answer": model["answer"],
         "answer_streamed": bool(model.get("streamed")),
+        "model_usage": model.get("model_usage"),
         "confidence": score_confidence(cited_ids, source_ids, bool(retrieved)),
         "validation_flags": (["WARN_UNTRUSTED_INSTRUCTIONS_IN_SOURCES"] if source_signals else [])
         + (["WARN_MODEL_OUTPUT_CONTAINS_INSTRUCTIONS"] if output_scan["suspected"] else [])
@@ -269,6 +286,9 @@ def answer_question(
         },
         "created_at": utc_now(),
     }
+    if ungrounded:
+        answer_trace["grounding"] = NO_SOURCES_USED
+        answer_trace["retrieval_status"] = retrieval["status"]
     answer_trace = validate_citations(answer_trace)
     answer_trace["export_paths"] = export_answer_trace(answer_trace, cfg)
     if persist:
@@ -278,3 +298,51 @@ def answer_question(
 
 def _elapsed_ms(started: float) -> float:
     return round((time.perf_counter() - started) * 1000, 1)
+
+
+_REASON_TEXT = {
+    "LOCAL_MODEL_SERVER_UNREACHABLE": "no model server is answering at {base_url}. Start Ollama, LM Studio or llama.cpp, or change the server URL",
+    "LOCAL_MODEL_URL_NOT_LOOPBACK": "the local server URL {base_url} is not on this machine. Use the remote server option for other machines",
+    "LOCAL_SERVER_LISTS_NO_MODELS": "the server at {base_url} has no model installed. Pull or load one first",
+    "REMOTE_MODEL_URL_NOT_SET": "no remote server URL is set",
+    "REMOTE_MODEL_URL_INVALID": "the remote server URL is not a valid http(s) address",
+    "REMOTE_MODEL_SERVER_UNREACHABLE": "no model server is answering at {base_url}",
+    "REMOTE_MODEL_SERVER_REJECTED_KEY": "the server at {base_url} rejected the API key",
+    "REMOTE_SERVER_LISTS_NO_MODELS": "the server at {base_url} lists no models. Enter the model name",
+    "LIVE_PROVIDER_NOT_EXPLICITLY_ALLOWED": "sending content to a remote model has not been allowed for this chat",
+    "LIVE_MODE_DISABLED": "live mode is off (set MUCARO_AI_LIVE_MODE=1)",
+    "OFFLINE_REQUIRED": "this chat is restricted to offline models",
+    "SYSTEM_OFFLINE": "the network is unavailable",
+}
+
+
+def describe_blocked_route(model_route: dict[str, Any], preferred_provider: str | None, cfg: Settings = settings) -> str:
+    """Say in words why no model could run, from the route's own candidate reasons."""
+    candidates = model_route.get("candidates") or []
+    row = next((item for item in candidates if item.get("provider") == preferred_provider), None)
+    if row is None:
+        return str(model_route.get("selection_reason") or "No eligible model provider.")
+    try:
+        # Served from the readiness probe cache; the explanation is best-effort, the status code is authoritative.
+        base_url = str((model_provider_status(row["provider"], cfg).get("local_server") or {}).get("base_url") or "")
+    except Exception:
+        base_url = ""
+    where = base_url or "the configured URL"
+    parts: list[str] = []
+    for code in [*row.get("reasons", []), *row.get("warnings", [])]:
+        code = str(code)
+        if code.startswith("PROVIDER_STATUS:") or code.endswith("_MODEL_CLEARTEXT_HTTP") or "_MODEL_AUTO_SELECTED:" in code:
+            continue
+        name, _, value = code.partition(":")
+        if name.endswith("_MODEL_NOT_INSTALLED"):
+            text = f"the model {value!r} is not on the server at {where}"
+        elif name == "API_KEY_MISSING":
+            text = f"the API key {value} is not set"
+        elif name == "OPTIONAL_DEPENDENCY_MISSING":
+            text = f"the Python package {value} is not installed"
+        else:
+            text = _REASON_TEXT.get(name, code).format(base_url=where)
+        if text not in parts:
+            parts.append(text)
+    reason = "; ".join(parts) or str(model_route.get("selection_reason") or "it is not ready")
+    return f"The model provider {row['provider']} cannot run: {reason}."

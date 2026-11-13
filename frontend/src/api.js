@@ -248,15 +248,26 @@ export const api = {
   health: () => request("/health", { timeoutMs: HEALTH_TIMEOUT_MS }),
   config: () => request("/config"),
   models: () => request("/models"),
+  saveModelSettings: (payload) => request("/models/settings", json("PUT", payload)),
+  probeModels: (baseUrl, apiKey) => request("/models/probe", json("POST", apiKey ? { base_url: baseUrl, api_key: apiKey } : { base_url: baseUrl })),
   offlineManifest: () => request("/offline-manifest"),
   modes: () => request("/work-runs/modes"),
+  workbenchPlan: (payload) => request("/workbench/plan", json("POST", payload)),
 
   conversations: () => request("/conversations"),
-  createConversation: (title) => request("/conversations", json("POST", { title })),
+  createConversation: (title, model) => request("/conversations", json("POST", model ? { title, model } : { title })),
+  setConversationModel: (id, model) => request(`/conversations/${id}/model`, json("PUT", model)),
   conversation: (id) => request(`/conversations/${id}`),
   renameConversation: (id, title) => request(`/conversations/${id}`, json("PATCH", { title })),
   deleteConversation: (id) => request(`/conversations/${id}`, { method: "DELETE" }),
   conversationRuns: (id) => request(`/conversations/${id}/runs?limit=100`),
+  executionEntry: (id) => request(`/conversations/${id}/execution-entry`),
+  executionEntryLabels: (locale, mode) =>
+    request(`/execution-entry/labels?locale=${encodeURIComponent(locale)}&mode=${encodeURIComponent(mode)}`),
+  decideExecutionEntry: (artifactId, revision, payload) =>
+    request(`/execution-entry/artifacts/${encodeURIComponent(artifactId)}/${revision}/decisions`, json("POST", payload)),
+  resumeExecutionEntry: (decisionId, payload) =>
+    request(`/execution-entry/decisions/${encodeURIComponent(decisionId)}/resume`, json("POST", payload)),
 
   sendMessage: (conversationId, payload) => request(`/conversations/${conversationId}/messages`, json("POST", payload)),
   editConversationMessage: (conversationId, messageKey, content, expectedRevision) =>

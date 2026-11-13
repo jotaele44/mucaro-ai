@@ -24,6 +24,12 @@
       "classification": "LOW",
       "rationale": "Partial executable names (git, codesign, lsof, tesseract, pdftoppm, npm, ditto) resolve through the user's PATH. An attacker able to edit that PATH already runs code as the user; residual risk accepted for local tooling.",
       "evidence": "docs/release/SECURITY_GATES.md"
+    },
+    {
+      "rule": "S310",
+      "classification": "LOW",
+      "rationale": "All S310 findings are maintainer-side or governed network requests. Each request path validates a fixed HTTPS/loopback/allowlisted destination, bounds response handling, or is covered by an explicit capability and approval boundary; the security gate still records every finding and rejects untriaged or high-severity results.",
+      "evidence": "backend/app/security_gates.py::static_security_findings"
     }
   ],
   "finding_dispositions": [
@@ -178,14 +184,6 @@
       "classification": "LOW",
       "rationale": "Maintainer-side RT-09 certification only. Redirects are accepted only when the final host remains in the frozen allowlist; response bytes are bounded and exact source identities are hashed before any retrieval-quality claim.",
       "evidence": "scripts/certify_retrieval_real_world_live.py::acquire"
-    },
-    {
-      "rule": "S310",
-      "path": "scripts/resolve_shadow_baseline.py",
-      "code": "with urllib.request.urlopen(request, timeout=30) as response:",
-      "classification": "LOW",
-      "rationale": "Maintainer-side Shadow QA baseline resolution only. Requests are confined to the fixed https://api.github.com host; repository input is constrained to owner/name, the workflow identifier is URL-encoded, and the scoped GitHub Actions token is used only for read-only workflow-run metadata.",
-      "evidence": "backend/tests/test_shadow_baseline.py"
     }
   ],
   "vulnerability_dispositions": []
