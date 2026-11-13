@@ -1,26 +1,47 @@
 from __future__ import annotations
 
+import logging
 import re
+import sqlite3
 from pathlib import Path, PurePath
 
 from fastapi import Depends, FastAPI, File, Header, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
-from .auth import auth_status, is_public_api_path, require_operator_auth
+from .auth import auth_status, client_is_remote, is_public_api_path, require_operator_auth, require_remote_token
 from .config import Settings, settings
+from .error_categories import classify_error
 from .conversations import (
+    ConversationMessageEditError,
     append_answer_turn,
     build_conversation_context,
     create_conversation,
     delete_conversation,
+    edit_conversation_message,
     get_conversation,
     list_conversations,
     rename_conversation,
+    set_conversation_model,
 )
-from .db import init_db, list_payloads, upsert_payload
+from .db import get_connection, init_db, list_payloads, upsert_payload
+from .development_workbench import WorkbenchPlanError, compile_plan as compile_workbench_plan
+from .execution_entry import (
+    ExecutionEntryError,
+    create_entry_artifact,
+    current_conversation_entry_context,
+    decide_entry,
+    get_entry_artifact,
+    entry_labels,
+    get_entry_decision,
+    resume_interrupted_entry_decision,
+    resume_pending_entry_decisions,
+    transition_entry_artifact,
+)
 from .execution_gate import analyze_task, approve_execution
+from .execution_workbench import create_plan as create_workbench_execution_plan
+from .exports import EXPORT_FILES, export_file_path
 from .ingestion import (
     FOLDER_SUPPORTED_SUFFIXES,
     IngestLimitError,
@@ -37,22 +58,32 @@ from .models import (
     ApprovalRequest,
     AskRequest,
     ConversationCreateRequest,
+    ConversationModelConfig,
     ConversationUpdateRequest,
+    ModelProbeRequest,
+    ModelSettingsRequest,
     DirectoryPermissionRequest,
+    ExecutionEntryCreateRequest,
+    ExecutionEntryDecisionRequest,
+    ExecutionEntryResumeRequest,
+    ExecutionEntryStateRequest,
     IngestPathRequest,
     InteractionCreateRequest,
     InteractionDismissRequest,
     InteractionResolveRequest,
     MemoryCreateRequest,
     MemoryUpdateRequest,
+    MessageEditRequest,
     MessageRequest,
     RunEditRequest,
     PlanRequest,
+    WorkbenchPlanRequest,
     ToolCallRequest,
     ToolDecisionRequest,
     WorkspaceProfileRequest,
 )
-from .model_router import list_model_providers
+from .model_router import ModelProviderError, list_model_providers, model_provider_names, probe_model_server
+from .model_settings import ModelSettingsError, public_model_settings, save_model_settings
 from .multimodal import MULTIMODAL_SUFFIXES
 from .offline import build_offline_manifest
 from .memory import (
@@ -70,6 +101,7 @@ from .permissions import (
     load_directory_grants,
     revoke_directory,
 )
+from .runtime_identity import current_git_head
 from .response_flow import (
     InteractionError,
     create_interaction,
@@ -115,10 +147,20 @@ from .workspaces import list_workspace_profiles, upsert_workspace_profile
 
 SUPPORTED_UPLOAD_SUFFIXES = FOLDER_SUPPORTED_SUFFIXES
 GENERATED_NAME_PATTERN = re.compile(r"^(src_|run_|chunk_)", re.IGNORECASE)
+logger = logging.getLogger(__name__)
+# Recovery failures that mean "the running source no longer matches the source the
+# decision was claimed under". These are expected after a code update and clear by
+# themselves once the source matches again; anything else is an integrity problem.
+EXECUTION_ENTRY_SOURCE_RECOVERY_STATUSES = frozenset(
+    {
+        "ERROR_EXECUTION_ENTRY_SOURCE_DRIFT",
+        "ERROR_EXECUTION_ENTRY_SOURCE_IDENTITY_UNAVAILABLE",
+    }
+)
 
 
 def api_error(status: str, detail: str, *, status_code: int = 400, **extra: object) -> HTTPException:
-    payload = {"status": status, "detail": detail}
+    payload = {"status": status, "category": classify_error(status), "detail": detail}
     payload.update(extra)
     return HTTPException(status_code=status_code, detail=payload)
 
@@ -189,6 +231,44 @@ class SecurityHeadersMiddleware:
         await self.app(scope, receive, send_with_headers)  # type: ignore[operator]
 
 
+def _claimed_entry_decision_ids(cfg: Settings) -> list[str]:
+    """Read-only list of decisions still CLAIMED, used only to give recovery logs context."""
+    conn = get_connection(cfg.sqlite_path)
+    try:
+        rows = conn.execute(
+            "SELECT decision_id FROM execution_entry_decisions WHERE state = 'CLAIMED' ORDER BY rowid ASC"
+        ).fetchall()
+    except sqlite3.Error:
+        return []
+    finally:
+        conn.close()
+    return [str(row["decision_id"]) for row in rows]
+
+
+def _resume_pending_entry_decisions_at_startup(cfg: Settings) -> None:
+    """Resume decisions stranded in CLAIMED without letting a recovery failure block boot.
+
+    A decision is stranded when the process died between claim and dispatch. If the
+    runtime source commit changed since (any code update), dispatch correctly refuses
+    with ERROR_EXECUTION_ENTRY_SOURCE_DRIFT. That refusal must not stop the server from
+    starting: the decision stays CLAIMED, nothing is dispatched for it, and it is
+    resumed on a later start whose source identity matches the claimed artifact.
+    resume_pending_entry_decisions stops at the first failing decision, so decisions
+    ordered behind it are retried on the next start as well.
+    """
+    try:
+        resume_pending_entry_decisions(cfg)
+    except ExecutionEntryError as exc:
+        log = logger.warning if exc.status in EXECUTION_ENTRY_SOURCE_RECOVERY_STATUSES else logger.error
+        log(
+            "execution-entry startup recovery deferred: status=%s detail=%s still_claimed_decisions=%s; "
+            "these decisions were left in state CLAIMED and are retried on the next start",
+            exc.status,
+            exc.detail,
+            _claimed_entry_decision_ids(cfg),
+        )
+
+
 def create_app(cfg: Settings = settings) -> FastAPI:
     try:
         enforce_startup_security(cfg)
@@ -201,9 +281,10 @@ def create_app(cfg: Settings = settings) -> FastAPI:
     ) -> dict:
         if is_public_api_path(request.url.path):
             return {"status": "AUTH_PUBLIC_ROUTE"}
+        require_remote_token(cfg, request.scope)
         return require_operator_auth(cfg, authorization=authorization, x_mucaro_token=x_mucaro_token)
 
-    app = FastAPI(title="Mucaro AI", version="0.1.23", dependencies=[Depends(require_auth_unless_public)])
+    app = FastAPI(title="Mucaro AI", version="0.1.24", dependencies=[Depends(require_auth_unless_public)])
     app.add_middleware(SecurityHeadersMiddleware)
     app.add_middleware(
         CORSMiddleware,
@@ -216,6 +297,7 @@ def create_app(cfg: Settings = settings) -> FastAPI:
     init_db(cfg.sqlite_path)
     reconcile_interrupted_tool_calls(cfg)
     reconcile_runs_on_startup(cfg)
+    _resume_pending_entry_decisions_at_startup(cfg)
 
     def resume_for_tool_call(result: dict) -> dict:
         run_id = (result.get("tool_call") or {}).get("run_id")
@@ -233,19 +315,38 @@ def create_app(cfg: Settings = settings) -> FastAPI:
         conflict = exc.status in {"ERROR_RUN_VERSION_CONFLICT", "ERROR_RUN_NOT_QUEUED", "ERROR_RUN_ALREADY_FINISHED"}
         return api_error(exc.status, exc.detail, status_code=404 if not_found else 409 if conflict else 400)
 
+    def execution_entry_actor(auth: dict) -> str:
+        return "operator" if auth.get("status") == "AUTH_OK" else "local_operator"
+
+    def execution_entry_error(exc: ExecutionEntryError) -> HTTPException:
+        not_found = exc.status in {"ERROR_EXECUTION_ENTRY_NOT_FOUND", "ERROR_EXECUTION_ENTRY_DECISION_NOT_FOUND"}
+        conflict = exc.status in {
+            "ERROR_EXECUTION_ENTRY_VERSION_CONFLICT",
+            "ERROR_EXECUTION_ENTRY_STALE_REVISION",
+            "ERROR_EXECUTION_ENTRY_IDEMPOTENCY_CONFLICT",
+            "ERROR_EXECUTION_ENTRY_CONFLICTING_RUN",
+            "ERROR_EXECUTION_ENTRY_SOURCE_DRIFT",
+        }
+        return api_error(exc.status, exc.detail, status_code=404 if not_found else 409 if conflict else 400)
+
     def require_auth(
         authorization: str | None = Header(default=None),
         x_mucaro_token: str | None = Header(default=None),
     ) -> dict:
         return require_operator_auth(cfg, authorization=authorization, x_mucaro_token=x_mucaro_token)
 
+    # These two routes are public so a client can discover that a token is needed. A remote peer learns that and
+    # nothing about the host: no filesystem paths and no origin list.
     @app.get("/health")
-    def health() -> dict:
-        return {"status": "OK", "model_provider": cfg.default_model_provider, "project_root": str(cfg.project_root)}
+    def health(request: Request) -> dict:
+        payload = {"status": "OK", "model_provider": cfg.default_model_provider}
+        if not client_is_remote(request.scope):
+            payload["project_root"] = str(cfg.project_root)
+        return payload
 
     @app.get("/config")
-    def config_status() -> dict:
-        return {
+    def config_status(request: Request) -> dict:
+        payload = {
             "status": "CONFIG_OK",
             "project_root": str(cfg.project_root),
             "data_dir": str(cfg.data_dir),
@@ -257,16 +358,227 @@ def create_app(cfg: Settings = settings) -> FastAPI:
             "auth": auth_status(cfg),
             "security": build_security_report(cfg),
         }
+        if client_is_remote(request.scope):
+            for key in ("project_root", "data_dir", "cors_origins"):
+                payload.pop(key)
+        return payload
 
     @app.get("/security")
     def security_status() -> dict:
         return build_security_report(cfg)
+
+    @app.post("/execution-entry/artifacts")
+    def create_execution_entry(req: ExecutionEntryCreateRequest, _auth: dict = Depends(require_auth)) -> dict:
+        try:
+            return create_entry_artifact(
+                mode=req.mode,
+                objective_id=req.objective_id,
+                conversation_id=req.conversation_id,
+                prompt=req.prompt,
+                runtime_mode=req.runtime_mode,
+                options=req.options,
+                source_commit=req.source_commit,
+                required_gates=[row.model_dump() for row in req.required_gates],
+                actor=execution_entry_actor(_auth),
+                authorized_actors=[execution_entry_actor(_auth)],
+                policy_version=req.policy_version,
+                cfg=cfg,
+            )
+        except ExecutionEntryError as exc:
+            raise execution_entry_error(exc) from exc
+
+    @app.get("/execution-entry/artifacts/{artifact_id}")
+    def execution_entry_artifact(artifact_id: str, revision: int | None = None) -> dict:
+        try:
+            return get_entry_artifact(artifact_id, revision, cfg)
+        except ExecutionEntryError as exc:
+            raise execution_entry_error(exc) from exc
+
+    @app.get("/conversations/{conversation_id}/execution-entry")
+    def conversation_execution_entry(conversation_id: str) -> dict:
+        if get_conversation(conversation_id, cfg) is None:
+            raise api_error("ERROR_CONVERSATION_NOT_FOUND", "Conversation not found.", status_code=404)
+        try:
+            return current_conversation_entry_context(conversation_id, cfg)
+        except ExecutionEntryError as exc:
+            raise execution_entry_error(exc) from exc
+
+    @app.post("/execution-entry/artifacts/{artifact_id}/{revision}/state")
+    def approve_execution_entry(
+        artifact_id: str,
+        revision: int,
+        req: ExecutionEntryStateRequest,
+        _auth: dict = Depends(require_auth),
+    ) -> dict:
+        try:
+            return transition_entry_artifact(
+                artifact_id,
+                revision,
+                expected_version=req.expected_version,
+                target_state=req.target_state,
+                actor=execution_entry_actor(_auth),
+                cfg=cfg,
+            )
+        except ExecutionEntryError as exc:
+            raise execution_entry_error(exc) from exc
+
+    @app.post("/execution-entry/artifacts/{artifact_id}/{revision}/decisions")
+    def execution_entry_decision(
+        artifact_id: str,
+        revision: int,
+        req: ExecutionEntryDecisionRequest,
+        _auth: dict = Depends(require_auth),
+    ) -> dict:
+        try:
+            return decide_entry(
+                artifact_id,
+                revision,
+                action=req.action,
+                expected_version=req.expected_version,
+                actor=execution_entry_actor(_auth),
+                idempotency_key=req.idempotency_key,
+                source_commit=req.source_commit,
+                changes=req.changes,
+                cfg=cfg,
+            )
+        except (ExecutionEntryError, RunError) as exc:
+            if isinstance(exc, ExecutionEntryError):
+                raise execution_entry_error(exc) from exc
+            raise run_error(exc) from exc
+
+    @app.get("/execution-entry/decisions/{decision_id}")
+    def execution_entry_decision_detail(decision_id: str) -> dict:
+        try:
+            return get_entry_decision(decision_id, cfg)
+        except ExecutionEntryError as exc:
+            raise execution_entry_error(exc) from exc
+
+    @app.post("/execution-entry/decisions/{decision_id}/resume")
+    def resume_execution_entry_decision(
+        decision_id: str,
+        req: ExecutionEntryResumeRequest,
+        _auth: dict = Depends(require_auth),
+    ) -> dict:
+        try:
+            return resume_interrupted_entry_decision(
+                decision_id,
+                actor=execution_entry_actor(_auth),
+                idempotency_key=req.idempotency_key,
+                cfg=cfg,
+            )
+        except (ExecutionEntryError, RunError) as exc:
+            if isinstance(exc, ExecutionEntryError):
+                raise execution_entry_error(exc) from exc
+            raise run_error(exc) from exc
+
+    @app.get("/execution-entry/labels")
+    def execution_entry_labels(locale: str = "en", mode: str = "GOAL") -> dict:
+        try:
+            return entry_labels(locale, mode)
+        except ExecutionEntryError as exc:
+            raise execution_entry_error(exc) from exc
 
     @app.post("/plan")
     def plan(req: PlanRequest, _auth: dict = Depends(require_auth)) -> dict:
         gate = analyze_task(req.user_request, inputs_available=req.inputs_available, approval_state=req.approval_state)
         upsert_payload("execution_gates", "task_id", gate, cfg.sqlite_path)
         return gate
+
+    @app.post("/workbench/plan")
+    def workbench_plan(req: WorkbenchPlanRequest, _auth: dict = Depends(require_auth)) -> dict:
+        """Compile a user-visible workbench plan without granting execution authority."""
+        observed_source_head = current_git_head(cfg.project_root)
+        claimed_source_head = req.source_commit.lower() if req.source_commit else None
+        if claimed_source_head is not None:
+            if observed_source_head is None:
+                raise api_error(
+                    "ERROR_WORKBENCH_SOURCE_IDENTITY_UNAVAILABLE",
+                    "A source commit was supplied but the running Mucaro source identity is unavailable.",
+                    status_code=422,
+                )
+            if claimed_source_head != observed_source_head.lower():
+                raise api_error(
+                    "ERROR_WORKBENCH_SOURCE_IDENTITY_MISMATCH",
+                    "The supplied source commit does not match the running Mucaro source identity.",
+                    status_code=409,
+                    claimed_source_commit=claimed_source_head,
+                    observed_source_commit=observed_source_head.lower(),
+                )
+
+        try:
+            compiled = compile_workbench_plan(
+                req.user_request,
+                source_commit=claimed_source_head,
+                features=req.features,
+                approval=False,
+            )
+            execution_plan = create_workbench_execution_plan(
+                req.profile,
+                req.network,
+                req.hardware,
+                req.platforms,
+            )
+        except (WorkbenchPlanError, ValueError) as exc:
+            raise api_error("ERROR_WORKBENCH_PLAN_INVALID", str(exc), status_code=422) from exc
+
+        gate = analyze_task(
+            req.user_request,
+            inputs_available=req.inputs_available,
+            approval_state="NOT_REQUESTED",
+        )
+        upsert_payload("execution_gates", "task_id", gate, cfg.sqlite_path)
+
+        evidence_status = {
+            item: {
+                "state": (
+                    "PASS"
+                    if item == "source_commit" and claimed_source_head is not None
+                    else "OPEN"
+                ),
+                "evidence_ref": (
+                    observed_source_head.lower()
+                    if item == "source_commit" and claimed_source_head is not None and observed_source_head
+                    else None
+                ),
+            }
+            for item in compiled["missing_evidence"]
+        }
+        missing_certification_evidence = [
+            item for item, row in evidence_status.items() if row["state"] != "PASS"
+        ]
+        return {
+            "status": "WORKBENCH_PLAN_READY",
+            "authority": {
+                "planning_compiler": "development_workbench",
+                "execution_gate": "execution_gate",
+                "run_runtime": "work_runs",
+                "plan_only": True,
+                "execution_authorized": False,
+            },
+            "source_identity": {
+                "claimed_source_commit": claimed_source_head,
+                "observed_source_commit": observed_source_head.lower() if observed_source_head else None,
+                "status": "VERIFIED_MATCH" if claimed_source_head is not None else "NOT_CLAIMED",
+            },
+            "evidence_status": evidence_status,
+            "missing_certification_evidence": missing_certification_evidence,
+            "gate": gate,
+            "workbench_plan": compiled,
+            "execution_plan": {
+                "profile": execution_plan.profile,
+                "network": execution_plan.network,
+                "hardware": execution_plan.hardware,
+                "platforms": list(execution_plan.platforms),
+                "lanes": list(execution_plan.lanes),
+                "model_lanes": list(execution_plan.model_lanes),
+                "blocked_lanes": list(execution_plan.blocked_lanes),
+                "lane_status": [list(row) for row in execution_plan.lane_status],
+                "catalog_status": execution_plan.catalog_status,
+                "catalog_ref": execution_plan.catalog_ref,
+                "state": execution_plan.state,
+                "certification": execution_plan.certification,
+            },
+        }
 
     @app.post("/approve")
     def approve(req: ApprovalRequest, _auth: dict = Depends(require_auth)) -> dict:
@@ -382,7 +694,19 @@ def create_app(cfg: Settings = settings) -> FastAPI:
 
     @app.post("/conversations")
     def create_chat(req: ConversationCreateRequest, _auth: dict = Depends(require_auth)) -> dict:
-        return create_conversation(req.title, cfg)
+        model = req.model.model_dump() if req.model else None
+        if model and model["model_provider"].strip().lower() not in model_provider_names():
+            raise api_error("ERROR_UNSUPPORTED_MODEL_PROVIDER", model["model_provider"])
+        return create_conversation(req.title, cfg, model=model)
+
+    @app.put("/conversations/{conversation_id}/model")
+    def set_chat_model(conversation_id: str, req: ConversationModelConfig, _auth: dict = Depends(require_auth)) -> dict:
+        if req.model_provider.strip().lower() not in model_provider_names():
+            raise api_error("ERROR_UNSUPPORTED_MODEL_PROVIDER", req.model_provider)
+        try:
+            return set_conversation_model(conversation_id, req.model_dump(), cfg)
+        except KeyError as exc:
+            raise api_error("ERROR_CONVERSATION_NOT_FOUND", "Conversation not found.", status_code=404) from exc
 
     @app.get("/conversations/{conversation_id}")
     def conversation(conversation_id: str) -> dict:
@@ -532,11 +856,32 @@ def create_app(cfg: Settings = settings) -> FastAPI:
 
     @app.get("/models")
     def models() -> dict:
-        return {"status": "MODEL_PROVIDERS_OK", "providers": list_model_providers()}
+        return {
+            "status": "MODEL_PROVIDERS_OK",
+            "providers": list_model_providers(cfg),
+            "settings": public_model_settings(cfg),
+        }
+
+    @app.put("/models/settings")
+    def update_model_settings(req: ModelSettingsRequest, _auth: dict = Depends(require_auth)) -> dict:
+        try:
+            saved = save_model_settings(req.model_dump(exclude_none=True), cfg)
+        except ModelSettingsError as exc:
+            raise api_error(exc.status, exc.detail) from exc
+        return {"status": "MODEL_SETTINGS_SAVED", "settings": saved, "providers": list_model_providers(cfg)}
+
+    @app.post("/models/probe")
+    def probe_models(req: ModelProbeRequest, _auth: dict = Depends(require_auth)) -> dict:
+        try:
+            return probe_model_server(req.base_url, api_key=req.api_key or None, cfg=cfg)
+        except ModelSettingsError as exc:
+            raise api_error(exc.status, exc.detail) from exc
+        except ModelProviderError as exc:
+            raise api_error(exc.status, exc.detail, status_code=403) from exc
 
     @app.get("/offline-manifest")
     def offline_manifest(offline: bool = False) -> dict:
-        return build_offline_manifest(system_offline=offline)
+        return build_offline_manifest(system_offline=offline, cfg=cfg)
 
     @app.get("/work-runs/modes")
     def work_run_modes() -> dict:
@@ -557,6 +902,47 @@ def create_app(cfg: Settings = settings) -> FastAPI:
             )
         except RunError as exc:
             raise run_error(exc) from exc
+
+    @app.patch("/conversations/{conversation_id}/messages/{message_key}")
+    def edit_message(
+        conversation_id: str,
+        message_key: str,
+        req: MessageEditRequest,
+        _auth: dict = Depends(require_auth),
+    ) -> dict:
+        conversation_payload = get_conversation(conversation_id, cfg)
+        if conversation_payload is None:
+            raise api_error("ERROR_CONVERSATION_NOT_FOUND", "Conversation not found.", status_code=404)
+
+        if message_key.startswith("turn:"):
+            turn_id = message_key.removeprefix("turn:")
+            if not turn_id or not any(turn.get("turn_id") == turn_id for turn in conversation_payload.get("turns", [])):
+                raise api_error("ERROR_MESSAGE_NOT_FOUND", "Message not found.", status_code=404)
+        else:
+            match = re.fullmatch(r"run:([^:]+):(user|assistant)", message_key)
+            if match is None:
+                raise api_error("ERROR_MESSAGE_KEY_INVALID", "Message key is not valid.")
+            run_id = match.group(1)
+            try:
+                run = get_run(run_id, cfg)
+            except RunError as exc:
+                raise api_error("ERROR_MESSAGE_NOT_FOUND", "Message not found.", status_code=404) from exc
+            if run.get("conversation_id") != conversation_id:
+                raise api_error("ERROR_MESSAGE_NOT_FOUND", "Message not found.", status_code=404)
+
+        try:
+            edit = edit_conversation_message(
+                conversation_id,
+                message_key,
+                req.content,
+                req.expected_revision,
+                cfg,
+            )
+        except ConversationMessageEditError as exc:
+            conflict = exc.status in {"ERROR_MESSAGE_EDIT_REVISION_CONFLICT", "ERROR_MESSAGE_EDITS_INVALID"}
+            missing = exc.status == "ERROR_CONVERSATION_NOT_FOUND"
+            raise api_error(exc.status, exc.detail, status_code=404 if missing else 409 if conflict else 400) from exc
+        return {"status": "MESSAGE_EDITED", "message_edit": edit}
 
     @app.get("/conversations/{conversation_id}/runs")
     def conversation_runs(conversation_id: str, limit: int = 50) -> dict:
@@ -772,6 +1158,13 @@ def create_app(cfg: Settings = settings) -> FastAPI:
         if not path.exists():
             raise api_error("ERROR_EXPORT_NOT_FOUND", "Export not found.", status_code=404, run_id=run_id)
         return {"run_id": run_id, "path": str(path), "content": path.read_text(encoding="utf-8")}
+
+    @app.get("/exports/{run_id}/files/{kind}")
+    def export_file(run_id: str, kind: str) -> FileResponse:
+        path = export_file_path(run_id, kind, cfg)
+        if path is None:
+            raise api_error("ERROR_EXPORT_NOT_FOUND", "Export not found.", status_code=404, run_id=run_id, kind=kind)
+        return FileResponse(path, media_type=EXPORT_FILES[kind][1], filename=path.name)
 
     @app.post("/validate")
     def validate() -> dict:

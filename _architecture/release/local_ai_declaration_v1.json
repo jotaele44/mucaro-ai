@@ -15,8 +15,19 @@
       "tested_protocol": "GET /v1/models, POST /v1/chat/completions (stream and non-stream)",
       "compatible_servers": ["Ollama (OpenAI-compatible endpoint)", "llama.cpp server", "LM Studio local server"],
       "default_endpoint": "http://127.0.0.1:11434/v1",
-      "configuration": ["MUCARO_AI_LOCAL_MODEL_URL", "MUCARO_AI_LOCAL_MODEL", "MUCARO_AI_LOCAL_MODEL_TIMEOUT", "MUCARO_AI_LOCAL_MODEL_CONTEXT"],
+      "configuration": ["MUCARO_AI_LOCAL_MODEL_URL", "MUCARO_AI_LOCAL_MODEL", "MUCARO_AI_LOCAL_MODEL_TIMEOUT", "MUCARO_AI_LOCAL_MODEL_CONTEXT", "in-app model setup (server URL and model, saved on this device)"],
+      "model_selection": "any model id the server lists; a named model must be installed (case and an implicit ':latest' tag are tolerated); when no model is named, the first model the server lists is used and reported as LOCAL_MODEL_AUTO_SELECTED",
       "network_boundary": "loopback addresses only; non-loopback URLs are refused before any request; environment proxies are bypassed"
+    },
+    {
+      "provider": "openai_compatible_remote",
+      "locality": "remote",
+      "kind": "OpenAI-compatible chat-completions API on another machine (LAN or hosted)",
+      "tested_protocol": "GET /v1/models, POST /v1/chat/completions (stream and non-stream), optional Authorization: Bearer key",
+      "compatible_servers": ["vLLM", "Ollama or LM Studio on another host", "hosted OpenAI-compatible open-model endpoints"],
+      "configuration": ["MUCARO_AI_REMOTE_MODEL_URL", "MUCARO_AI_REMOTE_MODEL", "MUCARO_AI_REMOTE_MODEL_API_KEY", "MUCARO_AI_REMOTE_MODEL_TIMEOUT", "MUCARO_AI_REMOTE_MODEL_CONTEXT", "in-app model setup"],
+      "gating": "requires a configured server URL and allow_live=true per request; never selected implicitly; questions and source excerpts leave this device",
+      "network_boundary": "explicit network exception; the API key is stored on this device in a 0600 file and is never returned by the API; plain http to a non-loopback host is flagged REMOTE_MODEL_CLEARTEXT_HTTP"
     },
     {
       "provider": "anthropic",
@@ -37,6 +48,7 @@
     "Mucaro does not ship or download model weights; a local model server must be installed and running for openai_compatible_local.",
     "No claim of universal local-model compatibility: only the OpenAI-compatible chat-completions protocol subset above is exercised by tests.",
     "Answer quality and citation compliance depend on the selected local model; uncited answers are flagged ERROR_UNCITED_ANSWER rather than accepted.",
+    "In chat, a message that matches no local source is answered by the selected model without evidence and marked NO_SOURCES_USED / WARN_NO_SOURCES_USED; it is never reported as CITATION_OK. The ask API and CLI stay strict and return ERROR_NO_RETRIEVAL_CONTEXT.",
     "Models do not call tools; tool actions are explicit user commands through the approval gate.",
     "Text-only modality; image/audio modalities route as MODALITY_UNSUPPORTED.",
     "Remote-provider behaviour is verified with gating tests only; live remote evaluation is blocked on credentials (BLK-LLM-001)."

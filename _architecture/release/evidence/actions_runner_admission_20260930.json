@@ -1,0 +1,102 @@
+{
+  "schema_version": "mucaro-actions-runner-admission-evidence/1.0",
+  "observed_utc": "2026-09-30T15:38:40Z",
+  "repository": "jotaele44/mucaro-ai",
+  "repository_visibility": "private",
+  "repository_admin_access_observed": true,
+  "prior_evidence": "_architecture/release/evidence/actions_runner_admission_20260929.json",
+  "classification": {
+    "fact": "Two new independent N03 pull-request heads created GitHub-hosted Linux, macOS, Chromium and WebKit jobs that terminated before any workflow step executed.",
+    "binding": "BLOCKED infrastructure evidence; not code/test PASS and not code/test FAIL.",
+    "hypothesis": [
+      "Private-repository Actions quota or billing admission",
+      "Repository/account Actions policy or hosted-runner eligibility"
+    ],
+    "unknown": "The account-specific admission cause remains unreadable from the connected GitHub surface. Repository metadata confirms admin permission, but Actions policy/billing endpoints are not exposed."
+  },
+  "reproductions": [
+    {
+      "pull_request": 150,
+      "head_sha": "e5d486fc53c93d81d274739e29e00ae811f85965",
+      "purpose": "N03 common runtime contract producers",
+      "jobs": [
+        {
+          "workflow": "CI",
+          "run_id": 36737793172,
+          "job_id": 109963955403,
+          "conclusion": "failure",
+          "executed_steps": 0
+        },
+        {
+          "workflow": "macOS app",
+          "run_id": 36737793091,
+          "job_id": 109963955463,
+          "conclusion": "failure",
+          "executed_steps": 0
+        },
+        {
+          "workflow": "Rendered UI QA / WebKit",
+          "run_id": 36737793224,
+          "job_id": 109963955450,
+          "conclusion": "failure",
+          "executed_steps": 0
+        },
+        {
+          "workflow": "Rendered UI QA / Chromium",
+          "run_id": 36737793224,
+          "job_id": 109963955724,
+          "conclusion": "failure",
+          "executed_steps": 0
+        }
+      ]
+    },
+    {
+      "pull_request": 151,
+      "head_sha": "e5699b60c842530e54e45ddebab4d466cfd735df",
+      "purpose": "N03 governed GIS/OCR entrypoints",
+      "jobs": [
+        {
+          "workflow": "CI",
+          "run_id": 36738206842,
+          "job_id": 109965381426,
+          "conclusion": "failure",
+          "executed_steps": 0
+        },
+        {
+          "workflow": "macOS app",
+          "run_id": 36738206992,
+          "job_id": 109965381902,
+          "conclusion": "failure",
+          "executed_steps": 0
+        },
+        {
+          "workflow": "Rendered UI QA / Chromium",
+          "run_id": 36738206893,
+          "job_id": 109965381195,
+          "conclusion": "failure",
+          "executed_steps": 0
+        },
+        {
+          "workflow": "Rendered UI QA / WebKit",
+          "run_id": 36738206893,
+          "job_id": 109965381603,
+          "conclusion": "failure",
+          "executed_steps": 0
+        }
+      ]
+    }
+  ],
+  "connector_boundary": {
+    "repository_metadata_readable": true,
+    "repository_admin_permission_reported": true,
+    "actions_policy_endpoint_readable": false,
+    "actions_billing_or_usage_endpoint_readable": false,
+    "job_logs_present": false,
+    "job_steps_present": false
+  },
+  "falsification": [
+    "Any later hosted job in this repository that executes at least one step falsifies the claim that runner admission remains universally blocked at that later time.",
+    "Once a job executes, its actual output must be adjudicated independently from this blocker evidence.",
+    "Source presence or zero-step workflow failure cannot promote or fail the affected release requirement."
+  ]
+}

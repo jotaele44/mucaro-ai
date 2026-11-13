@@ -10,6 +10,7 @@ import pytest
 import backend.app.cli as cli
 import backend.app.packaging as packaging
 from backend.app.cli import main
+from backend.app.coding_certification import build_coding_certification_report
 from backend.app.config import Settings
 from backend.app.release_receipts import write_release_receipt
 from backend.app.retrieval_eval import build_retrieval_eval_report
@@ -81,6 +82,126 @@ def test_cli_help_lists_serve(capsys):
     assert "serve" in output
 
 
+def test_cli_inspects_portable_runtime_archive_without_materializing(tmp_path: Path, capsys, monkeypatch):
+    cfg = make_settings(tmp_path)
+    archive = tmp_path / "runtime.tar.gz"
+    archive.write_bytes(b"fixture")
+    expected = {
+        "archive_bytes": 7,
+        "archive_root": "python",
+        "archive_sha256": "a" * 64,
+        "logical_members_sha256": "b" * 64,
+        "member_count": 2,
+        "payload_multiset_sha256": "c" * 64,
+        "regular_file_count": 1,
+        "symlink_count": 1,
+        "total_regular_bytes": 17,
+    }
+
+    monkeypatch.setattr(cli, "inspect_runtime_archive", lambda path: expected if path == archive else {})
+    monkeypatch.setattr(
+        cli,
+        "materialize_portable_runtime",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("must not materialize")),
+    )
+
+    assert main(["package", "portable-runtime", "--inspect-archive", str(archive), "--format", "json"], cfg=cfg) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload == {"status": "PORTABLE_RUNTIME_ARCHIVE_INSPECTED", **expected}
+
+
+def test_cli_archive_inspection_passes_explicit_safety_bounds(tmp_path: Path, capsys, monkeypatch):
+    cfg = make_settings(tmp_path)
+    archive = tmp_path / "runtime.tar.gz"
+    observed = {}
+
+    def fake_inspect(path: Path, **kwargs):
+        observed["path"] = path
+        observed["kwargs"] = kwargs
+        return {
+            "archive_bytes": 1,
+            "archive_root": "python",
+            "archive_sha256": "a" * 64,
+            "logical_members_sha256": "b" * 64,
+            "member_count": 1,
+            "payload_multiset_sha256": "c" * 64,
+            "regular_file_count": 1,
+            "symlink_count": 0,
+            "total_regular_bytes": 1,
+        }
+
+    monkeypatch.setattr(cli, "inspect_runtime_archive", fake_inspect)
+
+    assert (
+        main(
+            [
+                "package",
+                "portable-runtime",
+                "--inspect-archive",
+                str(archive),
+                "--max-members",
+                "2500",
+                "--max-regular-bytes",
+                "80000000",
+                "--format",
+                "json",
+            ],
+            cfg=cfg,
+        )
+        == 0
+    )
+    assert observed == {
+        "path": archive,
+        "kwargs": {"max_members": 2500, "max_regular_bytes": 80000000},
+    }
+
+
+def test_cli_archive_inspection_bounds_require_inspection_mode(tmp_path: Path, capsys, monkeypatch):
+    cfg = make_settings(tmp_path)
+    monkeypatch.setattr(
+        cli,
+        "materialize_portable_runtime",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("must fail before materialization")),
+    )
+
+    assert main(["package", "portable-runtime", "--max-members", "2500", "--format", "json"], cfg=cfg) == 2
+    payload = json.loads(capsys.readouterr().err)
+    assert payload["status"] == "ERROR_PORTABLE_RUNTIME_MODE_CONFLICT"
+    assert "--inspect-archive" in payload["detail"]
+
+
+def test_cli_archive_inspection_rejects_conflicting_modes(tmp_path: Path, capsys, monkeypatch):
+    cfg = make_settings(tmp_path)
+    archive = tmp_path / "runtime.tar.gz"
+    verify = tmp_path / "runtime"
+
+    monkeypatch.setattr(
+        cli,
+        "inspect_runtime_archive",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("conflict must fail before inspection")),
+    )
+
+    assert (
+        main(
+            [
+                "package",
+                "portable-runtime",
+                "--inspect-archive",
+                str(archive),
+                "--verify",
+                str(verify),
+                "--format",
+                "json",
+            ],
+            cfg=cfg,
+        )
+        == 2
+    )
+    payload = json.loads(capsys.readouterr().err)
+    assert payload["status"] == "ERROR_PORTABLE_RUNTIME_MODE_CONFLICT"
+    assert "--verify" in payload["detail"]
+
+
 def test_cli_materializes_portable_runtime_with_governed_defaults(tmp_path: Path, capsys, monkeypatch):
     cfg = make_settings(tmp_path)
     expected_output = tmp_path / "data" / "exports" / "portable_runtimes" / "macos-x86_64"
@@ -98,6 +219,66 @@ def test_cli_materializes_portable_runtime_with_governed_defaults(tmp_path: Path
     payload = json.loads(capsys.readouterr().out)
     assert payload["status"] == "PORTABLE_RUNTIME_VERIFIED"
     assert payload["runtime_dir"] == str(expected_output)
+
+
+def test_cli_materializes_portable_runtime_with_explicit_manifest_output(tmp_path: Path, capsys, monkeypatch):
+    cfg = make_settings(tmp_path)
+    manifest = tmp_path / "packaging" / "runtime" / "macos-arm64.json"
+    expected_output = tmp_path / "data" / "exports" / "portable_runtimes" / "macos-arm64"
+
+    def fake_materialize(root: Path, manifest_path: Path, output: Path, *, archive_path: Path | None = None):
+        assert root == tmp_path
+        assert manifest_path == manifest
+        assert output == expected_output
+        assert archive_path is None
+        return {"status": "PORTABLE_RUNTIME_VERIFIED", "runtime_dir": str(output), "failed_checks": []}
+
+    monkeypatch.setattr(cli, "materialize_portable_runtime", fake_materialize)
+
+    assert (
+        main(
+            ["package", "portable-runtime", "--manifest", str(manifest), "--format", "json"],
+            cfg=cfg,
+        )
+        == 0
+    )
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "PORTABLE_RUNTIME_VERIFIED"
+    assert payload["runtime_dir"] == str(expected_output)
+
+
+def test_cli_portable_runtime_explicit_output_overrides_manifest_name(tmp_path: Path, capsys, monkeypatch):
+    cfg = make_settings(tmp_path)
+    manifest = tmp_path / "packaging" / "runtime" / "macos-arm64.json"
+    explicit_output = tmp_path / "custom" / "runtime"
+
+    def fake_materialize(root: Path, manifest_path: Path, output: Path, *, archive_path: Path | None = None):
+        assert root == tmp_path
+        assert manifest_path == manifest
+        assert output == explicit_output
+        assert archive_path is None
+        return {"status": "PORTABLE_RUNTIME_VERIFIED", "runtime_dir": str(output), "failed_checks": []}
+
+    monkeypatch.setattr(cli, "materialize_portable_runtime", fake_materialize)
+
+    assert (
+        main(
+            [
+                "package",
+                "portable-runtime",
+                "--manifest",
+                str(manifest),
+                "--output-dir",
+                str(explicit_output),
+                "--format",
+                "json",
+            ],
+            cfg=cfg,
+        )
+        == 0
+    )
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["runtime_dir"] == str(explicit_output)
 
 
 def test_cli_refuses_portable_app_when_runtime_verification_fails(tmp_path: Path, capsys, monkeypatch):
@@ -252,6 +433,156 @@ def test_cli_ocr_analyze_reports_receipt_summary(tmp_path: Path, capsys, monkeyp
     assert "layout_mode=auto" in output
     assert "span_count=1" in output
     assert "warnings=OCR_UNKNOWN_CONFIDENCE_PRESENT" in output
+
+
+def test_cli_ocr_analyze_routes_pdf_to_page_receipt(tmp_path: Path, capsys, monkeypatch):
+    cfg = make_settings(tmp_path)
+    pdf = tmp_path / "document.pdf"
+    pdf.write_bytes(b"%PDF-1.7\n")
+    observed = {}
+
+    def fake_analyze(path: Path, **kwargs):
+        observed.update(path=path, kwargs=kwargs)
+        return {
+            "status": "OCR_PDF_OK",
+            "report_id": "ocrpdf_fixture",
+            "report_path": str(tmp_path / "report.json"),
+            "report_sha256": "c" * 64,
+        }
+
+    monkeypatch.setattr(cli, "analyze_pdf_ocr", fake_analyze)
+
+    assert main(
+        ["ocr", "analyze", str(pdf), "--dpi", "300", "--timeout-seconds", "45", "--format", "json"],
+        cfg=cfg,
+    ) == 0
+    assert capsys.readouterr().out
+    assert observed["path"] == pdf
+    assert observed["kwargs"]["dpi"] == 300
+    assert observed["kwargs"]["render_timeout_seconds"] == 45
+    assert observed["kwargs"]["ocr_timeout_seconds"] == 45
+
+
+def test_cli_capabilities_validate_execution_report(tmp_path: Path, capsys):
+    cfg = make_settings(tmp_path)
+    source = {
+        "schema_version": "mucaro-artifact/1.0",
+        "artifact_id": "artifact_input",
+        "artifact_type": "SOURCE",
+        "sha256": "a" * 64,
+        "byte_size": 1,
+        "logical_identity": "skill:input",
+        "producer": "skill_runtime",
+        "producer_version": "1.0.0",
+        "created_utc": "2026-10-22T00:00:00Z",
+        "parent_artifact_ids": [],
+        "schema_id": "test.input/1",
+        "source_path_or_uri": "skill://test/input",
+    }
+    output = {**source, "artifact_id": "artifact_output", "artifact_type": "DERIVED", "parent_artifact_ids": ["artifact_input"]}
+    report = {
+        "execution_id": "execution_cli",
+        "skill_id": "mucaro/test",
+        "skill_digest": "sha256:test",
+        "runtime": "IN_PROCESS",
+        "status": "PASS",
+        "artifact_lineage": {"input": source, "output": output, "failure_receipt": None},
+    }
+    report_path = tmp_path / "execution.json"
+    report_path.write_text(json.dumps(report), encoding="utf-8")
+
+    assert main(["capabilities", "validate-execution-report", str(report_path), "--format", "text"], cfg=cfg) == 0
+    text_output = capsys.readouterr().out
+    assert "CAPABILITY_OUTPUT_CONTRACT_OK" in text_output
+    assert "capability_id=transparency_objectivity_governance" in text_output
+    assert "operation=skill_execution_artifact_lineage" in text_output
+
+
+def test_cli_capabilities_validate_retrieval_output(tmp_path: Path, capsys):
+    cfg = make_settings(tmp_path)
+    report = {
+        "status": "RETRIEVAL_OK",
+        "query": "lineage",
+        "retrieved_chunks": [
+            {
+                "chunk_id": "chunk_1",
+                "source_id": "source_1",
+                "chunk_index": 0,
+                "text": "lineage",
+                "score": 1.0,
+                "retrieval_strategy": "lexical_v2",
+                "matched_terms": ["lineage"],
+            }
+        ],
+    }
+    path = tmp_path / "retrieval.json"
+    path.write_text(json.dumps(report), encoding="utf-8")
+
+    assert main(["capabilities", "validate-retrieval-output", str(path), "--format", "json"], cfg=cfg) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "CAPABILITY_OUTPUT_CONTRACT_OK"
+    assert payload["operation"] == "retrieval_output_integrity"
+
+
+def test_cli_capabilities_validate_web_snapshot(tmp_path: Path, capsys):
+    cfg = make_settings(tmp_path)
+    content = b"<html><body>hello</body></html>"
+    report = {
+        "schema_version": "mucaro_web_snapshot_v1",
+        "snapshot_id": "websnap_cli",
+        "snapshot_kind": "web_page",
+        "requested_url": "https://example.com/source",
+        "fetch_url": "https://example.com/source",
+        "final_url": "https://example.com/source",
+        "redirect_chain": [],
+        "fragment_removed": False,
+        "retrieval_started_utc": "2026-10-22T00:00:00Z",
+        "retrieval_utc": "2026-10-22T00:00:01Z",
+        "http_status": 200,
+        "content_type": "text/html",
+        "cache_policy": {"cache_mode": "immutable_snapshot_only", "reuse_allowed": False, "revalidation_required_before_reuse": True},
+        "robots_policy": {"status": "ROBOTS_ALLOWED", "robots_url": "https://example.com/robots.txt", "allowed": True, "checked_at": "2026-10-22T00:00:00Z"},
+        "http_error_policy": {"is_http_error": False, "snapshot_allowed": False, "citation_allowed": False},
+        "content_sha256": hashlib.sha256(content).hexdigest(),
+        "content_size_bytes": len(content),
+        "content_base64": __import__("base64").b64encode(content).decode("ascii"),
+        "parser_name": "web_snapshot_preview_v1",
+        "parser_trace": {"parser_name": "web_snapshot_preview_v1", "content_kind": "html", "text_preview_length": 5, "trace_warnings": []},
+        "parser_warnings": [],
+        "text_preview": "hello",
+        "policy": {"timeout_seconds": 5, "max_bytes": 1000000, "cache_mode": "immutable_snapshot_only"},
+    }
+    path = tmp_path / "snapshot.json"
+    path.write_text(json.dumps(report), encoding="utf-8")
+
+    assert main(["capabilities", "validate-web-snapshot", str(path), "--format", "json"], cfg=cfg) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "CAPABILITY_OUTPUT_CONTRACT_OK"
+    assert payload["operation"] == "web_snapshot_integrity"
+
+
+def test_cli_capabilities_validate_coding_report(tmp_path: Path, capsys):
+    cfg = make_settings(tmp_path)
+    arch = tmp_path / "_architecture"
+    arch.mkdir()
+    (arch / "coding_regression_manifest.json").write_text(
+        json.dumps({"schema_version": "MUCARO_CODING_REGRESSION/1.1", "requirements": [{"id": "CODE-R01", "class": "positive", "gate": "discovery"}]}),
+        encoding="utf-8",
+    )
+    report = build_coding_certification_report(
+        [{"requirement_id": "CODE-R01", "state": "PASS", "evidence": ["receipt:code-r01"]}],
+        source_head_sha="a" * 40,
+        runtime_identity_sha256="b" * 64,
+        coding_image_digest="sha256:" + "c" * 64,
+        cfg=cfg,
+    )
+    path = tmp_path / "coding.json"
+    path.write_text(json.dumps(report), encoding="utf-8")
+
+    assert main(["capabilities", "validate-coding-report", str(path), "--format", "json"], cfg=cfg) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "CAPABILITY_OUTPUT_CONTRACT_OK"
+    assert payload["operation"] == "coding_certification_integrity"
 
 
 def test_cli_capabilities_validate_ocr_report_checks_saved_receipts(tmp_path: Path, capsys):
@@ -784,13 +1115,13 @@ def test_cli_models_list_reports_provider_registry(tmp_path: Path, capsys, monke
 
     assert payload["status"] == "MODEL_PROVIDERS_OK"
     providers = {provider["name"]: provider for provider in payload["providers"]}
-    assert set(providers) == {"mock", "anthropic", "openai_compatible_local"}
+    assert set(providers) == {"mock", "anthropic", "openai_compatible_local", "openai_compatible_remote"}
     assert providers["mock"]["status"] == "MODEL_PROVIDER_READY"
     assert providers["anthropic"]["status"] == "MODEL_PROVIDER_DISABLED"
 
     assert main(["models", "list", "--format", "text"], cfg=cfg) == 0
     text_output = capsys.readouterr().out
-    assert "providers=3" in text_output
+    assert "providers=4" in text_output
     assert "MODEL_PROVIDER_READY mock" in text_output
     assert "MODEL_PROVIDER_DISABLED anthropic" in text_output
 
@@ -841,7 +1172,7 @@ def test_cli_version(capsys):
     except SystemExit as exc:
         assert exc.code == 0
     output = capsys.readouterr().out
-    assert output == "mucaro 0.1.23\n"
+    assert output == "mucaro 0.1.24\n"
 
 
 def test_cli_validate_text_output(tmp_path: Path, capsys):
@@ -1531,16 +1862,16 @@ def test_cli_eval_gis_reports_fixture_manifest_results(tmp_path: Path, capsys):
     assert main(["eval", "gis", "--format", "json"], cfg=cfg) == 0
     payload = json.loads(capsys.readouterr().out)
     assert payload["status"] == "GIS_EVAL_OK"
-    assert payload["counts"]["cases"] == 64
-    assert payload["counts"]["passed"] == 64
+    assert payload["counts"]["cases"] == 70
+    assert payload["counts"]["passed"] == 70
     assert payload["counts"]["failed"] == 0
-    assert payload["counts"]["operations"] == 25
-    assert payload["counts"]["negative_cases"] == 26
+    assert payload["counts"]["operations"] == 26
+    assert payload["counts"]["negative_cases"] == 29
 
     assert main(["eval", "gis", "--format", "text"], cfg=cfg) == 0
     text_output = capsys.readouterr().out
     assert "GIS_EVAL_OK" in text_output
-    assert "operation_count=25" in text_output
+    assert "operation_count=26" in text_output
     assert "PASS raster_depression_fill raster_depression_fill_enclosed_bowl_closes_volume" in text_output
     assert "PASS raster_hillshade raster_hillshade_west_light_east_rising_plane" in text_output
     assert "PASS raster_d8_flow raster_d8_east_descent_closes_terminal_contributions" in text_output
@@ -1621,7 +1952,7 @@ def test_cli_certify_gis_quality_writes_exact_head_receipt(tmp_path: Path, capsy
     assert main(["certify", "gis-quality", "--format", "text"], cfg=cfg) == 0
     text_output = capsys.readouterr().out
     assert "GIS_QUALITY_CERT_OK" in text_output
-    assert "eval_case_count=64" in text_output
+    assert "eval_case_count=70" in text_output
     assert "PASS raster_depression_fill raster_depression_fill_enclosed_bowl_closes_volume" in text_output
     assert "PASS raster_hillshade raster_hillshade_west_light_east_rising_plane" in text_output
     assert "PASS raster_d8_flow raster_d8_east_descent_closes_terminal_contributions" in text_output
@@ -1676,6 +2007,8 @@ mucaro = "backend.app.cli:main"
         "packaging/macos/PrivacyInfo.xcprivacy",
         "packaging/runtime/macos-x86_64.json",
         "packaging/runtime/requirements-macos-x86_64.lock",
+        "packaging/runtime/macos-arm64.json",
+        "packaging/runtime/requirements-macos-arm64.lock",
     ]:
         target = root / relative
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -1690,6 +2023,9 @@ mucaro = "backend.app.cli:main"
         "scripts/package_desktop.py",
         "scripts/certify_source_artifact.py",
         "scripts/certify_python_distribution.py",
+        "scripts/native_start.sh",
+        "scripts/one_click.sh",
+        "scripts/one_click.py",
     ]:
         (root / path).write_text("# fixture\n", encoding="utf-8")
     (root / "frontend" / "package.json").write_text(
@@ -1763,6 +2099,9 @@ def test_cli_package_macos_app_builds_and_verifies_bundle(tmp_path: Path, capsys
     write_package_fixture(tmp_path)
     (tmp_path / "frontend" / "dist").mkdir(parents=True)
     (tmp_path / "frontend" / "dist" / "index.html").write_text("<div>Mucaro</div>\n", encoding="utf-8")
+    (tmp_path / "scripts").mkdir(exist_ok=True)
+    for name in ("native_start.sh", "one_click.sh", "one_click.py"):
+        (tmp_path / "scripts" / name).write_text("# launcher\n", encoding="utf-8")
     output_dir = tmp_path / "desktop-apps"
 
     assert (
@@ -1783,12 +2122,12 @@ def test_cli_package_macos_app_builds_and_verifies_bundle(tmp_path: Path, capsys
     )
     payload = json.loads(capsys.readouterr().out)
     assert payload["status"] == "MACOS_APP_BUNDLE_READY"
-    assert payload["app_path"] == str(output_dir / "Mucaro AI.app")
+    assert payload["app_path"] == str(output_dir / "Mucaro AI Setup.app")
 
     assert main(["package", "macos-app", "--verify", payload["app_path"], "--format", "text"], cfg=cfg) == 0
     text_output = capsys.readouterr().out
     assert "MACOS_APP_BUNDLE_VERIFIED" in text_output
-    assert "PASS launcher_points_to_launch_app" in text_output
+    assert "PASS launcher_points_to_native_start" in text_output
 
 
 def test_cli_package_status_fails_on_version_mismatch(tmp_path: Path, capsys):
@@ -2132,7 +2471,7 @@ def test_cli_certify_status_reports_release_readiness(tmp_path: Path, capsys):
     assert main(["certify", "status", "--format", "json"], cfg=cfg) == 2
     payload = json.loads(capsys.readouterr().out)
     assert payload["status"] == "CERTIFICATION_FAIL"
-    assert payload["version"] == "0.1.23"
+    assert payload["version"] == "0.1.24"
     assert payload["project_root"] == str(tmp_path)
     assert payload["product_audit_status"] == "PRODUCT_AUDIT_OPEN"
     assert payload["json_status"] == "JSON_OK"
@@ -4610,7 +4949,7 @@ def test_cli_release_handoff_refreshes_certification_before_handoff_artifacts(tm
             calls.append("refresh:python_dist")
             return subprocess.CompletedProcess(cmd, 0, stdout="PYTHON_DIST_CERT_OK\n")
         if "certify_source_artifact.py" in command_text:
-            assert cmd[-1].endswith(f"mucaro-ai-0.1.23-{head_sha[:12]}-artifact-manifest.json")
+            assert cmd[-1].endswith(f"mucaro-ai-0.1.24-{head_sha[:12]}-artifact-manifest.json")
             calls.append("refresh:source_artifact")
             return subprocess.CompletedProcess(cmd, 0, stdout="SOURCE_ARTIFACT_CERT_OK\n")
         if "certify_fresh_clone.py" in command_text:
@@ -5511,3 +5850,168 @@ def test_cli_ask_invalid_top_k_returns_error_status(tmp_path: Path, capsys):
         assert exc.code == 2
     error_output = capsys.readouterr().err
     assert "TOP_K_RANGE:1-20" in error_output
+
+
+def test_cli_ocr_structure_derives_saved_form_receipt(tmp_path: Path, capsys) -> None:
+    cfg = make_settings(tmp_path)
+    report_path = tmp_path / "ocr-form.json"
+    report_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "mucaro_ocr_report_v1",
+                "report_id": "ocrreport_cli_form",
+                "source": {"sha256": "c" * 64},
+                "engine": {"name": "tesseract", "version": "fixture"},
+                "spans": [
+                    {
+                        "span_index": 0,
+                        "raw_text": "Name:",
+                        "page_index": 0,
+                        "block_num": 1,
+                        "paragraph_num": 1,
+                        "line_num": 1,
+                        "word_num": 1,
+                        "bbox": {"x": 100, "y": 100, "width": 120, "height": 24},
+                    },
+                    {
+                        "span_index": 1,
+                        "raw_text": "Alice",
+                        "page_index": 0,
+                        "block_num": 1,
+                        "paragraph_num": 1,
+                        "line_num": 1,
+                        "word_num": 2,
+                        "bbox": {"x": 300, "y": 100, "width": 130, "height": 24},
+                    },
+                    {
+                        "span_index": 2,
+                        "raw_text": "City:",
+                        "page_index": 0,
+                        "block_num": 1,
+                        "paragraph_num": 1,
+                        "line_num": 2,
+                        "word_num": 1,
+                        "bbox": {"x": 100, "y": 190, "width": 120, "height": 24},
+                    },
+                    {
+                        "span_index": 3,
+                        "raw_text": "Ponce",
+                        "page_index": 0,
+                        "block_num": 1,
+                        "paragraph_num": 1,
+                        "line_num": 2,
+                        "word_num": 2,
+                        "bbox": {"x": 300, "y": 190, "width": 130, "height": 24},
+                    },
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    assert main(["ocr", "structure", str(report_path), "--kind", "form", "--format", "json"], cfg=cfg) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "OCR_FORM_RECONSTRUCTION_OK"
+    assert payload["structure"]["field_count"] == 2
+    assert payload["structure"]["certification_state"] == "CANDIDATE_NOT_IDENTITY"
+
+
+def test_cli_ocr_structure_returns_nonzero_for_unresolved(tmp_path: Path, capsys) -> None:
+    cfg = make_settings(tmp_path)
+    report_path = tmp_path / "ocr-single-column.json"
+    spans = []
+    for index, y in enumerate((50, 120, 190, 260)):
+        spans.append(
+            {
+                "span_index": index,
+                "raw_text": f"Line{index}",
+                "page_index": 0,
+                "block_num": 1,
+                "paragraph_num": 1,
+                "line_num": index + 1,
+                "word_num": 1,
+                "bbox": {"x": 50, "y": y, "width": 180, "height": 24},
+            }
+        )
+    report_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "mucaro_ocr_report_v1",
+                "report_id": "ocrreport_cli_single",
+                "source": {"sha256": "d" * 64},
+                "engine": {"name": "tesseract"},
+                "spans": spans,
+            }
+        ),
+        encoding="utf-8",
+    )
+    assert main(
+        ["ocr", "structure", str(report_path), "--kind", "multi_column", "--format", "json"],
+        cfg=cfg,
+    ) == 2
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "OCR_STRUCTURE_UNRESOLVED"
+    assert payload["structure"]["certification_state"] == "UNRESOLVED"
+
+
+def test_cli_runs_context_text_reports_provider_usage_without_estimation(tmp_path: Path, capsys, monkeypatch):
+    cfg = make_settings(tmp_path)
+    monkeypatch.setattr(
+        cli,
+        "get_run",
+        lambda run_id, settings: {
+            "run_id": run_id,
+            "state": "COMPLETED",
+            "context_usage": {
+                "model": {"provider": "openai_compatible_local", "name": "tiny-local:1b"},
+                "metrics": {
+                    "context_consumed_tokens": {"value": 20, "classification": "PROVIDER_REPORTED"},
+                    "context_limit_tokens": {"value": 8192, "classification": "COMPUTED"},
+                },
+                "warnings": [],
+            },
+        },
+    )
+
+    assert main(["runs", "context", "run-1", "--format", "text"], cfg=cfg) == 0
+    assert capsys.readouterr().out == "ctx 20/8192\n"
+
+
+def test_cli_runs_context_json_preserves_unknown_usage(tmp_path: Path, capsys, monkeypatch):
+    cfg = make_settings(tmp_path)
+    monkeypatch.setattr(
+        cli,
+        "get_run",
+        lambda run_id, settings: {
+            "run_id": run_id,
+            "state": "COMPLETED",
+            "context_usage": {
+                "model": {"provider": "openai_compatible_local", "name": "tiny-local:1b"},
+                "metrics": {
+                    "context_consumed_tokens": {"value": None, "classification": "UNKNOWN"},
+                    "context_limit_tokens": {"value": 8192, "classification": "COMPUTED"},
+                },
+                "warnings": ["WARN_INPUT_TOKENS_UNKNOWN"],
+            },
+        },
+    )
+
+    assert main(["runs", "context", "run-2", "--format", "json"], cfg=cfg) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "CONTEXT_STATUS_PARTIAL"
+    assert payload["context_consumed_tokens"] is None
+    assert payload["context_limit_tokens"] == 8192
+    assert payload["display"] == "ctx ?/8192"
+    assert payload["invariants"]["estimated_missing_values"] is False
+
+
+def test_cli_runs_context_missing_run_fails_closed(tmp_path: Path, capsys, monkeypatch):
+    cfg = make_settings(tmp_path)
+
+    def missing(run_id, settings):
+        raise cli.RunError("ERROR_RUN_NOT_FOUND", run_id)
+
+    monkeypatch.setattr(cli, "get_run", missing)
+
+    assert main(["runs", "context", "missing", "--format", "json"], cfg=cfg) == 2
+    payload = json.loads(capsys.readouterr().err)
+    assert payload == {"status": "ERROR_RUN_NOT_FOUND", "detail": "missing"}

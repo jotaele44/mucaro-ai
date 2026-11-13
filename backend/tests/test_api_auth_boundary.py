@@ -24,8 +24,20 @@ PROTECTED_READS = [
     ("get", "/permissions/directories", None),
     ("get", "/workspaces", None),
     ("get", "/exports/run_missing", None),
+    ("get", "/exports/run_deadbeef/files/json", None),
     ("post", "/permissions/directories/check", {"path": "/etc"}),
     ("post", "/validate", None),
+    (
+        "post",
+        "/workbench/plan",
+        {
+            "user_request": "Plan a local-only workbench",
+            "profile": "blockers",
+            "network": "offline",
+            "hardware": "unavailable",
+            "platforms": ["macos"],
+        },
+    ),
 ]
 
 

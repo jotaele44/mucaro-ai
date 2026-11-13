@@ -1,11 +1,30 @@
 from __future__ import annotations
 
 import csv
+import re
+from pathlib import Path
 from typing import Any
 
 from .config import Settings, settings
 from .contracts import validate_contract
 from .utils import write_json
+
+# Every answer is exported as these files, named <run_id>.<suffix>; the keys are the kinds the API serves.
+EXPORT_FILES: dict[str, tuple[str, str]] = {
+    "json": ("answer_trace.json", "application/json"),
+    "markdown": ("answer_trace.md", "text/markdown; charset=utf-8"),
+    "csv": ("citations.csv", "text/csv; charset=utf-8"),
+}
+_RUN_ID = re.compile(r"^run_[0-9a-f]{8,64}$")
+
+
+def export_file_path(run_id: str, kind: str, cfg: Settings = settings) -> Path | None:
+    """The exported file of one kind for a run, or None. Only well-formed run ids map to a file name."""
+    spec = EXPORT_FILES.get(kind)
+    if spec is None or not _RUN_ID.fullmatch(run_id):
+        return None
+    path = cfg.export_dir / f"{run_id}.{spec[0]}"
+    return path if path.is_file() else None
 
 
 def export_answer_trace(answer_trace: dict[str, Any], cfg: Settings = settings) -> dict[str, str]:
@@ -15,9 +34,9 @@ def export_answer_trace(answer_trace: dict[str, Any], cfg: Settings = settings) 
     for record in answer_trace.get("cited_chunks", []):
         validate_contract("citation_record", record)
     run_id = answer_trace["run_id"]
-    json_path = cfg.export_dir / f"{run_id}.answer_trace.json"
-    md_path = cfg.export_dir / f"{run_id}.answer_trace.md"
-    csv_path = cfg.export_dir / f"{run_id}.citations.csv"
+    json_path = cfg.export_dir / f"{run_id}.{EXPORT_FILES['json'][0]}"
+    md_path = cfg.export_dir / f"{run_id}.{EXPORT_FILES['markdown'][0]}"
+    csv_path = cfg.export_dir / f"{run_id}.{EXPORT_FILES['csv'][0]}"
     write_json(json_path, answer_trace)
     md_path.write_text(_to_markdown(answer_trace), encoding="utf-8")
     with csv_path.open("w", encoding="utf-8", newline="") as f:

@@ -1,8 +1,8 @@
 import React, { useState } from "react";
 import { api } from "../api.js";
-import { STATE_LABEL, toolSummaryLabel } from "../feed.js";
-import { MessageActions } from "./MessageActions.jsx";
-import { RichText } from "./RichText.jsx";
+import { STATE_LABEL, TERMINAL_STATES, toolSummaryLabel } from "../feed.js";
+import { answerRecords } from "../files.js";
+import { EditableMessage } from "./MessageActions.jsx";
 import { Sheet } from "./Sheet.jsx";
 
 const OUTCOME_TEXT = {
@@ -185,17 +185,32 @@ function Citations({ citations, onOpenCitation }) {
   );
 }
 
-export function RunBlock({ view, onChanged, onOpenCitation, announce }) {
+export function RunBlock({ view, onChanged, onOpenCitation, announce, messageEdits = {}, onEditMessage }) {
   const [toolsOpen, setToolsOpen] = useState(false);
-  const active = ["RUNNING", "AWAITING_APPROVAL", "AWAITING_INPUT", "QUEUED"].includes(view.state);
   const toolLabel = toolSummaryLabel(view.calls);
   const planSteps = view.plan?.steps || [];
+  const userMessageKey = `run:${view.runId}:user`;
+  const assistantMessageKey = `run:${view.runId}:assistant`;
+  const userEdit = messageEdits[userMessageKey];
+  const assistantEdit = messageEdits[assistantMessageKey];
+  // Save and Share appear once the answer is complete, never on text that is still streaming.
+  const answerFile =
+    view.answer && TERMINAL_STATES.has(view.state)
+      ? { title: String(userEdit?.content ?? view.prompt ?? ""), citations: view.citations, records: answerRecords(view.artifacts) }
+      : null;
 
   return (
     <article className="run" aria-busy={view.state === "RUNNING"} data-state={view.state}>
       <div className="bubble user-bubble">
-        <RichText text={view.prompt} />
-        {view.mode !== "ask" && <span className="mode-tag">{view.mode}</span>}
+        <EditableMessage
+          text={String(userEdit?.content ?? view.prompt ?? "")}
+          revision={Number(userEdit?.revision || 0)}
+          edited={Boolean(userEdit)}
+          onSave={(content, revision) => onEditMessage(userMessageKey, content, revision)}
+          announce={announce}
+        >
+          {view.mode !== "ask" && <span className="mode-tag">{view.mode}</span>}
+        </EditableMessage>
       </div>
 
       <div className="assistant-block">
@@ -215,7 +230,9 @@ export function RunBlock({ view, onChanged, onOpenCitation, announce }) {
               </ol>
               {view.route && (
                 <p className="muted small">
-                  Model: {view.route.selected_provider || "none"} ({view.route.selection_reason || view.route.status})
+                  Model: {view.route.selected_provider || "none"}
+                  {view.route.selected_provider && view.route.selected_model ? ` · ${view.route.selected_model}` : ""} ({view.route.selection_reason || view.route.status})
+                  {view.route.detail && <span className="block">{view.route.detail}</span>}
                 </p>
               )}
             </details>
@@ -248,7 +265,15 @@ export function RunBlock({ view, onChanged, onOpenCitation, announce }) {
 
         {view.answer && (
           <div className="bubble assistant-bubble">
-            <RichText text={view.answer} />
+            <EditableMessage
+              text={String(assistantEdit?.content ?? view.answer ?? "")}
+              revision={Number(assistantEdit?.revision || 0)}
+              edited={Boolean(assistantEdit)}
+              onSave={(content, revision) => onEditMessage(assistantMessageKey, content, revision)}
+              announce={announce}
+              allowReadAloud
+              file={answerFile}
+            />
           </div>
         )}
         <Citations citations={view.citations} onOpenCitation={onOpenCitation} />
@@ -257,13 +282,15 @@ export function RunBlock({ view, onChanged, onOpenCitation, announce }) {
           <p key={index} className="notice" role="note">
             {warning.category === "UNTRUSTED_CONTENT"
               ? "Some sources contain instruction-like text. It was treated as data only and nothing was executed."
-              : `${warning.status}${warning.detail ? `: ${warning.detail}` : ""}`}
+              : warning.status === "WARN_NO_SOURCES_USED"
+                ? "No sources used: nothing in your local library matched this message, so this reply is the model's own and is not cited."
+                : `${warning.status}${warning.detail ? `: ${warning.detail}` : ""}`}
           </p>
         ))}
         {view.error && (
           <p className="error-card" role="alert">
             <strong>{view.error.category}</strong> — {view.error.status}
-            {view.error.detail ? `: ${view.error.detail}` : ""}
+            {view.error.detail && view.error.detail !== view.error.status ? `: ${view.error.detail}` : ""}
           </p>
         )}
         {view.interrupted && (
@@ -275,7 +302,6 @@ export function RunBlock({ view, onChanged, onOpenCitation, announce }) {
         {view.final && !view.answer && view.final.outcome !== "ANSWERED" && (
           <p className="outcome">{OUTCOME_TEXT[view.final.outcome] || `Outcome: ${view.final.outcome}`}</p>
         )}
-        {view.answer && !active && <MessageActions text={view.answer} announce={announce} />}
       </div>
       {toolsOpen && <ToolDrawer calls={view.calls} onClose={() => setToolsOpen(false)} />}
     </article>

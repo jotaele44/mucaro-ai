@@ -7,6 +7,8 @@ from typing import Any
 
 from .coding_workspace import CodingWorkspaceError, inspect_repository, resolve_repository
 from .config import Settings, settings
+from .local_tools import resolve_local_tool
+from .permission_engine import PermissionEngineError, PermissionRequest, require
 from .permissions import is_within_path
 
 DEFAULT_PATCH_MAX_BYTES = 512 * 1024
@@ -35,10 +37,17 @@ def _validate_relative_path(relative: str) -> str:
     return candidate.as_posix()
 
 
+def _git_executable() -> str:
+    git = resolve_local_tool("git")
+    if not git:
+        raise CodingWorkspaceError("ERROR_CODING_GIT_UNAVAILABLE", "Git is not bundled in this Mucaro runtime.")
+    return git
+
+
 def _git_numstat_paths(repo_root: Path, patch_bytes: bytes) -> list[str]:
     try:
         proc = subprocess.run(
-            ["git", "apply", "--numstat", "-z", "-"],
+            [_git_executable(), "apply", "--numstat", "-z", "-"],
             cwd=repo_root,
             input=patch_bytes,
             capture_output=True,
@@ -104,7 +113,7 @@ def _parse_diff_paths(repo_root: Path, patch: str, patch_bytes: bytes) -> list[s
 def _git_apply_check(repo_root: Path, patch_bytes: bytes) -> tuple[bool, str]:
     try:
         proc = subprocess.run(
-            ["git", "apply", "--check", "--whitespace=error-all", "-"],
+            [_git_executable(), "apply", "--check", "--whitespace=error-all", "-"],
             cwd=repo_root,
             input=patch_bytes,
             capture_output=True,
@@ -157,6 +166,18 @@ def validate_patch_proposal(
         )
 
     context = resolve_repository(repo_root, cfg)
+    try:
+        require(
+            PermissionRequest(
+                capability="git.read",
+                subject="coding_patch.validate_patch_proposal",
+                target=str(context.repo_root),
+                origin="operator",
+            ),
+            cfg=cfg,
+        )
+    except PermissionEngineError as exc:
+        raise CodingWorkspaceError(exc.status, exc.detail) from exc
     paths = _parse_diff_paths(context.repo_root, patch, patch_bytes)
     preimages = [_path_preimage(context.repo_root, path) for path in paths]
     state = inspect_repository(context.repo_root, cfg=cfg)

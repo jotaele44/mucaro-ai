@@ -216,7 +216,7 @@ def test_blocked_state_requires_active_blocker(tmp_path):
     _save(root, "acceptance", ledger)
     blockers = _load(root, "blockers")
     for blocker in blockers["blockers"]:
-        if blocker["blocker_id"] == "BLK-SPEC-001":
+        if blocker["blocker_id"] == "BLK-SIGN-001":
             blocker["status"] = "RESOLVED"
             blocker["resolution"] = "test"
     _save(root, "blockers", blockers)
@@ -224,7 +224,7 @@ def test_blocked_state_requires_active_blocker(tmp_path):
     errors = report["errors"]
     assert {"code": "ERROR_BLOCKED_WITHOUT_BLOCKER", "detail": "TGT-008"} in errors
     assert {"code": "ERROR_UNKNOWN_BLOCKER", "detail": "TGT-009:BLK-NOPE-001"} in errors
-    assert {"code": "ERROR_BLOCKER_NOT_ACTIVE", "detail": "KERNEL-003:BLK-SPEC-001"} in errors
+    assert {"code": "ERROR_BLOCKER_NOT_ACTIVE", "detail": "TGT-028:BLK-SIGN-001"} in errors
 
 
 def test_scope_delta_defect_must_enter_denominator(tmp_path):
@@ -334,7 +334,7 @@ def test_release_status_is_provisional_with_residue():
     status = compute_release_status(REPO_ROOT)
     assert status["status"] == STATUS_PROVISIONAL
     assert status["release_status_line"] == "MUCARO AI RELEASE STATUS = PROVISIONAL"
-    assert status["conditions"]["bound_specification"] is False
+    assert status["conditions"]["bound_specification"] is True
     assert "TGT-027" in status["residue"]["externally_blocked"]
     ledger = json.loads((REPO_ROOT / "_architecture/release/contradiction_ledger_v1.json").read_text(encoding="utf-8"))
     expected = sorted(row["contradiction_id"] for row in ledger["contradictions"] if row["material"] and row["state"] == "UNRESOLVED")
@@ -430,3 +430,24 @@ def test_write_status_doc_inserts_then_replaces_only_the_block(tmp_path):
     write_status_doc(tmp_path, {**status, "residue": {"open": []}})
     second = doc.read_text(encoding="utf-8")
     assert second.count(STATUS_BLOCK_BEGIN) == 1 and "Hand-written history." in second and "`X-1`" not in second
+
+
+def test_stale_subsystem_rows_are_provisional_not_pass():
+    ledger = _load(REPO_ROOT, "acceptance")
+    rows = {row["requirement_id"]: row for row in ledger["rows"]}
+    expected = {
+        "TGT-004": ("GIS-10 PROVISIONAL", "remote sensing"),
+        "MATRIX-005": ("70/70 GIS evaluation", "bathymetry"),
+        "TGT-005": ("OCR-09/10 OPEN", "difficult scans"),
+        "MATRIX-006": ("12-case OCR V1 denominator", "mismatch adjudication"),
+        "TGT-007": ("CODE-09/10", "not yet sufficient for PASS"),
+        "MATRIX-009": ("CODE-R13", "before PASS"),
+    }
+    for requirement_id, residues in expected.items():
+        row = rows[requirement_id]
+        assert row["state"] == "PROVISIONAL"
+        assert row["implementation_state"] == "PARTIAL"
+        assert row["evidence_refs"]
+        assert row["blocker_id"] is None
+        for residue in residues:
+            assert residue in row["notes"]

@@ -6,6 +6,7 @@ from pathlib import Path
 
 import numpy as np
 import rasterio
+from PIL import Image
 from rasterio.transform import from_origin
 
 from backend.app.capability_contracts import (
@@ -343,6 +344,38 @@ def test_advanced_raster_and_export_cli_commands_emit_governed_receipts(tmp_path
     assert "cell_accounting_closed=True" in output
     assert "INTERSECTS_VALID=1" in output
 
+    fractional_raster = write_raster(tmp_path / "fractional-grid.tif", crs="EPSG:3857")
+    fractional_vector = write_geojson(
+        tmp_path / "fractional-zone.geojson",
+        [
+            {
+                "type": "Feature",
+                "id": "fractional-zone",
+                "geometry": {"type": "Polygon", "coordinates": [[[0.5, 0.5], [1.5, 0.5], [1.5, 1.5], [0.5, 1.5], [0.5, 0.5]]]},
+                "properties": {},
+            }
+        ],
+        crs="EPSG:3857",
+    )
+    assert main(
+        [
+            "gis",
+            "zonal-stats",
+            str(fractional_vector),
+            str(fractional_raster),
+            "--inclusion-rule",
+            "fractional_coverage",
+            "--format",
+            "text",
+        ],
+        cfg=cfg,
+    ) == 0
+    output = capsys.readouterr().out
+    assert "GIS_ZONAL_STATS_OK" in output
+    assert "cell_inclusion_rule=fractional_coverage" in output
+    assert "coverage_accounting_closed=True" in output
+    assert "weighted_statistics=True" in output
+
     assert main(
         [
             "gis",
@@ -557,6 +590,7 @@ def test_advanced_gis_contract_accepts_real_reports_and_rejects_false_accounting
         check["name"] for check in result["failed_checks"]
     }
 
+
     unresolved_pipeline = copy.deepcopy(reports[0])
     unresolved_pipeline["parameters"]["transformer_definition"] = "unavailable until proj_trans is called"
     result = validate_gis_report_contract(unresolved_pipeline)
@@ -663,6 +697,38 @@ def test_advanced_gis_contract_accepts_real_reports_and_rejects_false_accounting
     assert "depression_fill.breach_policy" in {
         check["name"] for check in result["failed_checks"]
     }
+
+
+def test_render_validation_cli_and_saved_report_contract(tmp_path: Path, capsys) -> None:
+    cfg = make_settings(tmp_path)
+    rendered = tmp_path / "rendered.png"
+    image = Image.new("RGB", (6, 4), "white")
+    image.putpixel((2, 2), (20, 80, 140))
+    image.save(rendered, format="PNG")
+
+    assert main(
+        [
+            "gis",
+            "map-render-validate",
+            str(rendered),
+            "--min-width",
+            "4",
+            "--min-height",
+            "3",
+            "--format",
+            "text",
+        ],
+        cfg=cfg,
+    ) == 0
+    output = capsys.readouterr().out
+    assert "GIS_RENDER_VALIDATION_OK" in output
+    assert "source_width=6" in output
+    assert "nonblank_content_present=True" in output
+
+    report_path = Path(next(line.split("=", 1)[1] for line in output.splitlines() if line.startswith("report_path=")))
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    contract = validate_gis_report_contract(report)
+    assert contract["status"] == CAPABILITY_OUTPUT_CONTRACT_OK, contract["failed_checks"]
 
 
 def test_real_corpus_cli_and_contract_share_one_receipt_boundary(tmp_path: Path, capsys) -> None:

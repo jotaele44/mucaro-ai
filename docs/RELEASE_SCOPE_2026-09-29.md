@@ -8,7 +8,7 @@ Decision authority: project owner affirmation in the active session.
 | Portable desktop lane | Native arm64 embedded runtime | Retain the two-lane requirement. Freeze an independently verified arm64 runtime source and test its packaged app on Apple Silicon. x86_64 under Rosetta is a separate compatibility observation. |
 | Mobile | Responsive web UI at iPhone width | Native iOS distribution is outside this release. Chromium device emulation is provisional for iOS Safari behavior. Run WebKit/Safari on an actual iPhone for keyboard, actions, copy/read-aloud and linked PR navigation. |
 | Windows and Linux | Source setup documentation only | No packaged or signed desktop release claim. |
-| Phone access to local Mac | Not part of the responsive UI evidence | Do not imply a LAN, TLS, PWA or native shipping channel from viewport tests. |
+| Phone access to local Mac | Adopted as scope delta `SD-012` (amended 2026-10-01, project owner affirmation in the active session): a phone on the same private network or VPN reaches the source launcher's service with an access token, optionally over TLS. Status PROVISIONAL; see `docs/PHONE_ACCESS.md`. Not part of the responsive UI evidence. | Viewport tests do not prove it. `SD-012` carries its own gates and needs a physical iPhone session before it can pass. Do not imply an installable web app, a native client (`SD-010`) or serving from the packaged app, which stays loopback-only. |
 
 ## Release gate
 

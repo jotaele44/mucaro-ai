@@ -14,6 +14,7 @@ from backend.app.portable_runtime_source import (
     _parse_lock,
     _validate_archive_bytes,
     extract_runtime_archive,
+    inspect_runtime_archive,
     load_runtime_source_manifest,
 )
 
@@ -48,6 +49,136 @@ def _archive(path: Path, entries: list[tuple[str, bytes | None, str | None]]) ->
             "max_regular_bytes": 1024,
         },
     }
+
+
+def test_archive_inspector_freezes_logical_and_payload_identity(tmp_path: Path) -> None:
+    archive = tmp_path / "runtime.tar.gz"
+    _archive(
+        archive,
+        [
+            ("python/bin/python3", b"#!/bin/sh\nexit 0\n", None),
+            ("python/lib/example.dat", b"payload", None),
+            ("python/bin/python", None, "python3"),
+        ],
+    )
+
+    report = inspect_runtime_archive(archive)
+
+    assert report["archive_root"] == "python"
+    assert report["archive_bytes"] == archive.stat().st_size
+    assert report["archive_sha256"] == hashlib.sha256(archive.read_bytes()).hexdigest()
+    assert report["member_count"] == 3
+    assert report["regular_file_count"] == 2
+    assert report["symlink_count"] == 1
+    assert report["total_regular_bytes"] == 24
+    assert len(report["logical_members_sha256"]) == 64
+    assert len(report["payload_multiset_sha256"]) == 64
+    assert report["logical_members_sha256"] != report["payload_multiset_sha256"]
+
+
+def _mode_archive(path: Path, mode: int) -> None:
+    with tarfile.open(path, "w:gz") as archive:
+        member = tarfile.TarInfo("python/bin/python3")
+        payload = b"same-payload"
+        member.size = len(payload)
+        member.mode = mode
+        archive.addfile(member, io.BytesIO(payload))
+
+
+def test_archive_logical_identity_includes_file_mode_but_payload_identity_does_not(tmp_path: Path) -> None:
+    executable = tmp_path / "executable.tar.gz"
+    plain = tmp_path / "plain.tar.gz"
+    _mode_archive(executable, 0o755)
+    _mode_archive(plain, 0o644)
+
+    executable_report = inspect_runtime_archive(executable)
+    plain_report = inspect_runtime_archive(plain)
+
+    assert executable_report["payload_multiset_sha256"] == plain_report["payload_multiset_sha256"]
+    assert executable_report["logical_members_sha256"] != plain_report["logical_members_sha256"]
+
+
+def test_archive_inspector_rejects_member_count_above_bound_before_payload_hashing(tmp_path: Path) -> None:
+    archive = tmp_path / "runtime.tar.gz"
+    _archive(
+        archive,
+        [
+            ("python/a", b"a", None),
+            ("python/b", b"b", None),
+        ],
+    )
+
+    with pytest.raises(PortableRuntimeSourceError) as exc:
+        inspect_runtime_archive(archive, max_members=1)
+
+    assert exc.value.status == "ERROR_PORTABLE_RUNTIME_ARCHIVE_LIMIT"
+    assert "member_count>1" in exc.value.detail
+
+
+def test_archive_inspector_rejects_declared_regular_bytes_above_bound(tmp_path: Path) -> None:
+    archive = tmp_path / "runtime.tar.gz"
+    _archive(archive, [("python/data", b"0123456789", None)])
+
+    with pytest.raises(PortableRuntimeSourceError) as exc:
+        inspect_runtime_archive(archive, max_regular_bytes=9)
+
+    assert exc.value.status == "ERROR_PORTABLE_RUNTIME_ARCHIVE_LIMIT"
+    assert "total_regular_bytes>9" in exc.value.detail
+
+
+def test_extract_uses_manifest_specific_archive_limits(tmp_path: Path) -> None:
+    archive = tmp_path / "runtime.tar.gz"
+    manifest = _archive(archive, [("python/bin/python3", b"python", None)])
+    manifest["archive_policy"]["max_regular_bytes"] = 5
+
+    with pytest.raises(PortableRuntimeSourceError) as exc:
+        extract_runtime_archive(archive, tmp_path / "runtime", manifest)
+
+    assert exc.value.status == "ERROR_PORTABLE_RUNTIME_ARCHIVE_LIMIT"
+    assert not (tmp_path / "runtime").exists()
+
+
+def test_archive_inspector_rejects_multiple_roots(tmp_path: Path) -> None:
+    archive = tmp_path / "runtime.tar.gz"
+    _archive(
+        archive,
+        [
+            ("python/bin/python3", b"python", None),
+            ("other/file", b"other", None),
+        ],
+    )
+
+    with pytest.raises(PortableRuntimeSourceError) as exc:
+        inspect_runtime_archive(archive)
+
+    assert exc.value.status == "ERROR_PORTABLE_RUNTIME_ARCHIVE_ROOT"
+
+
+def test_archive_inspector_rejects_broken_symlink(tmp_path: Path) -> None:
+    archive = tmp_path / "runtime.tar.gz"
+    _archive(
+        archive,
+        [
+            ("python/bin/python3", b"python", None),
+            ("python/bin/python", None, "missing"),
+        ],
+    )
+
+    with pytest.raises(PortableRuntimeSourceError) as exc:
+        inspect_runtime_archive(archive)
+
+    assert exc.value.status == "ERROR_PORTABLE_RUNTIME_SYMLINK_TARGET"
+
+
+def test_extract_rejects_frozen_logical_manifest_drift(tmp_path: Path) -> None:
+    archive = tmp_path / "runtime.tar.gz"
+    manifest = _archive(archive, [("python/bin/python3", b"python", None)])
+    manifest["archive_policy"]["logical_members_sha256"] = "0" * 64
+
+    with pytest.raises(PortableRuntimeSourceError) as exc:
+        extract_runtime_archive(archive, tmp_path / "runtime", manifest)
+
+    assert exc.value.status == "ERROR_PORTABLE_RUNTIME_ARCHIVE_IDENTITY"
 
 
 def test_archive_symlink_is_contained_and_materialized(tmp_path: Path) -> None:
@@ -124,6 +255,50 @@ def test_runtime_environment_excludes_host_python_and_pip_configuration(monkeypa
     assert "PIP_INDEX_URL" not in env
     assert env["PYTHONNOUSERSITE"] == "1"
     assert env["PYTHONSAFEPATH"] == "1"
+
+
+def test_runtime_manifest_rejects_malformed_archive_identity_digest(tmp_path: Path) -> None:
+    (tmp_path / "pyproject.toml").write_text(
+        '[project]\nname="fixture"\nversion="1.0"\ndependencies=["example==1.0"]\n',
+        encoding="utf-8",
+    )
+    (tmp_path / "runtime.lock").write_text(
+        "example==1.0 \\\n    --hash=sha256:" + "a" * 64 + "\n",
+        encoding="utf-8",
+    )
+    manifest = tmp_path / "runtime.json"
+    manifest.write_text(
+        json.dumps(
+            {
+                "archive_policy": {
+                    "logical_members_sha256": "not-a-sha256",
+                    "max_members": 1,
+                    "max_regular_bytes": 1,
+                    "member_count": 1,
+                    "payload_multiset_sha256": "b" * 64,
+                    "regular_file_count": 1,
+                    "symlink_count": 0,
+                    "total_regular_bytes": 1,
+                },
+                "dependency_lock": "runtime.lock",
+                "required_imports": ["example"],
+                "schema_version": "mucaro-portable-runtime-source/1.0",
+                "source": {
+                    "bytes": 1,
+                    "sha256": "a" * 64,
+                    "url": "https://github.com/example/runtime",
+                },
+                "target": {},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(PortableRuntimeSourceError) as exc:
+        load_runtime_source_manifest(tmp_path, manifest)
+
+    assert exc.value.status == "ERROR_PORTABLE_RUNTIME_SOURCE_HASH"
+    assert "logical_members_sha256" in exc.value.detail
 
 
 def test_runtime_lock_must_match_direct_project_dependencies(tmp_path: Path) -> None:

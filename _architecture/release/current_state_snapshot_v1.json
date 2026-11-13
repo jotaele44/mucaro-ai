@@ -3,11 +3,9 @@
     "frontend_build": "pass",
     "frontend_dist_present": true
   },
-  "captured_utc": "2026-09-24T20:42:34Z",
+  "captured_utc": "2026-09-29T16:55:34Z",
   "connected_resources": [
-    "GitHub MCP (jotaele44/mucaro-ai)",
-    "Google Drive (read/search)",
-    "Hugging Face Hub"
+    "GitHub MCP (jotaele44/mucaro-ai)"
   ],
   "credentials": [
     {
@@ -45,7 +43,7 @@
     {
       "lock_kind": "top_level_pins_transitive_unpinned",
       "path": "pyproject.toml",
-      "sha256": "89dc5a7177b084aa87aebe49a11b1eac2981c0d390a282f911501d0d665f9ab8"
+      "sha256": "e1d22308f4a9e5155a735d00f78c61073d316819e44af2c25fc79f06fe7e0c49"
     },
     {
       "lock_kind": "top_level_pins_transitive_unpinned",
@@ -60,29 +58,63 @@
   ],
   "known_boundaries": [
     "FastAPI backend in-process on loopback; React/Vite frontend served from frontend/dist",
-    "Local data under data/ (SQLite + JSON ledgers); no workspace isolation",
+    "Source checkouts keep data under data/; the packaged app keeps data in ~/Library/Application Support/Mucaro AI (SQLite + JSON ledgers); no workspace isolation",
     "Tool registry is approval-gated; GIS/OCR/coding extras are CLI/library-only",
-    "Model providers: mock (default) and anthropic (live-mode + key gated)",
-    "macOS .app is a source-bound bash wrapper that opens the system browser",
-    "Agent environment: Linux container; no macOS host; tesseract absent; docker present"
+    "Model providers: mock (default), openai_compatible_local (loopback) and anthropic (live mode + key gated)",
+    "Packaged app: PyInstaller Mucaro AI.app (arm64, macOS 14+) with a native WKWebView window, ad-hoc signed; Developer ID signing and notarization blocked (BLK-SIGN-001)",
+    "Portable embedded-runtime lane: the governed runtime source is x86_64 only (packaging/runtime/macos-x86_64.json); the release requires a native arm64 runtime (RC-009); the lane workflow is not on main",
+    "Rendered UI QA: Chromium and Playwright WebKit on Linux at desktop and iPhone widths; no macOS WKWebView or on-device iOS Safari evidence",
+    "Backend has no TLS; non-loopback serving needs an explicit opt-in over plain HTTP",
+    "Agent environment: Linux container; no macOS host; tesseract absent; docker present; Chromium is the only local browser"
   ],
-  "receipts": [],
+  "receipts": [
+    {
+      "head_sha": "4a95ca820baf3156c75959069528fba57345b917",
+      "receipt_id": "security_gates-4a95ca820baf",
+      "receipt_type": "security_gates",
+      "status": "SECURITY_GATES_PASS",
+      "valid": true
+    },
+    {
+      "head_sha": "4a95ca820baf3156c75959069528fba57345b917",
+      "receipt_id": "local_release-4a95ca820baf",
+      "receipt_type": "local_release",
+      "status": "CERTIFY_RELEASE_OK",
+      "valid": true
+    },
+    {
+      "head_sha": "4a95ca820baf3156c75959069528fba57345b917",
+      "receipt_id": "gis_quality-4a95ca820baf",
+      "receipt_type": "gis_quality",
+      "status": "GIS_QUALITY_CERT_OK",
+      "valid": true
+    },
+    {
+      "head_sha": "4a95ca820baf3156c75959069528fba57345b917",
+      "receipt_id": "retrieval_quality-4a95ca820baf",
+      "receipt_type": "retrieval_quality",
+      "status": "RETRIEVAL_QUALITY_CERT_OK",
+      "valid": true
+    },
+    {
+      "head_sha": "4a95ca820baf3156c75959069528fba57345b917",
+      "receipt_id": "answer_trace_quality-4a95ca820baf",
+      "receipt_type": "answer_trace_quality",
+      "status": "ANSWER_TRACE_QUALITY_CERT_OK",
+      "valid": true
+    },
+    {
+      "head_sha": "4a95ca820baf3156c75959069528fba57345b917",
+      "receipt_id": "operator_workflow-4a95ca820baf",
+      "receipt_type": "operator_workflow",
+      "status": "OPERATOR_WORKFLOW_CERT_OK",
+      "valid": true
+    }
+  ],
   "repository": {
-    "branch": "claude/inspiring-brahmagupta-6opmt3",
-    "dirty_paths": [
-      "backend/app/cli.py",
-      "_architecture/release/",
-      "backend/app/release_scope.py",
-      "docs/release/",
-      "schemas/release_acceptance_ledger.schema.json",
-      "schemas/release_blocker_ledger.schema.json",
-      "schemas/release_contradiction_ledger.schema.json",
-      "schemas/release_dag.schema.json",
-      "schemas/release_scope_delta_ledger.schema.json",
-      "schemas/release_scope_manifest.schema.json",
-      "schemas/release_state_snapshot.schema.json"
-    ],
-    "head_sha": "0bf5bf88a9088042688f1d77af5ad3dad144afce",
+    "branch": "claude/release-cert-audit-2026-09-29",
+    "dirty_paths": [],
+    "head_sha": "4a95ca820baf3156c75959069528fba57345b917",
     "path": "/home/user/mucaro-ai"
   },
   "runtime": {
@@ -95,7 +127,7 @@
   },
   "schema_version": "mucaro-release-state-snapshot/1.0",
   "tests": {
-    "backend_pytest": "663 passed, 246 warnings in 37.61s (baseline HEAD 0bf5bf8, before implementation changes)",
+    "backend_pytest": "975 passed, 1 skipped (scripts/certify_release.py at 4a95ca8)",
     "recorded": true
   }
 }

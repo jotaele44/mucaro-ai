@@ -1,5 +1,9 @@
 name: macOS app
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 # Builds the double-clickable Mucaro AI.app on Apple Silicon and verifies it end to end
 # through LaunchServices (GOAL-001, TGT-001, TGT-017, TGT-026, TGT-028, TGT-029).
 # Ad-hoc signed only: Developer ID signing and notarization need credentials (BLK-SIGN-001).

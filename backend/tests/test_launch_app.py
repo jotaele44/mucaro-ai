@@ -3,6 +3,7 @@ from __future__ import annotations
 import io
 import json
 import os
+import plistlib
 import subprocess
 import sys
 import tarfile
@@ -89,25 +90,87 @@ def test_package_desktop_self_test():
 def test_build_macos_app_bundle_creates_double_clickable_wrapper(tmp_path):
     (tmp_path / "scripts").mkdir()
     (tmp_path / "frontend" / "dist").mkdir(parents=True)
-    (tmp_path / "scripts" / "launch_app.py").write_text("# launcher\n", encoding="utf-8")
+    for name in ("native_start.sh", "one_click.sh", "one_click.py"):
+        (tmp_path / "scripts" / name).write_text("# launcher\n", encoding="utf-8")
     (tmp_path / "frontend" / "dist" / "index.html").write_text("<div>Mucaro</div>\n", encoding="utf-8")
     (tmp_path / "pyproject.toml").write_text('[project]\nname = "mucaro-ai"\nversion = "0.1.23"\n', encoding="utf-8")
 
     result = build_macos_app_bundle(tmp_path, output_dir=tmp_path / "apps", python_executable=sys.executable)
 
     assert result["status"] == "MACOS_APP_BUNDLE_READY"
-    app_path = tmp_path / "apps" / "Mucaro AI.app"
+    app_path = tmp_path / "apps" / "Mucaro AI Setup.app"
     executable = app_path / "Contents" / "MacOS" / "mucaro-ai"
     receipt = app_path / "Contents" / "Resources" / "mucaro-app-receipt.json"
     assert app_path.is_dir()
     assert executable.exists()
     assert executable.stat().st_mode & 0o111
-    assert "scripts/launch_app.py" in executable.read_text(encoding="utf-8")
+    assert "scripts/native_start.sh" in executable.read_text(encoding="utf-8")
     assert '"$@"' in executable.read_text(encoding="utf-8")
     assert json.loads(receipt.read_text(encoding="utf-8"))["scope"] == "source_bound_local_macos_app_wrapper"
+    info = plistlib.loads((app_path / "Contents" / "Info.plist").read_bytes())
+    assert info["CFBundleName"] == "Mucaro AI Setup"
+    assert info["CFBundleDisplayName"] == "Mucaro AI Setup"
+    assert info["CFBundleIdentifier"] == "ai.mucaro.source-launcher"
 
     verification = verify_macos_app_bundle(app_path, root=tmp_path)
     assert verification["status"] == "MACOS_APP_BUNDLE_VERIFIED"
+
+
+def _build_source_wrapper_fixture(tmp_path: Path) -> Path:
+    (tmp_path / "scripts").mkdir()
+    (tmp_path / "frontend" / "dist").mkdir(parents=True)
+    for name in ("native_start.sh", "one_click.sh", "one_click.py"):
+        (tmp_path / "scripts" / name).write_text("# launcher\n", encoding="utf-8")
+    (tmp_path / "frontend" / "dist" / "index.html").write_text("<div>Mucaro</div>\n", encoding="utf-8")
+    (tmp_path / "pyproject.toml").write_text(
+        '[project]\nname = "mucaro-ai"\nversion = "0.1.23"\n',
+        encoding="utf-8",
+    )
+    result = build_macos_app_bundle(tmp_path, output_dir=tmp_path / "apps")
+    assert result["status"] == "MACOS_APP_BUNDLE_READY"
+    return Path(result["app_path"])
+
+
+def test_verify_source_wrapper_rejects_release_filename_even_with_source_plist(tmp_path: Path) -> None:
+    app_path = _build_source_wrapper_fixture(tmp_path)
+    release_named = app_path.with_name("Mucaro AI.app")
+    app_path.rename(release_named)
+
+    verification = verify_macos_app_bundle(release_named, root=tmp_path)
+
+    assert verification["status"] == "MACOS_APP_BUNDLE_VERIFY_FAILED"
+    failed = {row["name"] for row in verification["checks"] if row["status"] == "FAIL"}
+    assert "source_bundle_filename" in failed
+    assert "receipt_app_path" in failed
+
+
+def test_verify_source_wrapper_rejects_partial_display_name_collision(tmp_path: Path) -> None:
+    app_path = _build_source_wrapper_fixture(tmp_path)
+    plist_path = app_path / "Contents" / "Info.plist"
+    plist = plistlib.loads(plist_path.read_bytes())
+    assert plist["CFBundleName"] == "Mucaro AI Setup"
+    plist["CFBundleDisplayName"] = "Mucaro AI"
+    plist_path.write_bytes(plistlib.dumps(plist))
+
+    verification = verify_macos_app_bundle(app_path, root=tmp_path)
+
+    assert verification["status"] == "MACOS_APP_BUNDLE_VERIFY_FAILED"
+    failed = {row["name"] for row in verification["checks"] if row["status"] == "FAIL"}
+    assert "plist_source_name" in failed
+
+
+def test_verify_source_wrapper_rejects_release_bundle_identifier(tmp_path: Path) -> None:
+    app_path = _build_source_wrapper_fixture(tmp_path)
+    plist_path = app_path / "Contents" / "Info.plist"
+    plist = plistlib.loads(plist_path.read_bytes())
+    plist["CFBundleIdentifier"] = "ai.mucaro.app"
+    plist_path.write_bytes(plistlib.dumps(plist))
+
+    verification = verify_macos_app_bundle(app_path, root=tmp_path)
+
+    assert verification["status"] == "MACOS_APP_BUNDLE_VERIFY_FAILED"
+    failed = {row["name"] for row in verification["checks"] if row["status"] == "FAIL"}
+    assert "plist_source_bundle_id" in failed
 
 
 def test_verify_macos_app_bundle_rejects_missing_bundle(tmp_path):
@@ -117,6 +180,27 @@ def test_verify_macos_app_bundle_rejects_missing_bundle(tmp_path):
     failed_names = {check["name"] for check in result["checks"] if check["status"] == "FAIL"}
     assert "app_bundle_exists" in failed_names
     assert "launcher_executable" in failed_names
+
+
+def test_certify_release_large_file_allowlist_is_path_specific_and_bounded(monkeypatch, tmp_path):
+    monkeypatch.setattr(certify_release, "ROOT", tmp_path)
+    icon = tmp_path / "Mucaro AI Setup.app" / "Contents" / "Resources" / "MucaroAI.icns"
+    icon.parent.mkdir(parents=True)
+    icon.write_bytes(b"x" * 2_500_000)
+
+    gate = certify_release.gate_no_large_files([icon])
+    assert gate.status == "PASS"
+
+    icon.write_bytes(b"x" * 3_000_001)
+    gate = certify_release.gate_no_large_files([icon])
+    assert gate.status == "FAIL"
+    assert "Mucaro AI Setup.app/Contents/Resources/MucaroAI.icns:3000001" in gate.detail
+
+    unrelated = tmp_path / "unexpected.bin"
+    unrelated.write_bytes(b"x" * 1_000_001)
+    gate = certify_release.gate_no_large_files([unrelated])
+    assert gate.status == "FAIL"
+    assert "unexpected.bin:1000001" in gate.detail
 
 
 def test_certify_release_includes_package_artifact_gate(monkeypatch, capsys):
@@ -168,6 +252,22 @@ def test_certify_release_includes_package_artifact_gate(monkeypatch, capsys):
             "pip_audit",
             "-r",
             "packaging/runtime/requirements-macos-x86_64.lock",
+            "--no-deps",
+            "--disable-pip",
+            "--strict",
+            "--progress-spinner",
+            "off",
+        ],
+        certify_release.ROOT,
+    ) in calls
+    assert (
+        "python_runtime_arm64_lock_audit",
+        [
+            sys.executable,
+            "-m",
+            "pip_audit",
+            "-r",
+            "packaging/runtime/requirements-macos-arm64.lock",
             "--no-deps",
             "--disable-pip",
             "--strict",
@@ -349,6 +449,24 @@ def test_source_artifact_extracts_expected_archive_root(tmp_path):
 
     assert source_dir == tmp_path / "extract" / "mucaro-ai-0.1.23"
     assert (source_dir / "README.md").read_text(encoding="utf-8") == "# Mucaro AI\n"
+
+
+def test_source_artifact_restores_unix_executable_mode(tmp_path):
+    archive_path = tmp_path / "source.zip"
+    info = certify_source_artifact.zipfile.ZipInfo("mucaro-ai-0.1.23/scripts/native_start.sh")
+    info.create_system = 3
+    info.external_attr = 0o755 << 16
+    with certify_source_artifact.zipfile.ZipFile(archive_path, "w") as archive:
+        archive.writestr(info, "#!/bin/bash\n")
+    manifest = {
+        "package_name": "mucaro-ai",
+        "version": "0.1.23",
+        "archive_path": str(archive_path),
+    }
+
+    source_dir = certify_source_artifact.extract_source_archive(manifest, tmp_path / "extract")
+
+    assert (source_dir / "scripts/native_start.sh").stat().st_mode & 0o111
 
 
 def test_source_artifact_rejects_unexpected_archive_root(tmp_path):
@@ -734,3 +852,24 @@ def test_release_check_pythonpath_uses_platform_separator(tmp_path, monkeypatch)
         release_check.main()
 
     assert calls[0]["PYTHONPATH"] == f"{tmp_path};{tmp_path / 'backend'}"
+
+
+def test_native_mode_never_falls_back_to_a_browser(monkeypatch, capsys):
+    opened = []
+    dialogs = []
+    monkeypatch.setattr(launch_app, "ensure_frontend_dist", lambda **_: None)
+    monkeypatch.setattr(launch_app, "port_open", lambda port: True)
+    monkeypatch.setattr(launch_app, "health_ok", lambda port: True)
+    monkeypatch.setattr(launch_app.webbrowser, "open", lambda url: opened.append(url))
+    monkeypatch.setattr(launch_app.native_window, "show_dialog", lambda message: dialogs.append(message))
+
+    def no_window(*args, **kwargs):
+        raise ImportError("No module named 'webview'")
+
+    monkeypatch.setattr(launch_app.native_window, "run_window", no_window)
+
+    assert launch_app.main(["--native"]) == 10
+
+    assert opened == []
+    assert len(dialogs) == 1 and "could not start" in dialogs[0]
+    assert "ERROR_NATIVE_WINDOW_UNAVAILABLE" in capsys.readouterr().err

@@ -1,15 +1,16 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import sqlite3
 from pathlib import Path
 from typing import Any
 
-from .config import settings
+from .config import parse_bool, settings
 
 # Bump when tables change; init_db only ever moves the recorded version forward.
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 
 def get_connection(sqlite_path: Path | None = None) -> sqlite3.Connection:
@@ -80,6 +81,31 @@ _SCHEMA_SQL = """
                 payload_json TEXT NOT NULL,
                 PRIMARY KEY (run_id, seq)
             );
+            CREATE TABLE IF NOT EXISTS execution_entry_artifacts (
+                artifact_id TEXT NOT NULL,
+                revision INTEGER NOT NULL,
+                mode TEXT NOT NULL,
+                state TEXT NOT NULL,
+                conversation_id TEXT NOT NULL,
+                source_commit TEXT NOT NULL,
+                payload_json TEXT NOT NULL,
+                PRIMARY KEY (artifact_id, revision)
+            );
+            CREATE INDEX IF NOT EXISTS execution_entry_artifacts_conversation
+                ON execution_entry_artifacts(conversation_id, revision);
+            CREATE TABLE IF NOT EXISTS execution_entry_decisions (
+                decision_id TEXT PRIMARY KEY,
+                artifact_id TEXT NOT NULL,
+                revision INTEGER NOT NULL,
+                idempotency_key TEXT NOT NULL UNIQUE,
+                request_sha256 TEXT NOT NULL,
+                state TEXT NOT NULL,
+                payload_json TEXT NOT NULL,
+                FOREIGN KEY(artifact_id, revision) REFERENCES execution_entry_artifacts(artifact_id, revision)
+            );
+            CREATE UNIQUE INDEX IF NOT EXISTS execution_entry_active_claim
+                ON execution_entry_decisions(artifact_id, revision)
+                WHERE state IN ('CLAIMED','DISPATCHED');
             CREATE TABLE IF NOT EXISTS schema_meta (
                 key TEXT PRIMARY KEY,
                 value TEXT NOT NULL
@@ -111,6 +137,14 @@ def init_db(sqlite_path: Path | None = None) -> None:
         except BaseException:
             conn.execute("ROLLBACK")
             raise
+        # Only after the version check, so a newer database is refused without being touched.
+        # WAL keeps durability (synchronous stays FULL) with one fsync per commit, and readers
+        # stop blocking the writer. It persists in the file; MUCARO_AI_SQLITE_WAL=0 opts out.
+        if parse_bool(os.getenv("MUCARO_AI_SQLITE_WAL") or None, True):
+            try:
+                conn.execute("PRAGMA journal_mode=WAL")
+            except sqlite3.OperationalError:
+                pass  # Best effort: a busy or unsupported file keeps its journal mode.
     finally:
         conn.close()
 

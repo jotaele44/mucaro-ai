@@ -255,6 +255,35 @@ def test_tool_runtime_web_search_stays_fail_closed_without_live_permission(monke
     assert exc.value.status == "ERROR_WEB_SEARCH_LIVE_NOT_ALLOWED"
 
 
+
+def test_malformed_non_object_tool_result_fails_closed(tmp_path: Path, monkeypatch):
+    from dataclasses import replace
+
+    from backend.app import tools as tools_module
+
+    cfg = make_settings(tmp_path)
+
+    def malformed_handler(arguments, cfg):
+        return "not-an-object"
+
+    malformed = replace(tools_module.TOOL_REGISTRY["source_library.status"], handler=malformed_handler)
+    monkeypatch.setitem(tools_module.TOOL_REGISTRY, "source_library.status", malformed)
+    call_id = request_tool_call("source_library.status", {}, cfg=cfg, requested_by="test")["tool_call"]["tool_call_id"]
+    approve_tool_call(call_id, cfg=cfg, approved_by="test")
+
+    with pytest.raises(ToolRuntimeError) as exc:
+        run_tool_call(call_id, cfg=cfg, executed_by="test")
+    assert exc.value.status == "ERROR_TOOL_RESULT_INVALID"
+
+    call = next(row for row in list_tool_calls(cfg)["tool_calls"] if row["tool_call_id"] == call_id)
+    assert call["status"] == "FAILED"
+    assert call["result"]["status"] == "ERROR_TOOL_RESULT_INVALID"
+    assert call["result"]["observed_type"] == "str"
+    # A malformed handler result is the tool's failure, not invalid user input.
+    from backend.app.error_categories import classify_error
+
+    assert classify_error("ERROR_TOOL_RESULT_INVALID") == "TOOL_FAILURE"
+
 def test_a_hung_handler_times_out_and_is_never_recorded_as_executed(tmp_path: Path, monkeypatch):
     import threading
     from dataclasses import replace

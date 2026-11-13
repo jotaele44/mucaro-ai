@@ -111,7 +111,7 @@ def test_terminal_checkpoint_survives_restart_and_stays_terminal(tmp_path: Path)
 from backend.app.agent_checkpoints import create_checkpoint, transition_checkpoint
 from backend.app.config import Settings
 cfg = Settings.load()
-created = create_checkpoint(session_id="s-terminal", run_id="r-terminal", objective="Finish", source_sha="{SHA}", cfg=cfg)
+created = create_checkpoint(session_id="s-terminal", run_id="r-terminal", objective="Finish", source_sha="{SHA}", state="EXECUTING", cfg=cfg)
 done = transition_checkpoint(created["checkpoint_id"], state="COMPLETED", cfg=cfg)
 print(done["checkpoint_id"])
 """,

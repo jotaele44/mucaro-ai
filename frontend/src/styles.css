@@ -328,6 +328,7 @@ button:disabled {
 
 .field input,
 .field select,
+.field textarea,
 .other-input {
   font-size: 15px;
   color: var(--text);
@@ -336,6 +337,11 @@ button:disabled {
   border-radius: 8px;
   padding: 8px 10px;
   min-height: 38px;
+}
+
+.field textarea {
+  width: 100%;
+  resize: vertical;
 }
 
 .field.compact input {
@@ -387,6 +393,75 @@ button:disabled {
 
 .menu-wrap {
   position: relative;
+}
+
+.chat-notice {
+  margin: 0 14px 8px;
+}
+
+
+.execution-entry-card {
+  width: min(760px, 100%);
+  align-self: center;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  padding: 16px;
+  box-shadow: var(--shadow);
+}
+
+.execution-entry-copy {
+  display: grid;
+  gap: 6px;
+}
+
+.execution-entry-copy h2,
+.execution-entry-copy p {
+  margin: 0;
+}
+
+.execution-entry-copy h2 {
+  font-size: 16px;
+}
+
+.execution-entry-card .eyebrow {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.execution-entry-actions {
+  margin-top: 14px;
+}
+
+.execution-entry-reason {
+  margin-top: 12px;
+}
+
+.execution-entry-card textarea {
+  width: 100%;
+  min-height: 120px;
+  resize: vertical;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px;
+  color: var(--text);
+  background: var(--surface);
+  font: inherit;
+  font-size: 16px;
+}
+
+.execution-entry-card button:focus-visible,
+.execution-entry-card textarea:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.execution-entry-card button:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
 }
 
 .menu {
@@ -450,6 +525,19 @@ button:disabled {
   border-radius: var(--radius);
   max-width: 100%;
   overflow-wrap: anywhere;
+  -webkit-user-select: text;
+  user-select: text;
+  -webkit-touch-callout: default;
+}
+
+.bubble .rich-text,
+.bubble .rich-text * {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.bubble .rich-text {
+  cursor: text;
 }
 
 .user-bubble {
@@ -695,9 +783,113 @@ details summary {
   color: var(--muted);
 }
 
+.editable-message {
+  min-width: 0;
+}
+
+.message-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
+  min-height: 28px;
+}
+
+.user-bubble .message-footer {
+  justify-content: flex-end;
+}
+
+.message-edited-label {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.25;
+}
+
 .message-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 4px;
+  margin-left: auto;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.message-actions .ghost-button {
+  min-height: 28px;
+  padding: 2px 7px;
+  font-size: 12px;
+}
+
+.message-actions .icon-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 30px;
+  padding: 2px 6px;
+}
+
+.icon {
+  display: block;
+  flex: none;
+  width: 16px;
+  height: 16px;
+}
+
+.message-editor {
+  display: grid;
+  gap: 8px;
+}
+
+.save-options {
+  display: grid;
+  gap: 8px;
+}
+
+.save-options .secondary-button {
+  width: 100%;
+  text-align: left;
+}
+
+.save-heading {
+  margin: 16px 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.message-editor label,
+.message-editor textarea {
+  width: 100%;
+}
+
+.message-editor textarea {
+  min-height: 88px;
+  resize: vertical;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--text);
+  padding: 9px 10px;
+  font: inherit;
+  line-height: 1.45;
+}
+
+.message-editor textarea:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.message-editor-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.message-edit-disclosure {
+  margin: 0;
 }
 
 /* ---------- composer ---------- */
@@ -998,6 +1190,19 @@ details summary {
   font-size: 14px;
 }
 
+/* ---------- access token gate (phone access) ---------- */
+
+.gate .gate-input {
+  display: flex;
+  gap: 8px;
+}
+
+.gate .gate-input input {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--mono);
+}
+
 /* ---------- phone widths (F01) ---------- */
 
 @media (max-width: 760px) {
@@ -1043,6 +1248,20 @@ details summary {
 
   .chat-header {
     padding: 8px 14px;
+  }
+
+  .execution-entry-card {
+    width: 100%;
+    padding: 14px;
+  }
+
+  .execution-entry-actions {
+    justify-content: stretch;
+  }
+
+  .execution-entry-actions button {
+    flex: 1 1 140px;
+    min-height: 44px;
   }
 
   .feed,
@@ -1098,4 +1317,50 @@ html {
   :root :is(button, select, input:not([type="file"]):not([type="checkbox"]):not([type="radio"])) {
     min-height: 44px;
   }
+
+  /* An icon has no text to widen its button, so it needs the 44px width explicitly. */
+  :root .message-actions .icon-action {
+    min-width: 44px;
+  }
+}
+
+/* Model setup: provider, server address and model for a chat. */
+.model-setup {
+  text-align: left;
+  gap: 10px;
+  min-width: 0;
+}
+
+.empty-state .model-setup {
+  max-width: 620px;
+  margin: 20px auto 0;
+}
+
+.model-choices {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.model-server {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: flex-end;
+}
+
+.model-server .field {
+  flex: 1 1 220px;
+}
+
+.model-state {
+  margin: 0;
+}
+
+.model-button {
+  max-width: 45%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border-color: var(--border);
 }

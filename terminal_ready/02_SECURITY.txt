@@ -1,0 +1,19 @@
+MÚCARO AI — SECURITY WORKFLOW
+Artifact execution: NOT_APPLICABLE
+
+macOS/Linux
+python3 scripts/certify_security_gates.py
+python3 -m pip_audit -r backend/requirements.txt --progress-spinner off
+python3 -m pip_audit -r packaging/runtime/requirements-macos-arm64.lock --no-deps --disable-pip --strict --progress-spinner off
+python3 -m pip_audit -r packaging/runtime/requirements-macos-x86_64.lock --no-deps --disable-pip --strict --progress-spinner off
+
+Windows PowerShell
+py -3.12 scripts/certify_security_gates.py
+py -3.12 -m pip_audit -r backend/requirements.txt --progress-spinner off
+py -3.12 -m pip_audit -r packaging/runtime/requirements-macos-arm64.lock --no-deps --disable-pip --strict --progress-spinner off
+py -3.12 -m pip_audit -r packaging/runtime/requirements-macos-x86_64.lock --no-deps --disable-pip --strict --progress-spinner off
+
+Failure handling
+Any known vulnerability in a required distribution lock is release-blocking until the lock is safely regenerated or updated and exact-head gates pass.
+Never suppress a security finding merely to turn CI green.
+Preserve the advisory identifier, affected lock, old version, replacement version, and resulting evidence.

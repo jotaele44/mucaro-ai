@@ -9,6 +9,8 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+from scripts import shadow_evidence
+
 ROOT = Path(__file__).resolve().parents[1]
 SCHEMA_VERSION = "mucaro-shadow-hardening-receipt/1.0"
 
@@ -56,13 +58,44 @@ def adjacent_paths(paths: list[str]) -> list[str]:
     return sorted(adjacent)
 
 
-def classify_rendered(paths: list[str]) -> tuple[str, str]:
-    if any(path.startswith("frontend/") for path in paths):
+def classify_rendered(
+    paths: list[str],
+    *,
+    checkpoint_sha: str,
+    receipt_paths: list[Path],
+) -> tuple[str, str]:
+    if not any(path.startswith("frontend/") for path in paths):
+        return ("AUDIT_ONLY", "No frontend surface changed in this checkpoint denominator.")
+    if not receipt_paths:
         return (
             "BLOCKED",
-            "Rendered desktop/mobile interaction evidence requires a runnable browser/device pass; static CI is not accepted as rendered proof.",
+            "Rendered desktop/mobile interaction evidence requires exact-checkpoint browser receipts; static CI is not accepted as rendered proof.",
         )
-    return ("AUDIT_ONLY", "No frontend surface changed in this checkpoint denominator.")
+
+    browsers: set[str] = set()
+    for receipt_path in receipt_paths:
+        try:
+            payload = json.loads(receipt_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            return ("BLOCKED", f"Rendered receipt unreadable: {receipt_path}: {exc}")
+        if payload.get("schema_version") != "mucaro-rendered-qa/1.0":
+            return ("BLOCKED", f"Rendered receipt schema invalid: {receipt_path}")
+        if payload.get("status") != "RENDERED_QA_PASS":
+            return ("BLOCKED", f"Rendered receipt is not PASS: {receipt_path}")
+        if payload.get("head_sha") != checkpoint_sha:
+            return ("BLOCKED", f"Rendered receipt checkpoint mismatch: {receipt_path}")
+        if payload.get("worktree_clean") is not True or int(payload.get("failed", 1)) != 0:
+            return ("BLOCKED", f"Rendered receipt is not clean/zero-failure: {receipt_path}")
+        browser = str(payload.get("browser") or "").lower()
+        if browser.startswith("chromium"):
+            browsers.add("chromium")
+        if browser.startswith("webkit"):
+            browsers.add("webkit")
+
+    missing = sorted({"chromium", "webkit"} - browsers)
+    if missing:
+        return ("BLOCKED", f"Rendered receipt browser denominator incomplete: missing={missing}")
+    return ("PASS", "Exact-checkpoint Chromium and WebKit rendered receipts passed.")
 
 
 REQUIRED_ADVERSARIAL_VECTORS = [
@@ -86,16 +119,21 @@ REQUIRED_ADVERSARIAL_VECTORS = [
 SHADOW_BOOTSTRAP_PATHS = {
     ".github/workflows/shadow-qa.yml",
     "backend/tests/test_shadow_baseline.py",
+    "backend/tests/test_shadow_evidence.py",
     "backend/tests/test_shadow_qa.py",
     "docs/SHADOW_QA.md",
     "scripts/resolve_shadow_baseline.py",
+    "scripts/shadow_evidence.py",
     "scripts/shadow_qa.py",
 }
 
 
 def adversarial_vector_results(paths: list[str]) -> dict[str, dict[str, str]]:
     path_set = set(paths)
-    bootstrap_only = bool(path_set) and path_set <= SHADOW_BOOTSTRAP_PATHS
+    bootstrap_only = bool(path_set) and all(
+        path in SHADOW_BOOTSTRAP_PATHS or path.startswith("_architecture/shadow/evidence/")
+        for path in path_set
+    )
     if bootstrap_only:
         reason = (
             "NOT_APPLICABLE: checkpoint changes only Shadow QA infrastructure; "
@@ -118,10 +156,62 @@ def exit_code_for_state(state: str) -> int:
     return 6
 
 
+def execute_vector_evidence(
+    vector_results: dict[str, dict[str, object]],
+    *,
+    checkpoint_sha: str,
+) -> list[str]:
+    failures: list[str] = []
+    for vector, result in vector_results.items():
+        if result.get("state") != "PASS":
+            continue
+        evidence = list(result.get("evidence") or [])
+        if any(item.get("kind") == "EXECUTION_RECEIPT" for item in evidence):
+            continue
+        tests = [item for item in evidence if item.get("kind") == "CHECKPOINT_TEST"]
+        nodeids = [f"{item['path']}::{item['selector'].split('::')[-1]}" for item in tests]
+        command = [sys.executable, "-m", "pytest", *nodeids, "-q"]
+        completed = subprocess.run(command, cwd=ROOT, text=True, capture_output=True)
+        receipt = {
+            "schema_version": shadow_evidence.EXECUTION_RECEIPT_SCHEMA_VERSION,
+            "checkpoint_sha": checkpoint_sha,
+            "vector": vector,
+            "status": "PASS" if completed.returncode == 0 else "FAIL",
+            "command": command,
+            "returncode": completed.returncode,
+            "stdout_tail": completed.stdout[-2000:],
+            "stderr_tail": completed.stderr[-2000:],
+        }
+        result["runtime_execution_receipt"] = receipt
+        if completed.returncode != 0:
+            failures.append(vector)
+    return failures
+
+def overall_state_for_results(
+    *,
+    failed_gates: list[dict[str, object]],
+    blocked_gates: list[dict[str, object]],
+    unresolved_vectors: list[str],
+    blocked_vectors: list[str],
+    rendered_state: str,
+) -> str:
+    if failed_gates:
+        return "FAIL"
+    if blocked_gates or unresolved_vectors or blocked_vectors or rendered_state == "BLOCKED":
+        return "PROVISIONAL"
+    return "PASS"
+
+
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Run bounded MUCARO Shadow QA against an exact frozen checkpoint.")
     parser.add_argument("--base", default="HEAD^", help="Base commit/ref for the changed-surface denominator.")
     parser.add_argument("--head", default="HEAD", help="Frozen checkpoint commit/ref.")
+    parser.add_argument("--evidence-manifest", type=Path, help="Checkpoint-bound vector evidence manifest.")
+    parser.add_argument("--execute-vector-evidence", action="store_true", help="Execute PASS vector checkpoint tests in this exact-checkpoint run and generate runtime receipts.")
+    parser.add_argument("--rendered-receipt", action="append", type=Path, default=[], help="Exact-checkpoint rendered QA receipt; provide both Chromium and WebKit receipts when frontend surfaces changed.")
+    parser.add_argument("--historical-replay", action="store_true", help="Adjudicate a historical checkpoint from frozen evidence without claiming its gates were rerun.")
     parser.add_argument(
         "--output",
         default=os.environ.get("MUCARO_SHADOW_RECEIPT", "artifacts/shadow-qa-receipt.json"),
@@ -132,57 +222,103 @@ def main() -> int:
     base_sha = git("rev-parse", args.base)
     head_sha = git("rev-parse", args.head)
     actual_head = git("rev-parse", "HEAD")
-    if head_sha != actual_head:
+    if head_sha != actual_head and not args.historical_replay:
         print(f"ERROR_SHADOW_HEAD_MISMATCH requested={head_sha} checkout={actual_head}", file=sys.stderr)
         return 2
+    if args.historical_replay and not args.evidence_manifest:
+        print("ERROR_SHADOW_EVIDENCE historical replay requires --evidence-manifest", file=sys.stderr)
+        return 7
 
     paths = changed_paths(base_sha, head_sha)
     adjacency = adjacent_paths(paths)
 
-    gates = [
-        run([sys.executable, "-m", "pytest", "backend/tests", "-q"]),
-        run([sys.executable, "scripts/validate_json.py"]),
-        run([sys.executable, "scripts/certify_release.py"]),
-    ]
-
-    frontend = ROOT / "frontend"
-    if (frontend / "package.json").exists() and (frontend / "node_modules").exists():
-        gates.append(run(["npm", "run", "build"], cwd=frontend))
-    else:
-        gates.append(
+    if args.historical_replay:
+        gates = [
             {
-                "command": ["npm", "run", "build"],
-                "cwd": "frontend",
+                "command": [],
+                "cwd": ".",
                 "returncode": None,
                 "state": "BLOCKED",
-                "reason": "frontend/node_modules is absent; build not silently treated as PASS",
+                "reason": "Historical replay preserves evidence but does not rerun checkpoint code from the tooling checkout.",
             }
-        )
+        ]
+    else:
+        gates = [
+            run([sys.executable, "-m", "pytest", "backend/tests", "-q"]),
+            run([sys.executable, "scripts/validate_json.py"]),
+            run([sys.executable, "scripts/certify_release.py"]),
+        ]
+
+        frontend = ROOT / "frontend"
+        if (frontend / "package.json").exists() and (frontend / "node_modules").exists():
+            gates.append(run(["npm", "run", "build"], cwd=frontend))
+        else:
+            gates.append(
+                {
+                    "command": ["npm", "run", "build"],
+                    "cwd": "frontend",
+                    "returncode": None,
+                    "state": "BLOCKED",
+                    "reason": "frontend/node_modules is absent; build not silently treated as PASS",
+                }
+            )
 
     failed = [gate for gate in gates if isinstance(gate.get("returncode"), int) and gate["returncode"] != 0]
     blocked = [gate for gate in gates if gate.get("state") == "BLOCKED"]
 
-    rendered_state, rendered_reason = classify_rendered(paths)
-    vector_results = adversarial_vector_results(paths)
+    rendered_state, rendered_reason = classify_rendered(
+        paths,
+        checkpoint_sha=head_sha,
+        receipt_paths=args.rendered_receipt,
+    )
+    try:
+        vector_results = (
+            shadow_evidence.load_manifest(
+                args.evidence_manifest,
+                base_sha=base_sha,
+                checkpoint_sha=head_sha,
+                required_vectors=REQUIRED_ADVERSARIAL_VECTORS,
+                require_execution_receipt=not args.execute_vector_evidence,
+            )
+            if args.evidence_manifest
+            else adversarial_vector_results(paths)
+        )
+    except shadow_evidence.ShadowEvidenceError as exc:
+        print(f"ERROR_SHADOW_EVIDENCE {exc}", file=sys.stderr)
+        return 7
+
     unresolved_vectors = [
         name for name, result in vector_results.items() if result["state"] == "UNRESOLVED"
     ]
+    blocked_vectors = [
+        name for name, result in vector_results.items() if result["state"] == "BLOCKED"
+    ]
+    failed_vector_executions = (
+        execute_vector_evidence(vector_results, checkpoint_sha=head_sha)
+        if args.execute_vector_evidence
+        else []
+    )
 
     # A gate can verify the declared changed-file denominator only when every executable gate passes
     # and every required adversarial vector is explicitly classified.
     # BLOCKED gates or unresolved vectors remain unresolved rather than being silently counted as verified.
-    if failed:
-        verified: list[str] = []
-        unresolved = list(paths)
-        overall = "FAIL"
-    elif blocked or unresolved_vectors:
-        verified = []
-        unresolved = list(paths)
-        overall = "PROVISIONAL"
-    else:
+    overall = (
+        "FAIL"
+        if failed_vector_executions
+        else overall_state_for_results(
+            failed_gates=failed,
+            blocked_gates=blocked,
+            unresolved_vectors=unresolved_vectors,
+            blocked_vectors=blocked_vectors,
+            rendered_state=rendered_state,
+        )
+    )
+    if overall == "PASS":
         verified = list(paths)
         unresolved = []
-        overall = "PASS"
+    else:
+        verified = []
+        unresolved = list(paths)
 
     receipt = {
         "schema_version": SCHEMA_VERSION,
@@ -224,8 +360,13 @@ def main() -> int:
             "required": len(REQUIRED_ADVERSARIAL_VECTORS),
             "classified": len(vector_results),
             "unresolved": len(unresolved_vectors),
+            "blocked": len(blocked_vectors),
+            "execution_failures": len(failed_vector_executions),
             "closes": len(vector_results) == len(REQUIRED_ADVERSARIAL_VECTORS),
         },
+        "execution_mode": "HISTORICAL_EVIDENCE_REPLAY" if args.historical_replay else "EXACT_CHECKPOINT_EXECUTION",
+        "evidence_manifest": str(args.evidence_manifest) if args.evidence_manifest else None,
+        "tooling_head_sha": actual_head,
         "overall_state": overall,
         "scope_note": "This receipt is bounded to the exact checkpoint and declared gates; it does not claim universal defect freedom.",
     }

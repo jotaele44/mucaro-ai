@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from .config import Settings, settings
+from .permission_engine import PermissionEngineError, PermissionRequest, require
 from .utils import stable_id, utc_now, write_json
 
 WEB_SEARCH_SCHEMA_VERSION = "mucaro-web-search/1.0"
@@ -124,6 +125,19 @@ def search_web_brave(
         raise WebSearchError("ERROR_WEB_SEARCH_COUNTRY", "country must be a two-letter code")
     if not search_lang or len(search_lang) > 8:
         raise WebSearchError("ERROR_WEB_SEARCH_LANGUAGE", "invalid search language")
+
+    try:
+        require(
+            PermissionRequest(
+                capability="network.public_http",
+                subject="web_search.brave",
+                target=BRAVE_WEB_SEARCH_ENDPOINT,
+                origin="operator",
+            ),
+            cfg=cfg,
+        )
+    except PermissionEngineError as exc:
+        raise WebSearchError(exc.status, exc.detail) from exc
 
     params = {
         "q": normalized_query,

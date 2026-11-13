@@ -1,0 +1,66 @@
+{
+  "schema_version": "mucaro-rt10-matrix007-execution-binding/1.0",
+  "observed_utc": "2026-10-16T18:28:27Z",
+  "benchmark_id": "mucaro-rt10-matrix007-scale-v1.2",
+  "workflow": {
+    "run_id": 36643492834,
+    "job_id": 117130186355,
+    "conclusion": "success",
+    "tests": "9 passed in 1.02s",
+    "certification_status": "RT10_SCALE_CERT_PASS"
+  },
+  "source_binding": {
+    "candidate_head_sha": "81b7a2d1128f4c20331b2ef46ce7ac9b4f7eced7",
+    "tested_merge_sha": "b51b30f120b1914235353dbebb289a4729bc1258",
+    "candidate_tree_sha": "006c2d2e2e7e29a6f904bb7de4599734d3f1d326",
+    "tested_tree_sha": "006c2d2e2e7e29a6f904bb7de4599734d3f1d326",
+    "tree_identity": "EXACT",
+    "commit_identity": "DISTINCT",
+    "compare_file_differences": 0,
+    "classification": "SOURCE_TREE_EQUIVALENT_EXECUTION"
+  },
+  "artifact": {
+    "artifact_id": 12066717067,
+    "name": "rt10-retrieval-scale-81b7a2d1128f4c20331b2ef46ce7ac9b4f7eced7",
+    "zip_sha256": "4af2ed16aecd44e9403bcfd6e673b20682632cd37d37601aef2bdc038fa3b08b",
+    "report_sha256": "9ab168908ade89993b209f055fa962dc79ff2e0887e88516ab147356e5d8c084",
+    "corpus_manifest_sha256": "760b2b40a3085d1be01a9ff1548717bd02017114da301fabb2d3326cca9cb18c",
+    "query_manifest_sha256": "8862e5f6b9aae5ebbaf81792ff545bdc4ea54ed2d47c3a64286c07453cadb63d",
+    "denominator_sha256": "df4a85fd20305f5eabcc0fb7debda3c79b23be87a70c16d86d6cb7be969ca50a"
+  },
+  "denominator": {
+    "chunks": 10000,
+    "queries": 80,
+    "answerable": 24,
+    "difficult": 16,
+    "ambiguous": 16,
+    "negative": 24,
+    "expected_bindings": 72
+  },
+  "quality_metrics": {
+    "expected_source_hit_rate": 1.0,
+    "expected_binding_recall": 1.0,
+    "ambiguous_full_hit_rate": 1.0,
+    "negative_query_accuracy": 1.0,
+    "citation_correctness": 1.0,
+    "citation_completeness": 1.0,
+    "faithfulness": 1.0,
+    "unsupported_source_claim_rate": 0.0
+  },
+  "performance_metrics": {
+    "p50_latency_ms": 310.49339549999644,
+    "p95_latency_ms": 375.91151500001274,
+    "max_latency_ms": 381.7391670000063,
+    "throughput_qps": 3.2332162750061775,
+    "peak_rss_mib": 72.637,
+    "wall_seconds": 31.372
+  },
+  "threshold_failures": [],
+  "claim_boundary": [
+    "The stress corpus is deterministic and synthetic; RT-09 remains the real-world provenance evidence.",
+    "This certifies the local hybrid retrieval path plus deterministic mock citation construction.",
+    "Remote-model quality remains governed by its independent live-provider evidence gate.",
+    "Latency is runner-specific.",
+    "Production-scale means the declared 10,000-chunk local-workstation proxy."
+  ]
+}

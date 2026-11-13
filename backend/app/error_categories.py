@@ -29,6 +29,7 @@ _RULES: tuple[tuple[str, str], ...] = (
     ("DNS_FAILED", "OFFLINE"),
     ("PERMISSION", "PERMISSION_DENIED"),
     ("AUTH_REQUIRED", "PERMISSION_DENIED"),
+    ("REMOTE_ACCESS", "PERMISSION_DENIED"),
     ("PRIVATE_HOST_BLOCKED", "BLOCKED_ACTION"),
     ("ROBOTS_DISALLOWED", "BLOCKED_ACTION"),
     ("DENIED", "BLOCKED_ACTION"),
@@ -40,15 +41,22 @@ _RULES: tuple[tuple[str, str], ...] = (
     ("EXECUTABLE_PAYLOAD", "UNSUPPORTED_FORMAT"),
     ("ARCHIVE", "UNSUPPORTED_FORMAT"),
     ("PARSE_FAILED", "UNSUPPORTED_FORMAT"),
+    ("MODEL_REFUSAL", "BLOCKED_ACTION"),  # the model declined to answer
+    ("MODEL_OUTPUT_TRUNCATED", "MODEL_UNAVAILABLE"),  # the answer hit the output limit
     ("MODEL_PROVIDER", "MODEL_UNAVAILABLE"),
     ("MODEL_ROUTING", "MODEL_UNAVAILABLE"),
     ("PROVIDER_UNAVAILABLE", "MODEL_UNAVAILABLE"),
     ("ANTHROPIC", "MODEL_UNAVAILABLE"),
     ("LOCAL_MODEL", "MODEL_UNAVAILABLE"),
+    ("REMOTE_MODEL", "MODEL_UNAVAILABLE"),
+    ("MODEL_ROUTE", "MODEL_UNAVAILABLE"),  # no eligible model for this turn
+    ("MODEL_SETTINGS", "INPUT_INVALID"),
+    ("NO_RETRIEVAL_CONTEXT", "SOURCE_UNAVAILABLE"),  # sources exist but none matches the question
     ("SEARCH_KEY", "REMOTE_SERVICE_UNAVAILABLE"),
     ("FETCH_FAILED", "REMOTE_SERVICE_UNAVAILABLE"),
     ("HTTP_STATUS", "REMOTE_SERVICE_UNAVAILABLE"),
     ("TOOL_TIMEOUT", "TOOL_FAILURE"),  # a local handler ran out of time; not a remote outage
+    ("TOOL_RESULT_INVALID", "TOOL_FAILURE"),  # a handler returned a malformed result; not bad user input
     ("TIMEOUT", "REMOTE_SERVICE_UNAVAILABLE"),
     ("NOT_FOUND", "SOURCE_UNAVAILABLE"),
     ("NO_SOURCES", "SOURCE_UNAVAILABLE"),

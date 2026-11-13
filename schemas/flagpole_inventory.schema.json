@@ -1,0 +1,44 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"https://mucaro.local/schemas/flagpole_inventory.schema.json",
+  "title":"Mucaro Flagpole Exact-Tree Inventory 1.0",
+  "type":"object","additionalProperties":false,
+  "required":["schema","source_sha","tree_sha","scope","exclusions","file_count","classification_counts","files","inventory_sha256"],
+  "properties":{
+    "schema":{"const":"mucaro-flagpole-exact-tree-inventory/1.0"},
+    "source_sha":{"type":"string","pattern":"^[0-9a-f]{40}$"},
+    "tree_sha":{"type":"string","pattern":"^[0-9a-f]{40}$"},
+    "scope":{"type":"string"},
+    "exclusions":{"type":"array","items":{"type":"string"}},
+    "file_count":{"type":"integer","minimum":0},
+    "classification_counts":{
+      "type":"object","additionalProperties":false,
+      "required":["configuration","data","documentation","other","schema","source","test","workflow"],
+      "properties":{
+        "configuration":{"type":"integer","minimum":0},
+        "data":{"type":"integer","minimum":0},
+        "documentation":{"type":"integer","minimum":0},
+        "other":{"type":"integer","minimum":0},
+        "schema":{"type":"integer","minimum":0},
+        "source":{"type":"integer","minimum":0},
+        "test":{"type":"integer","minimum":0},
+        "workflow":{"type":"integer","minimum":0}
+      }
+    },
+    "files":{
+      "type":"array",
+      "items":{
+        "type":"object","additionalProperties":false,
+        "required":["path","mode","blob_sha","size","classification"],
+        "properties":{
+          "path":{"type":"string","minLength":1},
+          "mode":{"type":"string","pattern":"^[0-7]{6}$"},
+          "blob_sha":{"type":"string","pattern":"^[0-9a-f]{40}$"},
+          "size":{"type":"integer","minimum":0},
+          "classification":{"enum":["configuration","data","documentation","other","schema","source","test","workflow"]}
+        }
+      }
+    },
+    "inventory_sha256":{"type":"string","pattern":"^[0-9a-f]{64}$"}
+  }
+}

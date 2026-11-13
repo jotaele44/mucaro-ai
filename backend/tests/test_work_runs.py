@@ -30,6 +30,7 @@ from backend.app.work_runs import (
     resume_waiting_run,
     run_envelope,
     stop_run,
+    stream_run_events,
     submit_message,
 )
 from backend.tests.test_api import make_settings
@@ -101,6 +102,14 @@ def test_answer_run_streams_an_ordered_feed_and_persists_turns(cfg, conversation
     assert [turn["role"] for turn in turns] == ["user", "assistant"]
     assert turns[1]["content"] == answer
     assert {turn["work_run_id"] for turn in turns} == {run["run_id"]}
+    context_usage = run["context_usage"]
+    assert context_usage["schema_version"] == "mucaro-context-usage/1.0"
+    assert context_usage["model"]["provider"] == "mock"
+    assert context_usage["model"]["run_mode"] == "ask"
+    assert context_usage["metrics"]["input_tokens"]["classification"] == "UNKNOWN"
+    assert context_usage["metrics"]["raw_context_chars"]["classification"] == "COMPUTED"
+    final = next(event for event in events if event["type"] == "final")
+    assert final["data"]["context_usage"] == context_usage
 
 
 def test_idempotent_resubmission_returns_the_original_run(cfg, conversation):
@@ -468,3 +477,58 @@ def test_api_message_routes_require_the_operator_token(tmp_path):
     assert client.post(f"/conversations/{conversation}/messages", json={"prompt": "hi"}).status_code == 401
     assert client.get("/work-runs").status_code == 401
     assert client.get("/work-runs/modes").status_code == 401
+
+
+# --- event stream delivery --------------------------------------------------------------
+
+
+def test_event_stream_wakes_on_a_commit_instead_of_waiting_out_its_poll(cfg, conversation):
+    run = _submit(conversation, "/status", cfg)
+    assert run["state"] == "AWAITING_APPROVAL"
+    last_seq = list_run_events(run["run_id"], cfg=cfg)[-1]["seq"]
+    received: list[tuple[str, float]] = []
+
+    def follow() -> None:
+        for block in stream_run_events(run["run_id"], last_seq, cfg, poll_seconds=30):
+            received.append((block, time.monotonic()))
+
+    follower = threading.Thread(target=follow, daemon=True)
+    follower.start()
+    time.sleep(0.2)  # let the stream reach its wait
+    emitted_at = time.monotonic()
+    work_runs._emit_only(run["run_id"], cfg, "warning", {"status": "WARN_TEST", "category": "INPUT_INVALID"})
+    deadline = emitted_at + 5
+    while not received and time.monotonic() < deadline:
+        time.sleep(0.01)
+    assert received, "the committed event never reached the stream"
+    assert "\nevent: warning\n" in received[0][0]
+    assert received[0][1] - emitted_at < 2  # far inside the 30 s poll interval
+    stop_run(run["run_id"], cfg=cfg)
+    follower.join(5)
+    assert not follower.is_alive()
+    assert received[-1][0].startswith("event: end")
+
+
+def test_event_stream_keeps_events_of_a_run_that_finishes_between_its_reads(cfg, conversation, monkeypatch):
+    run = _submit(conversation, "/status", cfg)
+    last_seq = list_run_events(run["run_id"], cfg=cfg)[-1]["seq"]
+    finished: list[bool] = []
+
+    def finish_after_first_read(read):
+        def wrapper(*args, **kwargs):
+            result = read(*args, **kwargs)
+            if not finished:
+                finished.append(True)
+                stop_run(run["run_id"], cfg=cfg)
+            return result
+
+        return wrapper
+
+    # Whichever read the stream makes first, the run reaches a terminal state right after it.
+    monkeypatch.setattr(work_runs, "get_run", finish_after_first_read(work_runs.get_run))
+    monkeypatch.setattr(work_runs, "list_run_events", finish_after_first_read(work_runs.list_run_events))
+    blocks = list(stream_run_events(run["run_id"], last_seq, cfg, poll_seconds=0.01))
+    delivered = [block.split("\n")[1] for block in blocks if block.startswith("id:")]
+    assert "event: interrupted" in delivered
+    assert blocks[-1].startswith("event: end")
+

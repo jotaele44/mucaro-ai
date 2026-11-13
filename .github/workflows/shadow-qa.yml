@@ -11,6 +11,15 @@ on:
         description: Exact frozen checkpoint SHA to audit
         required: true
         type: string
+      evidence_manifest_json:
+        description: Inline checkpoint-bound Shadow vector evidence manifest JSON
+        required: false
+        type: string
+      historical_replay:
+        description: Preserve historical evidence without rerunning checkpoint code; can never certify PASS
+        required: false
+        default: false
+        type: boolean
   push:
     branches:
       - main
@@ -25,6 +34,8 @@ jobs:
     env:
       SHADOW_BASE_OVERRIDE: ${{ inputs.base_sha || '' }}
       SHADOW_CHECKPOINT_SHA: ${{ inputs.checkpoint_sha || github.sha }}
+      SHADOW_EVIDENCE_MANIFEST_JSON: ${{ inputs.evidence_manifest_json || '' }}
+      SHADOW_HISTORICAL_REPLAY: ${{ inputs.historical_replay || false }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -69,10 +80,50 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci --registry=https://registry.npmjs.org/
         working-directory: frontend
+      - name: Materialize checkpoint-bound evidence manifest
+        if: github.event_name == 'workflow_dispatch'
+        shell: bash
+        run: |
+          test -n "$SHADOW_EVIDENCE_MANIFEST_JSON"
+          SHADOW_EVIDENCE_MANIFEST_PATH="$RUNNER_TEMP/shadow-evidence-manifest.json"
+          printf '%s\n' "$SHADOW_EVIDENCE_MANIFEST_JSON" > "$SHADOW_EVIDENCE_MANIFEST_PATH"
+          python -m json.tool "$SHADOW_EVIDENCE_MANIFEST_PATH" >/dev/null
+          echo "SHADOW_EVIDENCE_MANIFEST_PATH=$SHADOW_EVIDENCE_MANIFEST_PATH" >> "$GITHUB_ENV"
+      - name: Install rendered QA harness and browser engines
+        if: github.event_name == 'workflow_dispatch' && inputs.historical_replay != true
+        working-directory: qa/rendered
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+          npx playwright install --with-deps webkit
+      - name: Run exact-checkpoint rendered QA (Chromium)
+        if: github.event_name == 'workflow_dispatch' && inputs.historical_replay != true
+        working-directory: qa/rendered
+        run: node rendered_qa.mjs --browser chromium --python "$(which python)" --out "$RUNNER_TEMP/shadow-rendered-chromium"
+      - name: Run exact-checkpoint rendered QA (WebKit)
+        if: github.event_name == 'workflow_dispatch' && inputs.historical_replay != true
+        working-directory: qa/rendered
+        run: node rendered_qa.mjs --browser webkit --python "$(which python)" --out "$RUNNER_TEMP/shadow-rendered-webkit"
       - name: Run bounded Shadow QA
         env:
           MUCARO_SHADOW_RECEIPT: ${{ runner.temp }}/mucaro-shadow-qa-${{ env.SHADOW_CHECKPOINT_SHA }}.json
-        run: python scripts/shadow_qa.py --base "$SHADOW_BASE_SHA" --head "$SHADOW_CHECKPOINT_SHA" --output "$MUCARO_SHADOW_RECEIPT"
+        shell: bash
+        run: |
+          args=(--base "$SHADOW_BASE_SHA" --head "$SHADOW_CHECKPOINT_SHA" --output "$MUCARO_SHADOW_RECEIPT")
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            test -s "$SHADOW_EVIDENCE_MANIFEST_PATH"
+            args+=(--evidence-manifest "$SHADOW_EVIDENCE_MANIFEST_PATH")
+            if [ "$SHADOW_HISTORICAL_REPLAY" = "true" ]; then
+              args+=(--historical-replay)
+            else
+              args+=(
+                --execute-vector-evidence
+                --rendered-receipt "$RUNNER_TEMP/shadow-rendered-chromium/receipt.json"
+                --rendered-receipt "$RUNNER_TEMP/shadow-rendered-webkit/receipt.json"
+              )
+            fi
+          fi
+          python -m scripts.shadow_qa "${args[@]}"
       - name: Upload Shadow baseline receipt
         if: always()
         uses: actions/upload-artifact@v7
@@ -89,3 +140,12 @@ jobs:
           path: ${{ runner.temp }}/mucaro-shadow-qa-${{ env.SHADOW_CHECKPOINT_SHA }}.json
           if-no-files-found: error
           archive: false
+      - name: Upload exact-checkpoint rendered Shadow evidence
+        if: always() && github.event_name == 'workflow_dispatch' && inputs.historical_replay != true
+        uses: actions/upload-artifact@v7
+        with:
+          name: shadow-rendered-evidence-${{ env.SHADOW_CHECKPOINT_SHA }}
+          path: |
+            ${{ runner.temp }}/shadow-rendered-chromium
+            ${{ runner.temp }}/shadow-rendered-webkit
+          if-no-files-found: error

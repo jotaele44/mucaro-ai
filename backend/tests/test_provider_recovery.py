@@ -68,3 +68,33 @@ def test_non_provider_interruption_is_not_silently_converted_to_pause(tmp_path: 
         execute_with_provider_checkpoint(cp["checkpoint_id"], provider="anthropic", model="a", operation=bad_request, cfg=cfg)
     assert exc.value.status == "ERROR_INVALID_MODEL_REQUEST"
     assert get_checkpoint(cp["checkpoint_id"], cfg)["state"] == "EXECUTING"
+
+
+def test_local_provider_unavailable_pauses_and_persists_provider_model(tmp_path: Path) -> None:
+    cfg = make_settings(tmp_path)
+    cp = create_checkpoint(
+        session_id="session-local",
+        run_id="run-local",
+        objective="Continue local inference",
+        source_sha=SHA,
+        state="EXECUTING",
+        cfg=cfg,
+    )
+
+    def unavailable():
+        raise ModelProviderError("ERROR_LOCAL_MODEL_UNAVAILABLE", "loopback server unavailable")
+
+    result = execute_with_provider_checkpoint(
+        cp["checkpoint_id"],
+        provider="openai_compatible_local",
+        model="local-model",
+        operation=unavailable,
+        cfg=cfg,
+    )
+
+    stored = get_checkpoint(cp["checkpoint_id"], cfg)
+    assert result["status"] == "PAUSED_PROVIDER"
+    assert stored["state"] == "PAUSED_PROVIDER"
+    assert stored["provider"] == "openai_compatible_local"
+    assert stored["model"] == "local-model"
+    assert stored["checkpoint_id"] == cp["checkpoint_id"]

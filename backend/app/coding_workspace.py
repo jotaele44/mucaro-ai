@@ -8,6 +8,8 @@ from pathlib import Path
 from typing import Any
 
 from .config import Settings, settings
+from .local_tools import resolve_local_tool
+from .permission_engine import PermissionEngineError, PermissionRequest, require
 from .permissions import DirectoryPermissionError, ensure_directory_permission, is_within_path
 
 DEFAULT_FILE_MAX_BYTES = 256 * 1024
@@ -33,17 +35,23 @@ class RepositoryContext:
 
 
 def _git_process(repo_root: Path, args: list[str], *, timeout_seconds: int = 20) -> subprocess.CompletedProcess[str]:
+    git = resolve_local_tool("git")
+    if not git:
+        raise CodingWorkspaceError(
+            "ERROR_CODING_GIT_UNAVAILABLE",
+            "Git is not bundled in this Mucaro runtime.",
+        )
     try:
         return subprocess.run(
-            ["git", *args],
+            [git, *args],
             cwd=repo_root,
             text=True,
             capture_output=True,
             check=False,
             timeout=timeout_seconds,
         )
-    except FileNotFoundError as exc:
-        raise CodingWorkspaceError("ERROR_CODING_GIT_UNAVAILABLE", "git executable is not available.") from exc
+    except OSError as exc:
+        raise CodingWorkspaceError("ERROR_CODING_GIT_UNAVAILABLE", "Bundled Git could not be started.") from exc
     except subprocess.TimeoutExpired as exc:
         raise CodingWorkspaceError("ERROR_CODING_GIT_TIMEOUT", f"git command timed out: {' '.join(args)}") from exc
 
@@ -80,6 +88,18 @@ def resolve_repository(repo_root: str | Path, cfg: Settings = settings) -> Repos
 
     if not selected.is_dir():
         raise CodingWorkspaceError("ERROR_CODING_REPOSITORY_NOT_DIRECTORY", f"Repository selection is not a directory: {selected}")
+    try:
+        require(
+            PermissionRequest(
+                capability="git.read",
+                subject="coding_workspace.resolve_repository",
+                target=str(selected),
+                origin="operator",
+            ),
+            cfg=cfg,
+        )
+    except PermissionEngineError as exc:
+        raise CodingWorkspaceError(exc.status, exc.detail) from exc
 
     top_proc = _git_process(selected, ["rev-parse", "--show-toplevel"])
     if top_proc.returncode != 0 or not top_proc.stdout.strip():

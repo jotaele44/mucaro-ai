@@ -101,6 +101,18 @@ def _safe_relative(value: str) -> Path:
     return Path(*parsed.parts)
 
 
+def _tracked_app_bundle_root(value: str) -> str | None:
+    parsed = PurePosixPath(value)
+    if parsed.is_absolute() or ".." in parsed.parts or not parsed.parts:
+        raise PortableRuntimeError("ERROR_PORTABLE_MEMBER_PATH", value)
+    prefix: list[str] = []
+    for part in parsed.parts:
+        prefix.append(part)
+        if part.lower().endswith(".app"):
+            return PurePosixPath(*prefix).as_posix()
+    return None
+
+
 def build_portable_macos_app(
     root: Path,
     runtime_dir: Path,
@@ -145,7 +157,12 @@ def build_portable_macos_app(
 
     tracked = _git_tracked_files(root)
     copied_tracked: list[str] = []
+    excluded_tracked_app_bundles: set[str] = set()
     for rel in tracked:
+        app_bundle_root = _tracked_app_bundle_root(rel)
+        if app_bundle_root is not None:
+            excluded_tracked_app_bundles.add(app_bundle_root)
+            continue
         source = root / _safe_relative(rel)
         if not source.is_file():
             continue
@@ -211,6 +228,8 @@ exec "${PYTHON_EXECUTABLE}" -E -s -P -B scripts/launch_app.py "$@"
         },
         "application": {
             "tracked_source_count": len(copied_tracked),
+            "excluded_tracked_app_bundle_count": len(excluded_tracked_app_bundles),
+            "excluded_tracked_app_bundles": sorted(excluded_tracked_app_bundles),
             "member_count": len(app_rows),
             "members": app_rows,
             "frontend_index": "Contents/Resources/app/frontend/dist/index.html",
@@ -270,9 +289,42 @@ def verify_portable_macos_app(app_path: Path, *, expected_head: str | None = Non
         f"manifest={payload.get('release_version')!r} package={package_version!r}",
     )
 
+    application_members = payload["application"].get("members") or []
+    nested_app_members = [
+        row.get("path")
+        for row in application_members
+        if isinstance(row, dict)
+        and isinstance(row.get("path"), str)
+        and _tracked_app_bundle_root(row["path"]) is not None
+    ]
+    excluded_app_bundles = payload["application"].get("excluded_tracked_app_bundles") or []
+    excluded_app_count = payload["application"].get("excluded_tracked_app_bundle_count")
     runtime_python = app_path / _safe_relative(payload["runtime"]["python_path"])
     frontend_index = app_path / _safe_relative(payload["application"]["frontend_index"])
     entrypoint = app_path / _safe_relative(payload["application"]["entrypoint"])
+    check(
+        "application_excludes_nested_app_bundles",
+        not nested_app_members,
+        f"nested_app_members={nested_app_members}",
+    )
+    exclusion_receipt_present = (
+        "excluded_tracked_app_bundles" in payload["application"]
+        or "excluded_tracked_app_bundle_count" in payload["application"]
+    )
+    check(
+        "application_exclusion_receipt",
+        not exclusion_receipt_present
+        or (
+            isinstance(excluded_app_bundles, list)
+            and excluded_app_count == len(excluded_app_bundles)
+            and all(isinstance(item, str) and item.lower().endswith(".app") for item in excluded_app_bundles)
+        ),
+        (
+            "legacy_v1_manifest_without_exclusion_receipt"
+            if not exclusion_receipt_present
+            else f"count={excluded_app_count} bundles={excluded_app_bundles}"
+        ),
+    )
     check("runtime_python", runtime_python.is_file() and os.access(runtime_python, os.X_OK), str(runtime_python))
     check("frontend_index", frontend_index.is_file(), str(frontend_index))
     check("application_entrypoint", entrypoint.is_file(), str(entrypoint))
