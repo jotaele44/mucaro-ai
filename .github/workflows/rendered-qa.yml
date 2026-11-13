@@ -25,7 +25,7 @@ jobs:
     runs-on: ubuntu-24.04  # pinned: the pinned Playwright cannot install browsers on ubuntu-26.04
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: actions/setup-python@v5
