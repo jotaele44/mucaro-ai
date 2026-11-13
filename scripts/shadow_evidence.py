@@ -109,6 +109,7 @@ def validate_manifest(
     base_sha: str,
     checkpoint_sha: str,
     required_vectors: Iterable[str],
+    require_execution_receipt: bool = True,
 ) -> dict[str, dict[str, object]]:
     if not isinstance(payload, dict):
         raise ShadowEvidenceError("evidence manifest must be a JSON object")
@@ -164,8 +165,14 @@ def validate_manifest(
         if state == "PASS":
             if not evidence:
                 raise ShadowEvidenceError(f"PASS vector requires executable/checkpoint evidence: {vector}")
-            if not any(item["kind"] == "EXECUTION_RECEIPT" for item in evidence):
+            has_receipt = any(item["kind"] == "EXECUTION_RECEIPT" for item in evidence)
+            has_test = any(item["kind"] == "CHECKPOINT_TEST" for item in evidence)
+            if require_execution_receipt and not has_receipt:
                 raise ShadowEvidenceError(f"PASS vector requires exact-checkpoint execution receipt: {vector}")
+            if not require_execution_receipt and not (has_receipt or has_test):
+                raise ShadowEvidenceError(
+                    f"runtime-certified PASS vector requires checkpoint test or execution receipt: {vector}"
+                )
         if state in {"NOT_APPLICABLE", "BLOCKED", "UNRESOLVED"} and not rationale:
             raise ShadowEvidenceError(f"{state} vector requires rationale: {vector}")
         if state == "NOT_APPLICABLE" and evidence:
@@ -196,6 +203,7 @@ def load_manifest(
     base_sha: str,
     checkpoint_sha: str,
     required_vectors: Iterable[str],
+    require_execution_receipt: bool = True,
 ) -> dict[str, dict[str, object]]:
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
@@ -206,4 +214,5 @@ def load_manifest(
         base_sha=base_sha,
         checkpoint_sha=checkpoint_sha,
         required_vectors=required_vectors,
+        require_execution_receipt=require_execution_receipt,
     )

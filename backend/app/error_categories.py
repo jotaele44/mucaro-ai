@@ -56,6 +56,7 @@ _RULES: tuple[tuple[str, str], ...] = (
     ("FETCH_FAILED", "REMOTE_SERVICE_UNAVAILABLE"),
     ("HTTP_STATUS", "REMOTE_SERVICE_UNAVAILABLE"),
     ("TOOL_TIMEOUT", "TOOL_FAILURE"),  # a local handler ran out of time; not a remote outage
+    ("TOOL_RESULT_INVALID", "TOOL_FAILURE"),  # a handler returned a malformed result; not bad user input
     ("TIMEOUT", "REMOTE_SERVICE_UNAVAILABLE"),
     ("NOT_FOUND", "SOURCE_UNAVAILABLE"),
     ("NO_SOURCES", "SOURCE_UNAVAILABLE"),

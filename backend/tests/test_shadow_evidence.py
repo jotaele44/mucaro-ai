@@ -107,6 +107,19 @@ def test_pass_requires_evidence():
         validate(payload)
 
 
+
+def test_runtime_certification_allows_checkpoint_test_without_preexisting_receipt():
+    payload = manifest()
+    payload["vectors"][0]["evidence"] = payload["vectors"][0]["evidence"][:1]
+    result = shadow_evidence.validate_manifest(
+        payload,
+        base_sha=BASE,
+        checkpoint_sha=HEAD,
+        required_vectors=REQUIRED,
+        require_execution_receipt=False,
+    )
+    assert result["stale"]["state"] == "PASS"
+
 def test_pass_requires_exact_checkpoint_execution_receipt():
     payload = manifest()
     payload["vectors"][0]["evidence"] = payload["vectors"][0]["evidence"][:1]

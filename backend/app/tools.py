@@ -747,6 +747,16 @@ def run_tool_call(
         result = {"status": failure.status, "detail": failure.detail}
     else:
         result = outcome["result"]
+        if not isinstance(result, dict):
+            failure = ToolRuntimeError(
+                "ERROR_TOOL_RESULT_INVALID",
+                f"{tool_name} returned {type(result).__name__}; tool results must be JSON objects",
+            )
+            result = {
+                "status": failure.status,
+                "detail": failure.detail,
+                "observed_type": type(outcome["result"]).__name__,
+            }
     final_status = "FAILED" if failure else "EXECUTED"
     call = _transition(
         tool_call_id,
