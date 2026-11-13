@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 import subprocess
 import sys
 import time
@@ -294,18 +293,38 @@ elif mode == "ok":
 
 
 def real_fake_engine(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mode: str) -> tuple[str, Path]:
-    engine = tmp_path / "fake-engine"
-    engine.write_text(FAKE_ENGINE_SOURCE.format(python=sys.executable), encoding="utf-8")
-    engine.chmod(0o755)
+    """Route the engine argv to a real child process without needing an executable file.
+
+    The coding profile runs this suite inside the coding container, where /tmp is mounted noexec, so the fake engine
+    is a script interpreted by ``sys.executable`` rather than a file that is exec'd directly. The real ``Popen`` and
+    ``run`` still execute, so the bounded reader, the kill path and the container removal are exercised end to end.
+    """
+
+    engine = str(tmp_path / "fake-engine")
+    script = tmp_path / "fake_engine.py"
+    script.write_text(FAKE_ENGINE_SOURCE.format(python=sys.executable), encoding="utf-8")
     log = tmp_path / "fake-engine.log"
     log.write_text("", encoding="utf-8")
     monkeypatch.setenv("MUCARO_FAKE_ENGINE_LOG", str(log))
     monkeypatch.setenv("MUCARO_FAKE_ENGINE_MODE", mode)
-    monkeypatch.setattr(coding_container, "resolve_container_engine", lambda preferred=None: str(engine))
-    return str(engine), log
+    monkeypatch.setattr(coding_container, "resolve_container_engine", lambda preferred=None: engine)
+    real_popen = subprocess.Popen
+    real_run = subprocess.run
+
+    def route(argv):
+        if argv and argv[0] == engine:
+            return [sys.executable, str(script), *argv[1:]]
+        return argv
+
+    class RoutedPopen(real_popen):  # type: ignore[type-arg]
+        def __init__(self, argv, *args, **kwargs):
+            super().__init__(route(argv), *args, **kwargs)
+
+    monkeypatch.setattr(coding_container.subprocess, "Popen", RoutedPopen)
+    monkeypatch.setattr(coding_container.subprocess, "run", lambda argv, *args, **kwargs: real_run(route(argv), *args, **kwargs))
+    return engine, log
 
 
-@pytest.mark.skipif(os.name != "posix", reason="fake engine is a POSIX executable script")
 @pytest.mark.parametrize("mode,stream", [("flood_stdout", "stdout"), ("flood_stderr", "stderr")])
 def test_runaway_output_is_stopped_at_the_cap_with_bounded_memory(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mode: str, stream: str
@@ -345,7 +364,6 @@ def test_runaway_output_is_stopped_at_the_cap_with_bounded_memory(
     assert f"rm --force {name}" in events
 
 
-@pytest.mark.skipif(os.name != "posix", reason="fake engine is a POSIX executable script")
 def test_timeout_stops_and_removes_the_named_container(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     cfg = make_settings(tmp_path)
     repo = make_repo(tmp_path)
@@ -365,7 +383,6 @@ def test_timeout_stops_and_removes_the_named_container(tmp_path: Path, monkeypat
     assert f"rm --force {exc.value.receipt['container_name']}" in events
 
 
-@pytest.mark.skipif(os.name != "posix", reason="fake engine is a POSIX executable script")
 def test_bounded_runner_returns_complete_output_under_the_cap(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     cfg = make_settings(tmp_path)
     repo = make_repo(tmp_path)
