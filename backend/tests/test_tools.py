@@ -279,6 +279,10 @@ def test_malformed_non_object_tool_result_fails_closed(tmp_path: Path, monkeypat
     assert call["status"] == "FAILED"
     assert call["result"]["status"] == "ERROR_TOOL_RESULT_INVALID"
     assert call["result"]["observed_type"] == "str"
+    # A malformed handler result is the tool's failure, not invalid user input.
+    from backend.app.error_categories import classify_error
+
+    assert classify_error("ERROR_TOOL_RESULT_INVALID") == "TOOL_FAILURE"
 
 def test_a_hung_handler_times_out_and_is_never_recorded_as_executed(tmp_path: Path, monkeypatch):
     import threading
