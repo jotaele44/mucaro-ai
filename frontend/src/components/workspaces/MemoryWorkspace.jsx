@@ -94,10 +94,10 @@ export function MemoryWorkspace({ announce }) {
             <div className="grow">
               <p>{row.content}</p>
               <p className="muted small">
-                {row.kind} · {row.scope || "global"}
+                {`${row.kind} · from ${row.source} · scope ${row.scope || "global"}`}
                 {row.scope_id ? ` · ${row.scope_id}` : ""}
                 {row.scope_migration ? " · legacy → global" : ""}
-                {` · from ${row.source} · ${row.updated_at}`}
+                {` · ${row.updated_at}`}
               </p>
             </div>
             <label className="switch">
