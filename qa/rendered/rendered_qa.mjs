@@ -1630,6 +1630,124 @@ async function shareScenario(browser, base) {
   });
 }
 
+// Selector-specific rendered controls: selection is inert, submit is single-shot,
+// draft is preserved, failures retain the chooser, and all actions remain ask-first.
+async function nextVectorScenario(browser, base, viewport, contextOptions) {
+  const context = await browser.newContext({ ...contextOptions, baseURL: base });
+  const page = await context.newPage();
+  try {
+    await page.goto("/");
+    await page.getByLabel("Message Mucaro").waitFor();
+    await send(page, "How does source lineage work?");
+    await waitRunState(page, "COMPLETED");
+    const chooser = page.getByRole("form", { name: "Suggested next steps" });
+    await chooser.waitFor({ timeout: 15000 });
+    const before = await page.locator("article.run").count();
+    await chooser.getByRole("radio", { name: "Investigate unresolved gaps" }).check();
+    check("next-vector radio does not submit", viewport, await page.locator("article.run").count() === before);
+    const draft = "Unsent draft must survive the selected vector";
+    await page.getByLabel("Message Mucaro").fill(draft);
+    await chooser.getByRole("button", { name: "Preview exact prompt" }).click();
+    const preview = await chooser.locator(".next-vector-prompt").innerText();
+    check("next-vector exact prompt preview", viewport, preview.includes("Investigate unresolved gaps") && preview.includes("How does source lineage work?"));
+    check("next-vector preview preserves draft", viewport, await page.getByLabel("Message Mucaro").inputValue() === draft);
+    await page.reload();
+    await chooser.waitFor({ timeout: 15000 });
+    check("next-vector composer draft survives page reload", viewport, await page.getByLabel("Message Mucaro").inputValue() === draft);
+    await chooser.getByRole("radio", { name: "Investigate unresolved gaps" }).check();
+    // Same JavaScript task, two clicks: second must be ignored by synchronous in-flight guard.
+    await chooser.getByRole("button", { name: "Start selected vector" }).evaluate((button) => {
+      button.click();
+      button.click();
+    });
+    await page.waitForFunction((count) => document.querySelectorAll("article.run").length >= count, before + 1, { timeout: 20000 });
+    await page.waitForTimeout(600);
+    const runs = page.locator("article.run");
+    check("rapid double click submits exactly one vector", viewport, await runs.count() === before + 1);
+    const last = runs.last();
+    const prompt = await last.locator(".user-bubble").innerText();
+    check("selected vector maps to correct prompt", viewport, prompt.includes("Investigate unresolved gaps") && prompt.includes("How does source lineage work?"));
+    check("selected vector runs in ask-first mode", viewport, (await last.locator(".mode-tag").count()) === 0);
+    const apiRuns = await page.evaluate(async () => {
+      const row = document.querySelectorAll("article.run");
+      return row.length;
+    });
+    check("vector visible in canonical run feed", viewport, apiRuns === before + 1);
+    check("vector preserves unsent composer draft", viewport, await page.getByLabel("Message Mucaro").inputValue() === draft);
+    await waitRunState(page, "COMPLETED");
+    const nextChooser = page.getByRole("form", { name: "Suggested next steps" });
+    await nextChooser.waitFor();
+    await page.route("**/conversations/*/messages", (route) => route.fulfill({
+      status: 503, contentType: "application/json",
+      body: JSON.stringify({ detail: { status: "ERROR_TEST_INJECTED", detail: "simulated submission failure" } }),
+    }));
+    await nextChooser.getByRole("button", { name: "Start selected vector" }).click();
+    await nextChooser.getByRole("alert").waitFor();
+    check("failed submission leaves chooser and draft for retry", viewport,
+      (await nextChooser.count()) === 1 && (await page.getByLabel("Message Mucaro").inputValue()) === draft);
+    await page.unroute("**/conversations/*/messages");
+    const prior = await page.locator("article.run").count();
+    await nextChooser.getByRole("button", { name: "Start selected vector" }).click();
+    await page.waitForFunction((n) => document.querySelectorAll("article.run").length >= n, prior + 1, { timeout: 20000 });
+    check("explicit retry submits after temporary failure", viewport, (await page.locator("article.run").count()) === prior + 1);
+    await waitRunState(page, "COMPLETED");
+    const ambiguousChooser = page.getByRole("form", { name: "Suggested next steps" });
+    await ambiguousChooser.waitFor();
+    const beforeAmbiguous = await page.locator("article.run").count();
+    // Query the canonical durable ledger: rendered cards alone can hide a
+    // committed request whose response never reached the browser.
+    const durableRunIds = async () => page.evaluate(async () => {
+      const id = JSON.parse(localStorage.getItem("mucaro.activeConversation") || "null");
+      if (!id) throw new Error("No active conversation ID");
+      const response = await fetch(`/conversations/${encodeURIComponent(id)}/runs?limit=100`);
+      if (!response.ok) throw new Error(`Run-ledger read failed: ${response.status}`);
+      const payload = await response.json();
+      if (!Array.isArray(payload.runs)) throw new Error("Missing durable runs array");
+      return payload.runs.map((run) => run.run_id).sort();
+    });
+    const beforeLedger = await durableRunIds();
+    let upstreamAccepted = false;
+    let firstKey = null;
+    let retryKey = null;
+    // Commit the first POST on the server, then lose its acknowledgement.
+    await page.route("**/conversations/*/messages", async (route) => {
+      firstKey = route.request().postDataJSON()?.idempotency_key;
+      const upstream = await route.fetch();
+      upstreamAccepted = upstream.ok();
+      await route.fulfill({
+        status: 503, contentType: "application/json",
+        body: JSON.stringify({ detail: { status: "ERROR_LOST_ACK", detail: "response lost after server accepted request" } }),
+      });
+    });
+    await ambiguousChooser.getByRole("button", { name: "Start selected vector" }).click();
+    await ambiguousChooser.getByRole("alert").waitFor();
+    await page.unroute("**/conversations/*/messages");
+    const acceptedLedger = await durableRunIds();
+    // A retry is a new HTTP POST but MUST retain the first request identity.
+    await page.route("**/conversations/*/messages", async (route) => {
+      retryKey = route.request().postDataJSON()?.idempotency_key;
+      await route.continue();
+    });
+    await ambiguousChooser.getByRole("button", { name: "Start selected vector" }).click();
+    await page.waitForFunction((count) => document.querySelectorAll("article.run").length >= count, beforeAmbiguous + 1, { timeout: 20000 });
+    const finalLedger = await durableRunIds();
+    check("lost-acknowledgement retry keeps identical idempotency key", viewport,
+      typeof firstKey === "string" && firstKey.length > 0 && firstKey === retryKey);
+    check("accepted-but-unacknowledged retry conserves durable run IDs", viewport,
+      upstreamAccepted &&
+      acceptedLedger.length === beforeLedger.length + 1 &&
+      finalLedger.length === acceptedLedger.length &&
+      finalLedger.every((id, i) => id === acceptedLedger[i]) &&
+      beforeLedger.every((id) => finalLedger.includes(id)));
+    check("accepted-but-unacknowledged retry remains exactly one visible run", viewport,
+      (await page.locator("article.run").count()) === beforeAmbiguous + 1);
+    await page.unroute("**/conversations/*/messages");
+    await shot(page, viewport, "next-vector");
+  } finally {
+    await context.close();
+  }
+}
+
 const dataDir = mkdtempSync(path.join(tmpdir(), "mucaro-qa-"));
 const port = await freePort();
 const base = `http://127.0.0.1:${port}`;
@@ -1650,6 +1768,8 @@ try {
     axeResults.push(...(await scenario(browser, base, "desktop", { viewport: { width: 1440, height: 900 } })));
     const iphone = devices["iPhone 13"];
     axeResults.push(...(await scenario(browser, base, "iphone", { ...iphone, viewport: { width: 390, height: 844 } })));
+    await nextVectorScenario(browser, base, "selector-desktop", { viewport: { width: 1440, height: 900 } });
+    await nextVectorScenario(browser, base, "selector-iphone", { ...iphone, viewport: { width: 390, height: 844 } });
     axeResults.push(...(await executionEntryScenario(browser, base, "entry-desktop", { viewport: { width: 1440, height: 900 } })));
     axeResults.push(...(await executionEntryScenario(
       browser,
