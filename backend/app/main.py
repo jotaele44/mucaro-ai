@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 import re
 import sqlite3
@@ -10,7 +11,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
-from .auth import auth_status, client_is_remote, is_public_api_path, require_operator_auth, require_remote_token
+from .auth import (
+    auth_status,
+    browser_request_refusal,
+    client_is_remote,
+    is_public_api_path,
+    require_operator_auth,
+    require_remote_token,
+)
 from .config import Settings, settings
 from .error_categories import classify_error
 from .conversations import (
@@ -231,6 +239,35 @@ class SecurityHeadersMiddleware:
         await self.app(scope, receive, send_with_headers)  # type: ignore[operator]
 
 
+class BrowserRequestGuardMiddleware:
+    """Pure ASGI middleware refusing rebinding and cross-site state-changing requests (see auth)."""
+
+    def __init__(self, app: object, cfg: Settings) -> None:
+        self.app = app
+        self.cfg = cfg
+
+    async def __call__(self, scope: dict, receive: object, send: object) -> None:
+        refusal = browser_request_refusal(self.cfg, scope) if scope.get("type") == "http" else None
+        if refusal is None:
+            await self.app(scope, receive, send)  # type: ignore[operator]
+            return
+        status, detail = refusal
+        body = json.dumps(
+            {"detail": {"status": status, "category": classify_error(status), "detail": detail}}
+        ).encode("utf-8")
+        await send(  # type: ignore[operator]
+            {
+                "type": "http.response.start",
+                "status": 403,
+                "headers": [
+                    (b"content-type", b"application/json"),
+                    (b"content-length", str(len(body)).encode("ascii")),
+                ],
+            }
+        )
+        await send({"type": "http.response.body", "body": body})  # type: ignore[operator]
+
+
 def _claimed_entry_decision_ids(cfg: Settings) -> list[str]:
     """Read-only list of decisions still CLAIMED, used only to give recovery logs context."""
     conn = get_connection(cfg.sqlite_path)
@@ -285,6 +322,7 @@ def create_app(cfg: Settings = settings) -> FastAPI:
         return require_operator_auth(cfg, authorization=authorization, x_mucaro_token=x_mucaro_token)
 
     app = FastAPI(title="Mucaro AI", version="0.1.24", dependencies=[Depends(require_auth_unless_public)])
+    app.add_middleware(BrowserRequestGuardMiddleware, cfg=cfg)
     app.add_middleware(SecurityHeadersMiddleware)
     app.add_middleware(
         CORSMiddleware,
@@ -601,6 +639,7 @@ def create_app(cfg: Settings = settings) -> FastAPI:
             target.unlink(missing_ok=True)
             raise api_error(exc.status, str(exc), status_code=422, filename=safe_name) from exc
         except Exception as exc:
+            target.unlink(missing_ok=True)
             raise api_error("ERROR_INGEST_FAILED", type(exc).__name__, filename=safe_name) from exc
 
     @app.post("/ingest-path")
@@ -1139,8 +1178,8 @@ def create_app(cfg: Settings = settings) -> FastAPI:
 
     @app.get("/exports/{run_id}")
     def exports(run_id: str) -> dict:
-        path = cfg.export_dir / f"{run_id}.answer_trace.json"
-        if not path.exists():
+        path = export_file_path(run_id, "json", cfg)
+        if path is None:
             raise api_error("ERROR_EXPORT_NOT_FOUND", "Export not found.", status_code=404, run_id=run_id)
         return {"run_id": run_id, "path": str(path), "content": path.read_text(encoding="utf-8")}
 

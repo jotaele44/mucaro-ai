@@ -397,7 +397,7 @@ approved and audited.
 | `ERROR_INPUT_PATH_UNSUPPORTED` | `ingest` path is neither a file nor folder |
 | `ERROR_DIRECTORY_PERMISSION_REQUIRED` | direct filesystem ingest needs a prior directory grant |
 | `ERROR_PERMISSION_CONFIRMATION_REQUIRED` | a directory grant was requested without `--yes` in a non-interactive terminal |
-| `ERROR_DIRECTORY_PERMISSION_TOO_BROAD` | a directory grant targeted the filesystem root |
+| `ERROR_DIRECTORY_PERMISSION_TOO_BROAD` | a directory grant targeted the filesystem root, the home directory or a parent of it, a hidden settings directory under home, or `/etc` |
 | `ERROR_NO_SOURCES` | `ask` ran before any source chunks were available |
 | `ERROR_NO_RETRIEVAL_CONTEXT` | sources exist but no chunk matches the query (the chat UI instead lets the chosen model reply, marked `WARN_NO_SOURCES_USED`) |
 | `ERROR_MODEL_ROUTE_BLOCKED` | the chosen model provider cannot run; the detail names the reason (server unreachable, model not installed, remote use not allowed) |

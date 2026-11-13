@@ -60,4 +60,7 @@ data/processed/directory_permissions.json
 It records the requested path, canonical granted root, grant time, caller, and
 optional reason. The ledger is runtime privacy state and is ignored by Git.
 
-Filesystem root grants are rejected with `ERROR_DIRECTORY_PERMISSION_TOO_BROAD`.
+Grants that are too broad or too sensitive are rejected with `ERROR_DIRECTORY_PERMISSION_TOO_BROAD`: the
+filesystem root, the home directory and any directory that contains it, hidden settings directories directly
+under home (such as `~/.ssh` and `~/.config`), and the system configuration tree (`/etc`). Grant the specific
+folder that holds the documents instead.

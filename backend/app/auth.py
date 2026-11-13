@@ -4,6 +4,7 @@ import hmac
 import ipaddress
 from collections.abc import Mapping
 from typing import Any
+from urllib.parse import urlsplit
 
 from fastapi import Header, HTTPException
 
@@ -11,6 +12,10 @@ from .config import Settings, settings
 from .error_categories import classify_error
 
 REMOTE_ACCESS_STATUS = "ERROR_REMOTE_ACCESS_REQUIRES_TOKEN"
+CROSS_SITE_STATUS = "ERROR_CROSS_SITE_REQUEST_DENIED"
+HOST_NOT_ALLOWED_STATUS = "ERROR_HOST_NOT_ALLOWED"
+SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
+LOOPBACK_HOSTNAMES = frozenset({"localhost", "127.0.0.1", "::1"})
 
 
 def auth_status(cfg: Settings = settings) -> dict[str, Any]:
@@ -95,3 +100,62 @@ PUBLIC_API_PATHS = frozenset({"/health", "/config", "/security", "/tools"})
 
 def is_public_api_path(path: str) -> bool:
     return path in PUBLIC_API_PATHS
+
+
+def _header(scope: Mapping[str, Any], name: bytes) -> str:
+    for key, value in scope.get("headers") or ():
+        if key.lower() == name:
+            return value.decode("latin-1").strip()
+    return ""
+
+
+def _hostname(authority: str) -> str:
+    try:
+        return (urlsplit(f"//{authority}").hostname or "").lower()
+    except ValueError:
+        return ""
+
+
+def _is_loopback_hostname(hostname: str) -> bool:
+    return hostname in LOOPBACK_HOSTNAMES or hostname.endswith(".localhost")
+
+
+def _peer_is_loopback_address(scope: Mapping[str, Any]) -> bool:
+    client = scope.get("client")
+    if not client:
+        return False
+    try:
+        address = ipaddress.ip_address(str(client[0]).split("%", 1)[0].strip())
+    except ValueError:
+        return False
+    mapped = getattr(address, "ipv4_mapped", None)
+    return (mapped or address).is_loopback
+
+
+def browser_request_refusal(cfg: Settings, scope: Mapping[str, Any]) -> tuple[str, str] | None:
+    """Why a request must be refused because of where a browser sent it from, or None.
+
+    Without a token, loopback needs no credential, so a web page the user merely visits could otherwise reach
+    this service through their browser. Two checks close that:
+
+    - Host: a tokenless loopback request must name a loopback host. A page on another domain that re-points its
+      DNS at 127.0.0.1 (DNS rebinding) still sends its own domain in Host.
+    - Origin: a state-changing request that a browser marks as coming from another site is refused. A form
+      upload needs no CORS preflight, so the CORS policy alone does not stop it.
+
+    Clients that are not browsers send neither Origin nor Sec-Fetch-Site and are unaffected.
+    """
+    host = _header(scope, b"host")
+    if not cfg.operator_token and host and _peer_is_loopback_address(scope):
+        if not _is_loopback_hostname(_hostname(host)):
+            return HOST_NOT_ALLOWED_STATUS, "This service only answers to a local address unless a token is set."
+    if str(scope.get("method", "GET")).upper() in SAFE_METHODS:
+        return None
+    origin = _header(scope, b"origin")
+    if origin:
+        same_origin = bool(host) and urlsplit(origin).netloc.lower() == host.lower()
+        if not same_origin and origin not in cfg.cors_origins:
+            return CROSS_SITE_STATUS, "Requests that change data are only accepted from the Mucaro app itself."
+    elif _header(scope, b"sec-fetch-site").lower() == "cross-site":
+        return CROSS_SITE_STATUS, "Requests that change data are only accepted from the Mucaro app itself."
+    return None
