@@ -8,7 +8,9 @@ from .utils import read_json, stable_id, update_json, utc_now
 
 MEMORY_NAME = "assistant_memory.json"
 MEMORY_KINDS = {"preference", "profile", "instruction", "fact"}
+MEMORY_SCOPES = {"global", "workspace", "conversation"}
 MAX_MEMORY_CONTENT_CHARS = 800
+MAX_MEMORY_SCOPE_ID_CHARS = 160
 
 
 class MemoryError(RuntimeError):
@@ -34,9 +36,81 @@ def _validate_kind(kind: str) -> str:
     return normalized
 
 
+def _validate_scope(scope: str, scope_id: str | None, cfg: Settings) -> tuple[str, str | None]:
+    normalized = scope.strip().lower()
+    if normalized not in MEMORY_SCOPES:
+        allowed = ", ".join(sorted(MEMORY_SCOPES))
+        raise MemoryError("ERROR_MEMORY_SCOPE_UNSUPPORTED", f"Memory scope must be one of: {allowed}.")
+    resolved_id = " ".join(str(scope_id or "").strip().split()) or None
+    if resolved_id is not None and len(resolved_id) > MAX_MEMORY_SCOPE_ID_CHARS:
+        raise MemoryError(
+            "ERROR_MEMORY_SCOPE_ID_TOO_LONG",
+            f"Memory scope_id exceeds {MAX_MEMORY_SCOPE_ID_CHARS} characters.",
+        )
+    if normalized == "global":
+        if resolved_id is not None:
+            raise MemoryError("ERROR_MEMORY_SCOPE_ID_FOR_GLOBAL", "Global memory must not declare a scope_id.")
+        return normalized, None
+    if normalized == "workspace":
+        workspace_id = resolved_id or current_workspace_scope_id(cfg)
+        if not workspace_id.startswith("workspace_"):
+            raise MemoryError(
+                "ERROR_MEMORY_WORKSPACE_SCOPE_ID",
+                "Workspace-scoped memory requires a workspace_ stable identifier.",
+            )
+        return normalized, workspace_id
+    if resolved_id is None:
+        raise MemoryError(
+            "ERROR_MEMORY_CONVERSATION_SCOPE_REQUIRED",
+            "Conversation-scoped memory requires a conversation scope_id.",
+        )
+    if not resolved_id.startswith("conv_"):
+        raise MemoryError(
+            "ERROR_MEMORY_CONVERSATION_SCOPE_ID",
+            "Conversation-scoped memory requires a conv_ stable identifier.",
+        )
+    return normalized, resolved_id
+
+
+def current_workspace_scope_id(cfg: Settings = settings) -> str:
+    return stable_id("workspace", cfg.workspace_profile, str(cfg.project_root), length=12)
+
+
+def _normalize_stored_row(row: dict[str, Any], cfg: Settings) -> dict[str, Any]:
+    """Expose legacy rows as explicit global memory without rewriting source bytes."""
+    normalized = dict(row)
+    scope = normalized.get("scope")
+    if scope is None:
+        normalized["scope"] = "global"
+        normalized["scope_id"] = None
+        normalized["scope_migration"] = "LEGACY_DEFAULT_GLOBAL"
+        return normalized
+    stored_scope = str(scope).strip().lower()
+    stored_scope_id = " ".join(str(normalized.get("scope_id") or "").strip().split()) or None
+    if stored_scope in {"workspace", "conversation"} and stored_scope_id is None:
+        normalized["scope"] = "invalid"
+        normalized["scope_id"] = None
+        normalized["scope_migration"] = "INVALID_STORED_SCOPE"
+        return normalized
+    try:
+        resolved_scope, resolved_scope_id = _validate_scope(stored_scope, stored_scope_id, cfg)
+    except MemoryError:
+        normalized["scope"] = "invalid"
+        normalized["scope_id"] = normalized.get("scope_id")
+        normalized["scope_migration"] = "INVALID_STORED_SCOPE"
+        return normalized
+    normalized["scope"] = resolved_scope
+    normalized["scope_id"] = resolved_scope_id
+    return normalized
+
+
 def _load_memory(cfg: Settings) -> list[dict[str, Any]]:
     rows = read_json(_memory_path(cfg), [])
-    return [row for row in rows if isinstance(row, dict) and isinstance(row.get("memory_id"), str)]
+    return [
+        _normalize_stored_row(row, cfg)
+        for row in rows
+        if isinstance(row, dict) and isinstance(row.get("memory_id"), str)
+    ]
 
 
 def _valid_rows(rows: list[Any]) -> list[dict[str, Any]]:
@@ -66,6 +140,8 @@ def remember_memory_item(
     *,
     kind: str = "preference",
     source: str = "operator",
+    scope: str = "global",
+    scope_id: str | None = None,
 ) -> dict[str, Any]:
     cfg.ensure_dirs()
     normalized = _normalize_content(content)
@@ -77,13 +153,16 @@ def remember_memory_item(
             f"Memory content exceeds {MAX_MEMORY_CONTENT_CHARS} characters.",
         )
     resolved_kind = _validate_kind(kind)
+    resolved_scope, resolved_scope_id = _validate_scope(scope, scope_id, cfg)
     now = utc_now()
     row = {
-        "memory_id": stable_id("mem", resolved_kind, normalized, now, length=12),
+        "memory_id": stable_id("mem", resolved_kind, resolved_scope, str(resolved_scope_id), normalized, now, length=12),
         "kind": resolved_kind,
         "content": normalized,
         "enabled": True,
         "source": source,
+        "scope": resolved_scope,
+        "scope_id": resolved_scope_id,
         "created_at": now,
         "updated_at": now,
     }
@@ -100,7 +179,14 @@ def set_memory_enabled(
     def mutate(rows: list[Any]) -> dict[str, Any] | None:
         for index, row in enumerate(rows):
             if isinstance(row, dict) and row.get("memory_id") == memory_id:
-                updated = validate_contract("memory_item", {**row, "enabled": enabled, "updated_at": utc_now()})
+                canonical = _normalize_stored_row(row, cfg)
+                if canonical.get("scope_migration") == "INVALID_STORED_SCOPE":
+                    return {
+                        "_error_status": "ERROR_MEMORY_SCOPE_INVALID",
+                        "memory_id": memory_id,
+                    }
+                canonical.pop("scope_migration", None)
+                updated = validate_contract("memory_item", {**canonical, "enabled": enabled, "updated_at": utc_now()})
                 rows[index] = updated
                 return updated
         return None
@@ -108,6 +194,8 @@ def set_memory_enabled(
     updated = update_json(_memory_path(cfg), [], mutate)
     if updated is None:
         return {"status": "ERROR_MEMORY_NOT_FOUND", "memory_id": memory_id}
+    if updated.get("_error_status"):
+        return {"status": updated["_error_status"], "memory_id": memory_id}
     return {"status": "MEMORY_UPDATED", "memory": updated}
 
 

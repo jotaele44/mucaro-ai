@@ -6,6 +6,7 @@ import { Composer } from "./Composer.jsx";
 import { ConfirmSheet } from "./ConfirmSheet.jsx";
 import { EvidencePanel } from "./EvidencePanel.jsx";
 import { ExecutionEntryCard } from "./ExecutionEntryCard.jsx";
+import { NextVectorPicker } from "./NextVectorPicker.jsx";
 import { EditableMessage } from "./MessageActions.jsx";
 import { ModelSetup, modelLabel } from "./ModelSetup.jsx";
 import { RunBlock } from "./RunBlock.jsx";
@@ -277,7 +278,7 @@ export function ChatView({ reconnect = 0, conversationId, onConversationCreated,
     if (node) stick.current = node.scrollHeight - node.scrollTop - node.clientHeight < 80;
   }
 
-  async function send(prompt) {
+  async function send(prompt, modeOverride = null, suppliedIdempotencyKey = null) {
     setError(null);
     try {
       let id = conversationId;
@@ -286,8 +287,8 @@ export function ChatView({ reconnect = 0, conversationId, onConversationCreated,
         id = (await api.createConversation(prompt.slice(0, 60), draftModel)).conversation_id;
         onDefaultModelChange?.(draftModel); // the next new chat starts from this choice
       }
-      const key = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-      const result = await api.sendMessage(id, { prompt, mode, idempotency_key: key, options: { ...defaultOptions, ...chatModel } });
+      const key = suppliedIdempotencyKey || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+      const result = await api.sendMessage(id, { prompt, mode: modeOverride || mode, idempotency_key: key, options: { ...defaultOptions, ...chatModel } });
       // Switch to a new conversation only after its first run exists, so the reload sees and follows it.
       if (creating) onConversationCreated(id);
       else {
@@ -460,6 +461,14 @@ export function ChatView({ reconnect = 0, conversationId, onConversationCreated,
             onEditMessage={saveMessageEdit}
           />
         ))}
+        {!activeRun && queued.length === 0 && views.length > 0 && views[views.length - 1].state === "COMPLETED" && (
+          <NextVectorPicker
+            key={views[views.length - 1].runId}
+            request={views[views.length - 1].prompt}
+            // Follow-up selection is not tool approval. Use the canonical ask-first mode.
+            onStart={(prompt, idempotencyKey) => send(prompt, "ask", idempotencyKey)}
+          />
+        )}
         {error && (
           <p className="error-card" role="alert">
             <strong>{error.category || "ERROR"}</strong> — {error.status}: {error.message}
