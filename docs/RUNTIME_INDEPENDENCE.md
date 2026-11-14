@@ -100,6 +100,49 @@ a clean device or equivalently controlled clean-machine fixture:
 
 Until those gates pass, the correct state is `PROVISIONAL`, not independent.
 
+### Offline-independence receipt
+
+The repository contains a fail-closed evaluator in
+`backend/app/offline_independence.py` and the standalone entrypoint
+`scripts/certify_offline_independence.py`.
+
+The evaluator does not disable networking or infer that a host was clean. A
+clean-machine harness must supply named evidence for every externally observed
+fact. Start from
+`_architecture/offline_independence_evidence_template_v1.json`; every gate in
+that template begins `UNPROVEN`.
+
+Example:
+
+```bash
+python scripts/certify_offline_independence.py \
+  --platform macos-arm64 \
+  --head FULL_40_CHARACTER_SHA \
+  --artifact Mucaro-AI.zip \
+  --offline-manifest offline-manifest.json \
+  --evidence clean-machine-evidence.json \
+  --output offline-independence-receipt.json
+```
+
+The frozen core denominator and the required external evidence gates are the
+`certification_profile` of `_architecture/runtime_independence_v1.json`. The
+core is ingestion, local retrieval, deterministic cited answers, supported GIS
+processing, explicit local memory, and exports. A platform release may **add**
+OCR, rendered browsing, local-model inference, coding, or other capabilities to
+its denominator; it may never replace or narrow the frozen core by supplying a
+smaller scope.
+
+The evaluator emits `OFFLINE_INDEPENDENT` only when every required capability
+is available locally without network or operator setup and every evidence gate
+passed. It blocks on missing network-isolation evidence, unexplained egress,
+failed remote/web negative controls, missing required local capabilities,
+duplicate identities, or invalid artifact/source hashes. No such receipt has
+been produced for any platform package yet.
+
+`scripts/standalone_dependency_audit.py` is a separate static inventory of
+source-level dependencies. It is an input for finding residue, never a
+substitute for the externally observed evidence this receipt requires.
+
 ## Current first tranche
 
 The first implementation tranche:
