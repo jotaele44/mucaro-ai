@@ -32,7 +32,11 @@ from .conversations import (
     list_conversations,
     rename_conversation,
     set_conversation_model,
+    set_conversation_repo,
 )
+from .coding_container import _validate_coding_image as validate_coding_image
+from .coding_workspace import CodingWorkspaceError, resolve_repository
+from .container_runtime import ContainerRuntimeError
 from .db import get_connection, init_db, list_payloads, upsert_payload
 from .development_workbench import WorkbenchPlanError, compile_plan as compile_workbench_plan
 from .execution_entry import (
@@ -67,6 +71,7 @@ from .models import (
     AskRequest,
     ConversationCreateRequest,
     ConversationModelConfig,
+    ConversationRepoRequest,
     ConversationUpdateRequest,
     ModelProbeRequest,
     ModelSettingsRequest,
@@ -91,6 +96,7 @@ from .models import (
     WorkspaceProfileRequest,
 )
 from .model_router import ModelProviderError, list_model_providers, model_provider_names, probe_model_server
+from .github_pull_requests import REPO_PATTERN as GITHUB_REPO_PATTERN
 from .model_settings import ModelSettingsError, public_model_settings, save_model_settings
 from .multimodal import MULTIMODAL_SUFFIXES
 from .offline import build_offline_manifest
@@ -737,6 +743,31 @@ def create_app(cfg: Settings = settings) -> FastAPI:
         if model and model["model_provider"].strip().lower() not in model_provider_names():
             raise api_error("ERROR_UNSUPPORTED_MODEL_PROVIDER", model["model_provider"])
         return create_conversation(req.title, cfg, model=model)
+
+    @app.put("/conversations/{conversation_id}/repo")
+    def set_chat_repo(conversation_id: str, req: ConversationRepoRequest, _auth: dict = Depends(require_auth)) -> dict:
+        """Bind the chat to one repository inside a granted directory; the chat's model can then work on it only."""
+        binding: dict | None = None
+        if req.repo_root.strip():
+            try:
+                context = resolve_repository(req.repo_root.strip(), cfg)
+            except CodingWorkspaceError as exc:
+                denied = "PERMISSION" in exc.status
+                raise api_error(exc.status, exc.detail, status_code=403 if denied else 400) from exc
+            image = (req.coding_image or "").strip() or None
+            if image is not None:
+                try:
+                    validate_coding_image(image)
+                except ContainerRuntimeError as exc:
+                    raise api_error(exc.status, exc.detail) from exc
+            remote = (req.remote_repo or "").strip() or None
+            if remote is not None and not GITHUB_REPO_PATTERN.fullmatch(remote):
+                raise api_error("ERROR_CONVERSATION_REPO_REMOTE_INVALID", "GitHub repository must be owner/name.")
+            binding = {"repo_root": str(context.repo_root), "coding_image": image, "remote_repo": remote}
+        try:
+            return set_conversation_repo(conversation_id, binding, cfg)
+        except KeyError as exc:
+            raise api_error("ERROR_CONVERSATION_NOT_FOUND", "Conversation not found.", status_code=404) from exc
 
     @app.put("/conversations/{conversation_id}/model")
     def set_chat_model(conversation_id: str, req: ConversationModelConfig, _auth: dict = Depends(require_auth)) -> dict:

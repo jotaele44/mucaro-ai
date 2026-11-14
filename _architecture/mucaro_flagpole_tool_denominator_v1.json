@@ -10,7 +10,9 @@
       "clause": "Audit all seven federation repositories",
       "satisfied_by": [
         "coding.repo_status",
-        "coding.read_file"
+        "coding.read_file",
+        "coding.list_files",
+        "coding.search"
       ],
       "state": "PRESENT",
       "owner_domain": "V13",
@@ -96,9 +98,15 @@
     }
   ],
   "supporting_tools": [
-    "coding.pr_request",
     "coding.exec",
+    "coding.pr_request",
     "gis.inspect",
+    "github.gist_view",
+    "github.gists_list",
+    "github.issue_view",
+    "github.issues_list",
+    "github.pr_view",
+    "github.prs_list",
     "memory.list",
     "ocr.analyze_image",
     "product.audit",

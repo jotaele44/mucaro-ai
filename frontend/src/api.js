@@ -257,6 +257,7 @@ export const api = {
   conversations: () => request("/conversations"),
   createConversation: (title, model) => request("/conversations", json("POST", model ? { title, model } : { title })),
   setConversationModel: (id, model) => request(`/conversations/${id}/model`, json("PUT", model)),
+  setConversationRepo: (id, repo) => request(`/conversations/${id}/repo`, json("PUT", repo)),
   conversation: (id) => request(`/conversations/${id}`),
   renameConversation: (id, title) => request(`/conversations/${id}`, json("PATCH", { title })),
   deleteConversation: (id) => request(`/conversations/${id}`, { method: "DELETE" }),

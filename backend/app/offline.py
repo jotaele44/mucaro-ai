@@ -55,6 +55,8 @@ _CORE_CAPABILITIES: tuple[tuple[str, str, str | None, str | None, tuple[str, ...
 _TOOL_LOCAL_DEPENDENCIES: dict[str, tuple[str, str]] = {
     "coding.repo_status": ("binary", "git"),
     "coding.read_file": ("binary", "git"),
+    "coding.list_files": ("binary", "git"),
+    "coding.search": ("binary", "git"),
     "coding.diff": ("binary", "git"),
     "coding.patch_check": ("binary", "git"),
     "coding.patch_apply": ("binary", "git"),
@@ -66,6 +68,12 @@ _TOOL_LOCAL_DEPENDENCIES: dict[str, tuple[str, str]] = {
     "github.pr_open_update": ("binary", "gh"),
     "github.ci_status": ("binary", "gh"),
     "ocr.analyze_image": ("binary", "tesseract"),
+    "github.issues_list": ("binary", "gh"),
+    "github.issue_view": ("binary", "gh"),
+    "github.prs_list": ("binary", "gh"),
+    "github.pr_view": ("binary", "gh"),
+    "github.gists_list": ("binary", "gh"),
+    "github.gist_view": ("binary", "gh"),
     "web.render": ("python_module", "playwright"),
 }
 

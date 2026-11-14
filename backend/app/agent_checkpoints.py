@@ -152,6 +152,35 @@ def list_checkpoints(cfg: Settings = settings) -> list[dict[str, Any]]:
     return [_decode(row["payload_json"], cfg) for row in rows]
 
 
+def set_checkpoint_metadata_namespace(
+    checkpoint_id: str,
+    *,
+    namespace: str,
+    value: dict[str, Any],
+    expected_sequence: int,
+    cfg: Settings = settings,
+) -> dict[str, Any]:
+    """Replace one non-task-DAG metadata namespace under optimistic concurrency.
+
+    task_dag is reserved for the canonical DAG helpers so generic metadata writes cannot
+    bypass DAG validation or rewrite its identity.
+    """
+    if not isinstance(namespace, str) or not namespace.strip() or namespace == "task_dag":
+        raise CheckpointError("ERROR_CHECKPOINT_METADATA_NAMESPACE", "metadata namespace is invalid or reserved")
+    if not isinstance(value, dict):
+        raise CheckpointError("ERROR_CHECKPOINT_METADATA_VALUE", "metadata namespace value must be an object")
+
+    def change(current: dict[str, Any]) -> dict[str, Any]:
+        if current["state"] in TERMINAL_STATES:
+            raise CheckpointError("ERROR_CHECKPOINT_TERMINAL", "terminal checkpoint metadata cannot change")
+        metadata = dict(current.get("metadata") or {})
+        metadata[namespace] = dict(value)
+        current["metadata"] = metadata
+        return current
+
+    return _mutate(checkpoint_id, change, cfg, expected_sequence=expected_sequence)
+
+
 def _mutate(checkpoint_id: str, change: Callable[[dict[str, Any]], dict[str, Any] | None], cfg: Settings, *, expected_sequence: int | None = None) -> dict[str, Any]:
     """Atomic read-modify-write. BEGIN IMMEDIATE serializes writers across threads and processes, so
     two concurrent transitions cannot both act on the same prior state. A change that returns None
