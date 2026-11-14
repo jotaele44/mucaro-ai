@@ -84,7 +84,8 @@ def _git_bounded(repo_root: Path, args: list[str], *, max_bytes: int, timeout_se
         size = 0
         truncated = False
         try:
-            assert proc.stdout is not None
+            if proc.stdout is None:
+                raise CodingWorkspaceError("ERROR_CODING_GIT_UNAVAILABLE", "Git output could not be read.")
             while True:
                 chunk = proc.stdout.read(65536)
                 if not chunk:
