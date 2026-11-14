@@ -22,7 +22,7 @@ from .coding_workspace import CodingWorkspaceError, inspect_repository, resolve_
 from .config import Settings, settings
 from .local_tools import resolve_local_tool
 from .permission_engine import PermissionEngineError, PermissionRequest, require
-from .permissions import DirectoryPermissionError, ensure_directory_permission, grant_directory, is_within_path
+from .permissions import DirectoryPermissionError, ensure_directory_permission, grant_directory, is_within_path, revoke_directory
 
 CODING_REMOTE_SCHEMA_VERSION = "mucaro-coding-remote/1.0"
 WORKSPACES_DIRNAME = "workspaces"
@@ -137,20 +137,42 @@ def clone_repository(url: str, *, cfg: Settings = settings, depth: int | None = 
     destination = root / f"{owner}__{name}"
     if not is_within_path(destination.resolve(), cfg.data_dir.resolve()):
         raise CodingRemoteError("ERROR_CODING_CLONE_DESTINATION", "Clone destination escapes the data directory.")
-    if destination.exists():
-        raise CodingRemoteError(
-            "ERROR_CODING_CLONE_EXISTS", f"{owner}/{name} is already cloned at {destination}. Use that folder or remove it first."
-        )
     _require("network.public_http", "coding_remote.clone_repository", canonical_url, cfg)
-    _require("filesystem.write", "coding_remote.clone_repository", str(destination), cfg)
-    _require("git.mutate", "coding_remote.clone_repository", str(destination), cfg)
     cfg.ensure_dirs()
     root.mkdir(parents=True, exist_ok=True)
+    # Reserve the folder atomically. Two clones of the same repository cannot both pass this point, and
+    # from here on this call removes only the folder it created itself.
+    try:
+        os.mkdir(destination)
+    except FileExistsError:
+        raise CodingRemoteError(
+            "ERROR_CODING_CLONE_EXISTS", f"{owner}/{name} is already cloned at {destination}. Use that folder or remove it first."
+        ) from None
+    except OSError as exc:
+        raise CodingRemoteError("ERROR_CODING_CLONE_DESTINATION", f"Clone folder could not be created: {exc}") from exc
+
+    grant = None
 
     def discard() -> None:
+        if grant is not None:
+            try:
+                revoke_directory(destination, cfg)  # while the folder still exists, so its path resolves
+            except DirectoryPermissionError:
+                pass
         shutil.rmtree(destination, ignore_errors=True)
 
     try:
+        try:
+            ensure_directory_permission(destination, cfg)
+        except DirectoryPermissionError:
+            # A data directory outside the project (packaged app): the approved clone is the grant, for this
+            # one folder only, and it has to exist before the filesystem permission check can pass.
+            try:
+                grant = grant_directory(destination, cfg, granted_by="repo.clone approval", reason=f"cloned {owner}/{name}")
+            except DirectoryPermissionError as exc:
+                raise CodingRemoteError(exc.status, exc.detail) from exc
+        _require("filesystem.write", "coding_remote.clone_repository", str(destination), cfg)
+        _require("git.mutate", "coding_remote.clone_repository", str(destination), cfg)
         proc = _git(
             root,
             ["-c", "protocol.file.allow=never", "-c", "protocol.ext.allow=never", "clone", "--depth", str(clone_depth),
@@ -167,16 +189,6 @@ def clone_repository(url: str, *, cfg: Settings = settings, depth: int | None = 
     if size > MAX_CLONE_BYTES:
         discard()
         raise CodingRemoteError("ERROR_CODING_CLONE_TOO_LARGE", f"Clone exceeds {MAX_CLONE_BYTES} bytes and was removed.")
-    grant = None
-    try:
-        ensure_directory_permission(destination, cfg)
-    except DirectoryPermissionError:
-        # A data directory outside the project (packaged app): the approved clone is the grant, for this folder only.
-        try:
-            grant = grant_directory(destination, cfg, granted_by="repo.clone approval", reason=f"cloned {owner}/{name}")
-        except DirectoryPermissionError as exc:
-            discard()
-            raise CodingRemoteError(exc.status, exc.detail) from exc
     try:
         state = inspect_repository(destination, cfg=cfg)
     except CodingWorkspaceError as exc:
@@ -234,21 +246,29 @@ def push_work_branch(
         raise CodingRemoteError("ERROR_CODING_PUSH_HEAD_DRIFT", f"expected {expected_head_sha}, observed {state['head_sha']}")
     if state["dirty_status"] != "CLEAN":
         raise CodingRemoteError("ERROR_CODING_PUSH_DIRTY_REPOSITORY", "Only a clean, committed work branch can be pushed.")
-    url_proc = _git(root, ["remote", "get-url", "--push", remote], timeout=20)
-    remote_repo = parse_github_remote(url_proc.stdout) if url_proc.returncode == 0 else None
+    # Every destination a push to this remote would reach. `git push origin` sends to all of them, so there
+    # must be exactly one, and it must be GitHub.
+    url_proc = _git(root, ["remote", "get-url", "--push", "--all", remote], timeout=20)
+    push_urls = [line.strip() for line in url_proc.stdout.splitlines() if line.strip()] if url_proc.returncode == 0 else []
+    if len(push_urls) > 1:
+        raise CodingRemoteError("ERROR_CODING_PUSH_REMOTE_INVALID", "The origin remote has more than one push destination; Mucaro pushes to exactly one.")
+    remote_repo = parse_github_remote(push_urls[0]) if push_urls else None
     if remote_repo is None:
         raise CodingRemoteError("ERROR_CODING_PUSH_REMOTE_INVALID", "The origin remote is missing or is not a GitHub repository.")
+    push_url = push_urls[0]
     _require("git.mutate", "coding_remote.push_work_branch", str(root), cfg)
     _require("network.public_http", "coding_remote.push_work_branch", f"https://github.com/{remote_repo}", cfg)
 
     refspec = f"{expected_head_sha}:refs/heads/{expected_branch}"
     # No --force and no '+': Git refuses anything that is not a fast-forward of the remote branch.
-    proc = _git(root, ["push", "--porcelain", "--no-verify", remote, refspec], timeout=PUSH_TIMEOUT_SECONDS)
+    # The validated URL itself is the destination, not the remote name, so nothing else can be reached and
+    # the check below reads the same repository that was written.
+    proc = _git(root, ["push", "--porcelain", "--no-verify", "--", push_url, refspec], timeout=PUSH_TIMEOUT_SECONDS)
     if proc.returncode != 0:
         detail = _clean(proc.stderr or proc.stdout or "git push failed")
         rejected = "[rejected]" in (proc.stdout + proc.stderr) or "non-fast-forward" in (proc.stdout + proc.stderr)
         raise CodingRemoteError("ERROR_CODING_PUSH_REJECTED" if rejected else "ERROR_CODING_PUSH_FAILED", detail)
-    listed = _git(root, ["ls-remote", "--heads", remote, f"refs/heads/{expected_branch}"], timeout=60)
+    listed = _git(root, ["ls-remote", "--heads", "--", push_url, f"refs/heads/{expected_branch}"], timeout=60)
     remote_sha = listed.stdout.split()[0] if listed.returncode == 0 and listed.stdout.split() else None
     if remote_sha != expected_head_sha:
         raise CodingRemoteError("ERROR_CODING_PUSH_UNVERIFIED", f"remote branch reports {remote_sha}, expected {expected_head_sha}")

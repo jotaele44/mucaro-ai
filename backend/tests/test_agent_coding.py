@@ -329,7 +329,10 @@ def github_stub(monkeypatch, tmp_path, repo):
     real_git = coding_remote._git
 
     def redirected(cwd, args, *, timeout):
-        swapped = [str(bare) if part == "https://github.com/octo/demo.git" else part for part in args]
+        # Nothing in these tests may reach the real github.com: any other repository is a path that does not exist.
+        absent = str(tmp_path / "no-such-repository.git")
+        swapped = [str(bare) if part == "https://github.com/octo/demo.git" else absent if part.startswith("https://github.com/") else part
+                   for part in args]
         swapped = [part for part in swapped if part not in {"protocol.file.allow=never"}]
         if "protocol.ext.allow=never" in swapped and "-c" in swapped:
             swapped.remove("-c")  # the -c that belonged to the dropped protocol.file setting
@@ -500,3 +503,95 @@ def test_search_and_list_stop_reading_at_the_output_ceiling(cfg, repo, monkeypat
     assert listed["truncated"] is True and listed["files"] == ["big.txt"]  # "tracked.txt" was cut mid-name and dropped
     small = coding_workspace.search_repository(repo, "alpha", cfg=cfg)
     assert small["stopped_at_output_ceiling"] is False and small["match_count"] == 1
+
+
+# --- review findings on clone and push -----------------------------------------------------------
+
+
+def test_clone_works_when_the_data_directory_is_outside_the_project_and_grants_only_its_own_folder(tmp_path, repo, github_stub):
+    from dataclasses import replace
+
+    from backend.app.coding_remote import clone_repository, workspaces_root
+    from backend.app.permissions import check_directory_permission
+
+    app_root = tmp_path / "app"
+    app_root.mkdir()
+    external = tmp_path / "userdata"
+    cfg = replace(
+        make_settings(app_root), data_dir=external, input_dir=external / "input", processed_dir=external / "processed",
+        export_dir=external / "exports", index_dir=external / "indexes", sqlite_path=external / "processed" / "test.sqlite3",
+    )
+    receipt = clone_repository("https://github.com/octo/demo", cfg=cfg)
+    destination = workspaces_root(cfg) / "octo__demo"
+    assert receipt["status"] == "CODING_CLONE_OK" and receipt["directory_grant_added"] is True
+    assert (destination / "tracked.txt").exists()
+    assert check_directory_permission(destination, cfg)["status"] == "PERMISSION_OK"
+    # The grant covers the cloned folder, not the whole data directory or its workspace root.
+    assert check_directory_permission(external, cfg)["status"] != "PERMISSION_OK"
+    assert check_directory_permission(workspaces_root(cfg), cfg)["status"] != "PERMISSION_OK"
+
+
+def test_a_failed_clone_removes_only_its_own_folder_and_grant(tmp_path, repo, github_stub, monkeypatch):
+    from dataclasses import replace
+
+    from backend.app import coding_remote
+    from backend.app.permissions import load_directory_grants
+
+    app_root = tmp_path / "app"
+    app_root.mkdir()
+    external = tmp_path / "userdata"
+    cfg = replace(
+        make_settings(app_root), data_dir=external, input_dir=external / "input", processed_dir=external / "processed",
+        export_dir=external / "exports", index_dir=external / "indexes", sqlite_path=external / "processed" / "test.sqlite3",
+    )
+    first = coding_remote.clone_repository("https://github.com/octo/demo", cfg=cfg)
+    grants_before = load_directory_grants(cfg)
+    # A second clone of the same repository loses the reservation and must leave the first one untouched.
+    with pytest.raises(coding_remote.CodingRemoteError) as lost:
+        coding_remote.clone_repository("https://github.com/octo/demo", cfg=cfg)
+    assert lost.value.status == "ERROR_CODING_CLONE_EXISTS"
+    assert (Path(first["repo_root"]) / "tracked.txt").exists() and load_directory_grants(cfg) == grants_before
+
+    # A clone that fails after reserving its folder removes that folder and the grant it added, nothing else.
+    with pytest.raises(coding_remote.CodingRemoteError) as failed:
+        coding_remote.clone_repository("https://github.com/octo/missing", cfg=cfg)
+    assert failed.value.status == "ERROR_CODING_CLONE_FAILED"
+    assert not (coding_remote.workspaces_root(cfg) / "octo__missing").exists()
+    assert load_directory_grants(cfg) == grants_before
+    assert (Path(first["repo_root"]) / "tracked.txt").exists()
+
+
+def test_push_refuses_a_remote_with_more_than_one_destination(cfg, repo, github_stub, tmp_path):
+    from backend.app.coding_remote import CodingRemoteError, push_work_branch
+
+    (tmp_path / "second").mkdir()
+    second = _bare_remote(tmp_path / "second", repo)
+    git(repo, "remote", "set-url", "--add", "--push", "origin", str(github_stub))
+    git(repo, "remote", "set-url", "--add", "--push", "origin", str(second))
+    git(repo, "checkout", "-b", "work/two")
+    (repo / "tracked.txt").write_text("alpha\nbeta\n", encoding="utf-8")
+    git(repo, "commit", "-am", "beta")
+    head = git(repo, "rev-parse", "HEAD").strip()
+    with pytest.raises(CodingRemoteError) as refused:
+        push_work_branch(str(repo), expected_head_sha=head, expected_branch="work/two", cfg=cfg)
+    assert refused.value.status == "ERROR_CODING_PUSH_REMOTE_INVALID" and "more than one push destination" in refused.value.detail
+    for bare in (github_stub, second):
+        assert "work/two" not in git(bare, "branch", "--list")
+
+
+def test_push_is_verified_against_the_repository_it_was_sent_to(cfg, repo, github_stub, tmp_path):
+    from backend.app.coding_remote import push_work_branch
+
+    # Fetch from one repository, push to another (a fork): the check must read the push destination.
+    (tmp_path / "upstream").mkdir()
+    upstream = _bare_remote(tmp_path / "upstream", repo)
+    git(repo, "remote", "set-url", "origin", str(upstream))
+    git(repo, "remote", "set-url", "--push", "origin", str(github_stub))
+    git(repo, "checkout", "-b", "work/fork")
+    (repo / "tracked.txt").write_text("alpha\nbeta\n", encoding="utf-8")
+    git(repo, "commit", "-am", "beta")
+    head = git(repo, "rev-parse", "HEAD").strip()
+    receipt = push_work_branch(str(repo), expected_head_sha=head, expected_branch="work/fork", cfg=cfg)
+    assert receipt["status"] == "CODING_PUSH_OK" and receipt["remote_head_sha"] == head
+    assert git(github_stub, "rev-parse", "refs/heads/work/fork").strip() == head
+    assert "work/fork" not in git(upstream, "branch", "--list")
