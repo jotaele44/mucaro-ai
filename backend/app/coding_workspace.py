@@ -3,6 +3,8 @@ from __future__ import annotations
 import hashlib
 import re
 import subprocess
+import tempfile
+import threading
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -54,6 +56,55 @@ def _git_process(repo_root: Path, args: list[str], *, timeout_seconds: int = 20)
         raise CodingWorkspaceError("ERROR_CODING_GIT_UNAVAILABLE", "Bundled Git could not be started.") from exc
     except subprocess.TimeoutExpired as exc:
         raise CodingWorkspaceError("ERROR_CODING_GIT_TIMEOUT", f"git command timed out: {' '.join(args)}") from exc
+
+
+def _git_bounded(repo_root: Path, args: list[str], *, max_bytes: int, timeout_seconds: int = 30) -> tuple[int | None, bytes, bool, str]:
+    """Run git and keep at most max_bytes of its output, stopping the process once the ceiling is passed.
+
+    Returns (exit code or None when stopped early, output, truncated, stderr text). Output is read as it
+    arrives, so a command that would print far more than the ceiling never fills this process's memory.
+    """
+    git = resolve_local_tool("git")
+    if not git:
+        raise CodingWorkspaceError("ERROR_CODING_GIT_UNAVAILABLE", "Git is not bundled in this Mucaro runtime.")
+    with tempfile.TemporaryFile() as errors:
+        try:
+            proc = subprocess.Popen([git, *args], cwd=repo_root, stdout=subprocess.PIPE, stderr=errors)
+        except OSError as exc:
+            raise CodingWorkspaceError("ERROR_CODING_GIT_UNAVAILABLE", "Bundled Git could not be started.") from exc
+        timed_out = threading.Event()
+
+        def stop() -> None:
+            timed_out.set()
+            proc.kill()
+
+        watchdog = threading.Timer(timeout_seconds, stop)
+        watchdog.start()
+        chunks: list[bytes] = []
+        size = 0
+        truncated = False
+        try:
+            assert proc.stdout is not None
+            while True:
+                chunk = proc.stdout.read(65536)
+                if not chunk:
+                    break
+                chunks.append(chunk)
+                size += len(chunk)
+                if size > max_bytes:
+                    truncated = True
+                    proc.kill()
+                    break
+        finally:
+            watchdog.cancel()
+            if proc.stdout is not None:
+                proc.stdout.close()
+            proc.wait()
+        if timed_out.is_set():
+            raise CodingWorkspaceError("ERROR_CODING_GIT_TIMEOUT", f"git command timed out: {args[0]}")
+        errors.seek(0)
+        stderr = errors.read(4000).decode("utf-8", errors="replace")
+    return (None if truncated else proc.returncode), b"".join(chunks)[:max_bytes], truncated, stderr
 
 
 def _git_output(repo_root: Path, args: list[str], *, timeout_seconds: int = 20) -> str:
@@ -258,6 +309,9 @@ MAX_LISTED_FILES = 2000
 MAX_SEARCH_MATCHES = 200
 MAX_SEARCH_PATTERN_BYTES = 512
 MAX_SEARCH_LINE_CHARS = 400
+# Ceilings on what is read from git, applied while reading rather than after.
+MAX_LIST_OUTPUT_BYTES = 4 * 1024 * 1024
+MAX_SEARCH_OUTPUT_BYTES = 2 * 1024 * 1024
 
 
 def _repository_pathspec(context: RepositoryContext, path_prefix: str | None) -> list[str]:
@@ -289,7 +343,13 @@ def list_repository_files(
     context = resolve_repository(repo_root, cfg)
     limit = _bounded_limit(max_entries, default=MAX_LISTED_FILES, maximum=MAX_LISTED_FILES, label="max_entries")
     pathspec = _repository_pathspec(context, path_prefix)
-    files = sorted(_split_nul(_git_output(context.repo_root, ["ls-files", "-z", "--", *pathspec])))
+    code, raw, cut, stderr = _git_bounded(context.repo_root, ["ls-files", "-z", "--", *pathspec], max_bytes=MAX_LIST_OUTPUT_BYTES)
+    if code not in {0, None}:
+        raise CodingWorkspaceError("ERROR_CODING_GIT", (stderr or "git ls-files failed").strip()[:400])
+    names = raw.decode("utf-8", errors="replace").split("\0")
+    if cut:
+        names = names[:-1]  # the last name may be incomplete
+    files = sorted(name for name in names if name)
     return {
         "status": "CODING_FILE_LIST_OK",
         "repo_root": str(context.repo_root),
@@ -297,7 +357,7 @@ def list_repository_files(
         "path_prefix": path_prefix or None,
         "file_count": len(files),
         "files": files[:limit],
-        "truncated": len(files) > limit,
+        "truncated": cut or len(files) > limit,
         "max_entries": limit,
         "limitations": [
             "tracked files only; untracked and ignored files are not listed",
@@ -323,12 +383,19 @@ def search_repository(
     limit = _bounded_limit(max_matches, default=MAX_SEARCH_MATCHES, maximum=MAX_SEARCH_MATCHES, label="max_matches")
     pathspec = _repository_pathspec(context, path_prefix)
     # -I skips binary files, -F makes the pattern literal, -e keeps a leading dash from being read as an option.
-    proc = _git_process(context.repo_root, ["grep", "-n", "-I", "-F", "--no-color", "-z", "-e", pattern, "--", *pathspec])
-    if proc.returncode not in {0, 1}:
-        raise CodingWorkspaceError("ERROR_CODING_SEARCH_FAILED", (proc.stderr or "git grep failed").strip()[:400])
+    code, raw, cut, stderr = _git_bounded(
+        context.repo_root,
+        ["grep", "-n", "-I", "-F", "--no-color", "-z", "-e", pattern, "--", *pathspec],
+        max_bytes=MAX_SEARCH_OUTPUT_BYTES,
+    )
+    if code not in {0, 1, None}:
+        raise CodingWorkspaceError("ERROR_CODING_SEARCH_FAILED", (stderr or "git grep failed").strip()[:400])
+    lines = raw.decode("utf-8", errors="replace").split("\n")
+    if cut:
+        lines = lines[:-1]  # the last line may be incomplete
     matches: list[dict[str, Any]] = []
     total = 0
-    for line in proc.stdout.splitlines():
+    for line in lines:
         # With -z each match line is "path\0line_number\0text".
         parts = line.split("\x00", 2)
         if len(parts) != 3 or not parts[1].isdigit():
@@ -342,9 +409,11 @@ def search_repository(
         "head_sha": _git_output(context.repo_root, ["rev-parse", "HEAD"]).strip(),
         "pattern": pattern,
         "path_prefix": path_prefix or None,
+        # A lower bound when the search was stopped at the output ceiling.
         "match_count": total,
         "matches": matches,
-        "truncated": total > limit,
+        "truncated": cut or total > limit,
+        "stopped_at_output_ceiling": cut,
         "max_matches": limit,
         "limitations": [
             "fixed-string match over tracked text files in the working tree; binary files are skipped",

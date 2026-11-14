@@ -471,3 +471,32 @@ def test_binding_fills_in_the_github_repository_from_the_origin_remote(tmp_path)
     assert client.put(f"/conversations/{chat}/repo", json={"repo_root": str(inside)}).json()["repo"]["remote_repo"] == "octo/demo"
     explicit = client.put(f"/conversations/{chat}/repo", json={"repo_root": str(inside), "remote_repo": "other/name"})
     assert explicit.json()["repo"]["remote_repo"] == "other/name"
+
+
+def test_search_and_list_stop_reading_at_the_output_ceiling(cfg, repo, monkeypatch):
+    from backend.app import coding_workspace
+
+    (repo / "big.txt").write_text("needle " + "x" * 200 + "\n" * 1 + ("needle " + "y" * 200 + "\n") * 5000, encoding="utf-8")
+    git(repo, "add", "big.txt")
+    git(repo, "commit", "-m", "big")
+    monkeypatch.setattr(coding_workspace, "MAX_SEARCH_OUTPUT_BYTES", 20_000)
+    read: list[int] = []
+    real = coding_workspace._git_bounded
+
+    def measured(repo_root, args, *, max_bytes, timeout_seconds=30):
+        code, raw, cut, stderr = real(repo_root, args, max_bytes=max_bytes, timeout_seconds=timeout_seconds)
+        read.append(len(raw))
+        return code, raw, cut, stderr
+
+    monkeypatch.setattr(coding_workspace, "_git_bounded", measured)
+    found = coding_workspace.search_repository(repo, "needle", cfg=cfg)
+    assert read == [20_000]  # about a megabyte of matches exists; only the ceiling was kept
+    assert found["stopped_at_output_ceiling"] is True and found["truncated"] is True
+    assert 0 < found["match_count"] < 5001 and len(found["matches"]) <= coding_workspace.MAX_SEARCH_MATCHES
+    assert all(match["path"] == "big.txt" and match["text"].startswith("needle ") for match in found["matches"])
+
+    monkeypatch.setattr(coding_workspace, "MAX_LIST_OUTPUT_BYTES", 12)
+    listed = coding_workspace.list_repository_files(repo, cfg=cfg)
+    assert listed["truncated"] is True and listed["files"] == ["big.txt"]  # "tracked.txt" was cut mid-name and dropped
+    small = coding_workspace.search_repository(repo, "alpha", cfg=cfg)
+    assert small["stopped_at_output_ceiling"] is False and small["match_count"] == 1
