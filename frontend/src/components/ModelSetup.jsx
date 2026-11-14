@@ -38,7 +38,7 @@ function reasonText(code) {
 
 /**
  * Choose the model for a chat: provider, server address, model and (for remote servers) key and consent.
- * `value` is { model_provider, model_name, allow_live }; server address and key are saved on the device
+ * `value` is { model_provider, model_name, allow_live, agent }; server address and key are saved on the device
  * that runs Mucaro, the model choice belongs to the chat.
  */
 export function ModelSetup({ value, onChange, announce = () => {}, legend = "Model for this chat" }) {
@@ -78,7 +78,12 @@ export function ModelSetup({ value, onChange, announce = () => {}, legend = "Mod
   function choose(name) {
     const next = (providers || []).find((item) => item.name === name);
     // A model name belongs to one server, and consent to send content never carries over to another provider.
-    onChange({ model_provider: name, model_name: null, allow_live: next?.locality === "remote" ? Boolean(value.allow_live) && name === provider : false });
+    onChange({
+      model_provider: name,
+      model_name: null,
+      allow_live: next?.locality === "remote" ? Boolean(value.allow_live) && name === provider : false,
+      agent: canUseTools(name),
+    });
     setError(null);
   }
 
@@ -193,6 +198,13 @@ export function ModelSetup({ value, onChange, announce = () => {}, legend = "Mod
         </label>
       )}
 
+      {providers && isServer && (
+        <label className="switch">
+          <input type="checkbox" checked={Boolean(value.agent)} onChange={(event) => onChange({ ...value, agent: event.target.checked })} />
+          <span>Let the model propose actions (search the web, fetch a page, read a repository). Each one asks you first.</span>
+        </label>
+      )}
+
       {state && (
         <p className="model-state small" role="status">
           <span className={`status-chip ${state.ok ? "status-completed" : "status-failed"}`}>{state.ok ? "Ready" : "Not ready"}</span>{" "}
@@ -203,6 +215,20 @@ export function ModelSetup({ value, onChange, announce = () => {}, legend = "Mod
     </fieldset>
   );
 }
+
+/** Providers whose models can propose tool calls. */
+export const canUseTools = (provider) => provider === LOCAL || provider === REMOTE;
+
+/** A chat's model choice from saved options; proposing actions is on for model servers unless it was turned off. */
+export const modelOf = (options) => {
+  const provider = options?.model_provider || "mock";
+  return {
+    model_provider: provider,
+    model_name: options?.model_name || null,
+    allow_live: Boolean(options?.allow_live),
+    agent: canUseTools(provider) && options?.agent !== false,
+  };
+};
 
 /** Short label for a chat's model, for headers and receipts. */
 export function modelLabel(model) {

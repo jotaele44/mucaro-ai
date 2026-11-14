@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { api } from "../../api.js";
 import { CleartextNotice } from "../CleartextNotice.jsx";
-import { ModelSetup } from "../ModelSetup.jsx";
+import { ModelSetup, modelOf } from "../ModelSetup.jsx";
 
 // One settings home (TGT-033): model, retrieval, access token and offline capability view.
 export function SettingsWorkspace({ options, onOptionsChange, announce }) {
@@ -29,7 +29,7 @@ export function SettingsWorkspace({ options, onOptionsChange, announce }) {
 
       <ModelSetup
         legend="Default model for new chats"
-        value={{ model_provider: options.model_provider || "mock", model_name: options.model_name || null, allow_live: Boolean(options.allow_live) }}
+        value={modelOf(options)}
         onChange={(model) => onOptionsChange({ ...options, ...model })}
         announce={announce}
       />
