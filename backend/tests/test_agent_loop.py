@@ -337,6 +337,9 @@ def test_catalogue_only_offers_registered_tools_and_no_state_changing_local_tool
         assert TOOL_REGISTRY[name].requires_approval is True
         assert entry["parameters"]["additionalProperties"] is False
     assert "coding.patch_apply" not in agent_loop.AGENT_TOOLS
+    # The administrative memory listing ignores enabled state and scope, so a model may not request it.
+    assert "memory.list" not in agent_loop.AGENT_TOOLS
+    assert agent_loop.validate_proposal("memory.list", {})[1]
     arguments, refusal = agent_loop.validate_proposal("web.search", {"query": "aquifers"})
     assert refusal is None and arguments == {"query": "aquifers", "allow_live_search": True}
     assert agent_loop.validate_proposal("web.search", {"query": ""})[1]
@@ -353,3 +356,21 @@ def test_agent_trace_validates(server, cfg):
     validate_contract("answer_trace", traces[0])
     assert traces[0]["agent"] == {"steps": 0, "tool_call_ids": [], "tool_protocol": "native"}
     assert run["outcome"] == "ANSWERED"
+
+
+def test_model_only_sees_enabled_memory_in_scope_and_cannot_list_the_rest(server, cfg):
+    from backend.app.memory import list_memory_items, remember_memory_item, set_memory_enabled
+
+    kept = remember_memory_item("Prefers metric units.", cfg)
+    hidden = remember_memory_item("Disabled secret preference.", cfg)
+    kept_id = (kept.get("memory") or kept)["memory_id"]
+    hidden_id = (hidden.get("memory") or hidden)["memory_id"]
+    set_memory_enabled(hidden_id, False, cfg)
+    assert {row["memory_id"] for row in list_memory_items(cfg)["memories"]} == {kept_id, hidden_id}
+    _Scripted.script = [_call("memory.list", {}), _text("Noted.")]
+    run = _submit(cfg, "what do you remember about me?", mode="auto")
+    assert run["outcome"] == "ANSWERED"
+    assert [call for call in list_tool_calls(cfg)["tool_calls"] if call.get("run_id") == run["run_id"]] == []
+    sent = json.dumps(_Scripted.requests)
+    assert "Prefers metric units." in sent
+    assert "Disabled secret preference." not in sent

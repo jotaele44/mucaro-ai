@@ -118,7 +118,7 @@ chat's **Model** button); Settings holds the default for new chats. The server a
 any API key are saved on the computer that runs Mucaro; the key is never shown again.
 
 With **Let the model propose actions** on (the default for model servers), the chat's model can
-ask to run an action: check the library or memory, search the web, fetch a page, or read a git
+ask to run an action: check the library, search the web, fetch a page, or read a git
 repository on this computer. It can only ask. Each request appears as a card with **Allow once**
 and **Deny**; in Auto mode only local read-only actions run without asking. What an action returns
 is handed back to the model as data, never as instructions. The model cannot apply patches,

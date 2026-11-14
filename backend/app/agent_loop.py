@@ -34,7 +34,8 @@ def _spec(properties: dict[str, Any], required: list[str]) -> dict[str, Any]:
 # Mucaro, not the model: they are the same explicit opt-ins the matching slash command sends.
 AGENT_TOOLS: dict[str, dict[str, Any]] = {
     "source_library.status": {"parameters": _spec({}, [])},
-    "memory.list": {"parameters": _spec({}, [])},
+    # memory.list is deliberately absent: it is the administrative listing (disabled items, every scope).
+    # A model is shown memory only through select_memory_context, which build_messages already includes.
     "web.search": {
         "parameters": _spec({"query": {**_STRING, "description": "Search query."}}, ["query"]),
         "fixed": {"allow_live_search": True},
