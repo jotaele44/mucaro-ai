@@ -11,6 +11,7 @@ from .coding_lifecycle import CodingLifecycleError, build_pull_request_request, 
 from .coding_checks import CodingCheck, CodingCheckError, execute_coding_check_suite
 from .coding_mutation import CodingMutationError, apply_patch_transaction
 from .coding_patch import validate_patch_proposal
+from .coding_remote import CodingRemoteError, clone_repository, push_work_branch
 from .coding_workspace import (
     CodingWorkspaceError,
     inspect_repository,
@@ -441,6 +442,31 @@ def _coding_commit(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
         raise ToolRuntimeError(exc.status, exc.detail) from exc
 
 
+def _coding_push(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
+    repo_root = arguments.get("repo_root")
+    if not isinstance(repo_root, str) or not repo_root.strip():
+        raise ToolRuntimeError("ERROR_CODING_REPO_ROOT_REQUIRED", "coding.push requires a non-empty repo_root argument.")
+    try:
+        return push_work_branch(
+            repo_root,
+            expected_head_sha=arguments.get("expected_head_sha"),
+            expected_branch=arguments.get("expected_branch"),
+            cfg=cfg,
+        )
+    except CodingRemoteError as exc:
+        raise ToolRuntimeError(exc.status, exc.detail) from exc
+
+
+def _repo_clone(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
+    url = arguments.get("url")
+    if not isinstance(url, str) or not url.strip():
+        raise ToolRuntimeError("ERROR_CODING_CLONE_URL_INVALID", "repo.clone requires a https://github.com/<owner>/<name> url.")
+    try:
+        return clone_repository(url, cfg=cfg, depth=arguments.get("depth"))
+    except CodingRemoteError as exc:
+        raise ToolRuntimeError(exc.status, exc.detail) from exc
+
+
 def _coding_pr_request(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
     repo_root = arguments.get("repo_root")
     expected_head_sha = arguments.get("expected_head_sha")
@@ -811,6 +837,24 @@ TOOL_REGISTRY: dict[str, ToolDefinition] = {
         handler=_coding_commit,
         autopilot_success_statuses=("CODING_COMMIT_CREATED",),
         timeout_seconds=120.0,
+    ),
+    "coding.push": ToolDefinition(
+        name="coding.push",
+        description="Push exactly the approved commit of a clean non-protected work branch to its GitHub origin remote; never forces, never pushes main or master, and verifies the remote head afterwards.",
+        mutates_state=True,
+        requires_approval=True,
+        network="remote",
+        handler=_coding_push,
+        timeout_seconds=200.0,
+    ),
+    "repo.clone": ToolDefinition(
+        name="repo.clone",
+        description="Shallow-clone one https://github.com/<owner>/<name> repository into Mucaro's workspace folder, without submodules, tags or LFS content.",
+        mutates_state=True,
+        requires_approval=True,
+        network="remote",
+        handler=_repo_clone,
+        timeout_seconds=360.0,
     ),
     "coding.pr_request": ToolDefinition(
         name="coding.pr_request",

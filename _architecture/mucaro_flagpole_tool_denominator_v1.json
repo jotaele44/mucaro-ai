@@ -100,6 +100,7 @@
   "supporting_tools": [
     "coding.exec",
     "coding.pr_request",
+    "coding.push",
     "gis.inspect",
     "github.gist_view",
     "github.gists_list",
@@ -110,6 +111,7 @@
     "memory.list",
     "ocr.analyze_image",
     "product.audit",
+    "repo.clone",
     "source_library.status",
     "web.fetch",
     "web.fetch_session",
