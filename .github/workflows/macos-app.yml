@@ -28,7 +28,7 @@ permissions:
 
 jobs:
   build-and-verify:
-    runs-on: macos-14
+    runs-on: macos-15
     timeout-minutes: 45
     env:
       # Receipts bind to the commit under review, not the synthetic pull-request merge commit.

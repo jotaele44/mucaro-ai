@@ -327,7 +327,9 @@ export function RunBlock({ view, onChanged, onOpenCitation, announce, messageEdi
           <p key={index} className="notice" role="note">
             {warning.category === "UNTRUSTED_CONTENT"
               ? "Some sources contain instruction-like text. It was treated as data only and nothing was executed."
-              : warning.status === "WARN_NO_SOURCES_USED"
+              : warning.status === "NOTE_CHAT_BOUND_TO_CLONED_REPOSITORY"
+                ? `This chat now works on the cloned repository at ${warning.detail}.`
+                : warning.status === "WARN_NO_SOURCES_USED"
                 ? "No sources used: nothing in your local library matched this message, so this reply is the model's own and is not cited."
                 : `${warning.status}${warning.detail ? `: ${warning.detail}` : ""}`}
           </p>
