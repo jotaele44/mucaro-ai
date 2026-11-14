@@ -254,6 +254,105 @@ def read_repository_file(
     }
 
 
+MAX_LISTED_FILES = 2000
+MAX_SEARCH_MATCHES = 200
+MAX_SEARCH_PATTERN_BYTES = 512
+MAX_SEARCH_LINE_CHARS = 400
+
+
+def _repository_pathspec(context: RepositoryContext, path_prefix: str | None) -> list[str]:
+    """A repository-relative prefix as a literal Git pathspec; empty means the whole repository."""
+    if path_prefix is None or not str(path_prefix).strip() or str(path_prefix).strip() in {".", "./"}:
+        return []
+    if not isinstance(path_prefix, str) or "\x00" in path_prefix or len(path_prefix.encode("utf-8")) > 1024:
+        raise CodingWorkspaceError("ERROR_CODING_PATH_PREFIX_INVALID", "path_prefix must be a short repository-relative path.")
+    requested = Path(path_prefix.strip())
+    if requested.is_absolute() or ".." in requested.parts:
+        raise CodingWorkspaceError("ERROR_CODING_PATH_PREFIX_INVALID", "path_prefix must stay inside the repository.")
+    if requested.parts and requested.parts[0] == ".git":
+        raise CodingWorkspaceError("ERROR_CODING_GIT_ADMIN_PATH_BLOCKED", "The .git administrative directory is blocked by the coding workspace boundary.")
+    target = (context.repo_root / requested).resolve()
+    if not is_within_path(target, context.repo_root):
+        raise CodingWorkspaceError("ERROR_CODING_FILE_OUTSIDE_REPOSITORY", f"path_prefix resolves outside repository root: {path_prefix}")
+    # ":(literal)" stops Git from reading glob or magic characters in the prefix.
+    return [f":(literal){requested.as_posix()}"]
+
+
+def list_repository_files(
+    repo_root: str | Path,
+    *,
+    path_prefix: str | None = None,
+    cfg: Settings = settings,
+    max_entries: int | None = None,
+) -> dict[str, Any]:
+    """Tracked files under an optional prefix. Read-only; ignored and untracked files are not listed."""
+    context = resolve_repository(repo_root, cfg)
+    limit = _bounded_limit(max_entries, default=MAX_LISTED_FILES, maximum=MAX_LISTED_FILES, label="max_entries")
+    pathspec = _repository_pathspec(context, path_prefix)
+    files = sorted(_split_nul(_git_output(context.repo_root, ["ls-files", "-z", "--", *pathspec])))
+    return {
+        "status": "CODING_FILE_LIST_OK",
+        "repo_root": str(context.repo_root),
+        "head_sha": _git_output(context.repo_root, ["rev-parse", "HEAD"]).strip(),
+        "path_prefix": path_prefix or None,
+        "file_count": len(files),
+        "files": files[:limit],
+        "truncated": len(files) > limit,
+        "max_entries": limit,
+        "limitations": [
+            "tracked files only; untracked and ignored files are not listed",
+            "names only; no file content is read",
+        ],
+    }
+
+
+def search_repository(
+    repo_root: str | Path,
+    pattern: str,
+    *,
+    path_prefix: str | None = None,
+    cfg: Settings = settings,
+    max_matches: int | None = None,
+) -> dict[str, Any]:
+    """Fixed-string search over tracked text files. Read-only; the pattern is never a regular expression."""
+    context = resolve_repository(repo_root, cfg)
+    if not isinstance(pattern, str) or not pattern.strip() or "\x00" in pattern or "\n" in pattern:
+        raise CodingWorkspaceError("ERROR_CODING_SEARCH_PATTERN_REQUIRED", "pattern must be a non-empty single-line string.")
+    if len(pattern.encode("utf-8")) > MAX_SEARCH_PATTERN_BYTES:
+        raise CodingWorkspaceError("ERROR_CODING_SEARCH_PATTERN_TOO_LONG", f"pattern exceeds {MAX_SEARCH_PATTERN_BYTES} bytes.")
+    limit = _bounded_limit(max_matches, default=MAX_SEARCH_MATCHES, maximum=MAX_SEARCH_MATCHES, label="max_matches")
+    pathspec = _repository_pathspec(context, path_prefix)
+    # -I skips binary files, -F makes the pattern literal, -e keeps a leading dash from being read as an option.
+    proc = _git_process(context.repo_root, ["grep", "-n", "-I", "-F", "--no-color", "-z", "-e", pattern, "--", *pathspec])
+    if proc.returncode not in {0, 1}:
+        raise CodingWorkspaceError("ERROR_CODING_SEARCH_FAILED", (proc.stderr or "git grep failed").strip()[:400])
+    matches: list[dict[str, Any]] = []
+    total = 0
+    for line in proc.stdout.splitlines():
+        # With -z each match line is "path\0line_number\0text".
+        parts = line.split("\x00", 2)
+        if len(parts) != 3 or not parts[1].isdigit():
+            continue
+        total += 1
+        if len(matches) < limit:
+            matches.append({"path": parts[0], "line": int(parts[1]), "text": parts[2][:MAX_SEARCH_LINE_CHARS]})
+    return {
+        "status": "CODING_SEARCH_OK",
+        "repo_root": str(context.repo_root),
+        "head_sha": _git_output(context.repo_root, ["rev-parse", "HEAD"]).strip(),
+        "pattern": pattern,
+        "path_prefix": path_prefix or None,
+        "match_count": total,
+        "matches": matches,
+        "truncated": total > limit,
+        "max_matches": limit,
+        "limitations": [
+            "fixed-string match over tracked text files in the working tree; binary files are skipped",
+            f"each matching line is cut at {MAX_SEARCH_LINE_CHARS} characters",
+        ],
+    }
+
+
 def inspect_repository_diff(
     repo_root: str | Path,
     *,

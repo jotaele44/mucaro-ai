@@ -160,6 +160,8 @@
       "tool_registry_bridges": [
         "coding.repo_status",
         "coding.read_file",
+        "coding.list_files",
+        "coding.search",
         "coding.diff",
         "coding.patch_check",
         "coding.patch_apply"

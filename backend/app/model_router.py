@@ -1216,7 +1216,9 @@ def generate_turn(
         by_wire = {_wire_name(name): name for name in known}
         for index, raw in enumerate(message.get("tool_calls") or []):
             function = (raw or {}).get("function") or {}
-            name = by_wire.get(str(function.get("name") or ""), str(function.get("name") or ""))
+            wire_name = str(function.get("name") or "")
+            # A name the model was not offered is still translated back, so the refusal names the real tool.
+            name = by_wire.get(wire_name, wire_name.replace("__", "."))
             arguments = function.get("arguments")
             error = None
             if isinstance(arguments, str):
