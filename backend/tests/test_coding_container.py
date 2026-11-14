@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import subprocess
+import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -150,14 +152,13 @@ def test_execution_receipt_closes_pass_and_preserves_host_state(tmp_path: Path, 
     repo = make_repo(tmp_path)
     fake_engine(monkeypatch)
     plan = build_coding_container_plan(repo, image=PINNED, command=["pytest", "-q"], cfg=cfg)
-    real_run = subprocess.run
 
-    def routed_run(argv, *args, **kwargs):
-        if argv and argv[0] == "/usr/bin/docker":
-            return subprocess.CompletedProcess(argv, 0, stdout=b"2 passed\n", stderr=b"")
-        return real_run(argv, *args, **kwargs)
+    def fake_container(argv, **kwargs):
+        assert argv[0] == "/usr/bin/docker"
+        assert argv[2] == f"--name={kwargs['container_name']}"
+        return 0, b"2 passed\n", b""
 
-    monkeypatch.setattr(coding_container.subprocess, "run", routed_run)
+    monkeypatch.setattr(coding_container, "_run_container_bounded", fake_container)
     receipt = run_coding_container_plan(plan, cfg=cfg)
 
     assert receipt["status"] == "CODING_CONTAINER_EXECUTED_PASS"
@@ -179,14 +180,13 @@ def test_nonzero_command_is_a_fail_receipt_not_an_infrastructure_claim(tmp_path:
     repo = make_repo(tmp_path)
     fake_engine(monkeypatch)
     plan = build_coding_container_plan(repo, image=PINNED, command=["pytest", "-q"], cfg=cfg)
-    real_run = subprocess.run
 
-    def routed_run(argv, *args, **kwargs):
-        if argv and argv[0] == "/usr/bin/docker":
-            return subprocess.CompletedProcess(argv, 7, stdout=b"", stderr=b"failing test\n")
-        return real_run(argv, *args, **kwargs)
+    def fake_container(argv, **kwargs):
+        assert argv[0] == "/usr/bin/docker"
+        assert argv[2] == f"--name={kwargs['container_name']}"
+        return 7, b"", b"failing test\n"
 
-    monkeypatch.setattr(coding_container.subprocess, "run", routed_run)
+    monkeypatch.setattr(coding_container, "_run_container_bounded", fake_container)
     receipt = run_coding_container_plan(plan, cfg=cfg)
 
     assert receipt["status"] == "CODING_CONTAINER_EXECUTED_FAIL"
@@ -200,19 +200,18 @@ def test_host_state_drift_during_execution_invalidates_receipt(tmp_path: Path, m
     repo = make_repo(tmp_path)
     fake_engine(monkeypatch)
     plan = build_coding_container_plan(repo, image=PINNED, command=["pytest"], cfg=cfg)
-    real_run = subprocess.run
     mutated = False
 
-    def routed_run(argv, *args, **kwargs):
+    def fake_container(argv, **kwargs):
         nonlocal mutated
-        if argv and argv[0] == "/usr/bin/docker":
-            if not mutated:
-                (repo / "tracked.txt").write_text("tampered\n", encoding="utf-8")
-                mutated = True
-            return subprocess.CompletedProcess(argv, 0, stdout=b"ok\n", stderr=b"")
-        return real_run(argv, *args, **kwargs)
+        assert argv[0] == "/usr/bin/docker"
+        assert argv[2] == f"--name={kwargs['container_name']}"
+        if not mutated:
+            (repo / "tracked.txt").write_text("tampered\n", encoding="utf-8")
+            mutated = True
+        return 0, b"ok\n", b""
 
-    monkeypatch.setattr(coding_container.subprocess, "run", routed_run)
+    monkeypatch.setattr(coding_container, "_run_container_bounded", fake_container)
     with pytest.raises(CodingContainerError) as exc:
         run_coding_container_plan(plan, cfg=cfg)
 
@@ -240,14 +239,13 @@ def test_command_resource_mount_and_output_limits_fail_closed(tmp_path: Path, mo
     assert limit.value.status == "ERROR_CODING_CONTAINER_LIMIT"
 
     plan = build_coding_container_plan(repo, image=PINNED, command=["pytest"], cfg=cfg, max_output_bytes=4)
-    real_run = subprocess.run
 
-    def routed_run(argv, *args, **kwargs):
-        if argv and argv[0] == "/usr/bin/docker":
-            return subprocess.CompletedProcess(argv, 0, stdout=b"12345", stderr=b"")
-        return real_run(argv, *args, **kwargs)
+    def fake_container(argv, **kwargs):
+        assert argv[0] == "/usr/bin/docker"
+        assert argv[2] == f"--name={kwargs['container_name']}"
+        return 0, b"12345", b""
 
-    monkeypatch.setattr(coding_container.subprocess, "run", routed_run)
+    monkeypatch.setattr(coding_container, "_run_container_bounded", fake_container)
     with pytest.raises(CodingContainerError) as output:
         run_coding_container_plan(plan, cfg=cfg)
     assert output.value.status == "ERROR_CODING_CONTAINER_OUTPUT_TOO_LARGE"
@@ -264,3 +262,138 @@ def test_exact_local_image_id_is_immutable_coding_identity(tmp_path: Path, monke
 
     assert plan.image == local_id
     assert local_id in argv
+
+
+FAKE_ENGINE_SOURCE = """#!{python}
+import os, sys, time
+log = os.environ["MUCARO_FAKE_ENGINE_LOG"]
+if sys.argv[1] == "rm":
+    with open(log, "a") as handle:
+        handle.write("rm " + " ".join(sys.argv[2:]) + "\\n")
+    sys.exit(0)
+with open(log, "a") as handle:
+    handle.write("run " + next(arg for arg in sys.argv if arg.startswith("--name=")) + "\\n")
+mode = os.environ["MUCARO_FAKE_ENGINE_MODE"]
+if mode == "flood_stdout":
+    chunk = b"x" * 65536
+    while True:
+        os.write(1, chunk)
+elif mode == "flood_stderr":
+    chunk = b"e" * 65536
+    while True:
+        os.write(2, chunk)
+elif mode == "hang":
+    os.write(1, b"started\\n")
+    time.sleep(600)
+elif mode == "ok":
+    os.write(1, b"o" * 1000)
+    os.write(2, b"warn\\n")
+    sys.exit(3)
+"""
+
+
+def real_fake_engine(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mode: str) -> tuple[str, Path]:
+    """Route the engine argv to a real child process without needing an executable file.
+
+    The coding profile runs this suite inside the coding container, where /tmp is mounted noexec, so the fake engine
+    is a script interpreted by ``sys.executable`` rather than a file that is exec'd directly. The real ``Popen`` and
+    ``run`` still execute, so the bounded reader, the kill path and the container removal are exercised end to end.
+    """
+
+    engine = str(tmp_path / "fake-engine")
+    script = tmp_path / "fake_engine.py"
+    script.write_text(FAKE_ENGINE_SOURCE.format(python=sys.executable), encoding="utf-8")
+    log = tmp_path / "fake-engine.log"
+    log.write_text("", encoding="utf-8")
+    monkeypatch.setenv("MUCARO_FAKE_ENGINE_LOG", str(log))
+    monkeypatch.setenv("MUCARO_FAKE_ENGINE_MODE", mode)
+    monkeypatch.setattr(coding_container, "resolve_container_engine", lambda preferred=None: engine)
+    real_popen = subprocess.Popen
+    real_run = subprocess.run
+
+    def route(argv):
+        if argv and argv[0] == engine:
+            return [sys.executable, str(script), *argv[1:]]
+        return argv
+
+    class RoutedPopen(real_popen):  # type: ignore[type-arg]
+        def __init__(self, argv, *args, **kwargs):
+            super().__init__(route(argv), *args, **kwargs)
+
+    monkeypatch.setattr(coding_container.subprocess, "Popen", RoutedPopen)
+    monkeypatch.setattr(coding_container.subprocess, "run", lambda argv, *args, **kwargs: real_run(route(argv), *args, **kwargs))
+    return engine, log
+
+
+@pytest.mark.parametrize("mode,stream", [("flood_stdout", "stdout"), ("flood_stderr", "stderr")])
+def test_runaway_output_is_stopped_at_the_cap_with_bounded_memory(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mode: str, stream: str
+) -> None:
+    cfg = make_settings(tmp_path)
+    repo = make_repo(tmp_path)
+    _, log = real_fake_engine(tmp_path, monkeypatch, mode)
+    cap = 100_000
+    plan = build_coding_container_plan(
+        repo, image=PINNED, command=["yes"], cfg=cfg, max_output_bytes=cap, timeout_seconds=60
+    )
+
+    started = time.monotonic()
+    with pytest.raises(CodingContainerError) as exc:
+        run_coding_container_plan(plan, cfg=cfg)
+    elapsed = time.monotonic() - started
+
+    # The engine never exits on its own: it must be stopped by the cap, far before the 60 s timeout.
+    assert exc.value.status == "ERROR_CODING_CONTAINER_OUTPUT_TOO_LARGE"
+    assert elapsed < 30
+    receipt = exc.value.receipt
+    assert receipt is not None
+    assert receipt["stop_reason"] == "ERROR_CODING_CONTAINER_OUTPUT_TOO_LARGE"
+    captured = receipt[stream]
+    assert captured["truncated"] is True
+    assert captured["byte_size"] == cap
+    assert captured["text"].endswith(coding_container.OUTPUT_TRUNCATION_MARKER.format(max_bytes=cap))
+    assert len(captured["text"]) <= cap + 200
+    # Reading stopped within one chunk of the cap instead of buffering the whole stream.
+    assert cap < captured["observed_byte_size_at_stop"] <= cap + coding_container.OUTPUT_READ_CHUNK_BYTES
+    other = receipt["stdout" if stream == "stderr" else "stderr"]
+    assert other["truncated"] is False
+    # The named container is force-removed, not left running.
+    events = log.read_text(encoding="utf-8").splitlines()
+    name = events[0].removeprefix("run --name=")
+    assert name.startswith("mucaro-coding-") and name == receipt["container_name"]
+    assert f"rm --force {name}" in events
+
+
+def test_timeout_stops_and_removes_the_named_container(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    cfg = make_settings(tmp_path)
+    repo = make_repo(tmp_path)
+    _, log = real_fake_engine(tmp_path, monkeypatch, "hang")
+    plan = build_coding_container_plan(repo, image=PINNED, command=["sleep", "600"], cfg=cfg, timeout_seconds=1)
+
+    started = time.monotonic()
+    with pytest.raises(CodingContainerError) as exc:
+        run_coding_container_plan(plan, cfg=cfg)
+
+    assert exc.value.status == "ERROR_CODING_CONTAINER_TIMEOUT"
+    assert time.monotonic() - started < 30
+    assert exc.value.receipt is not None
+    assert exc.value.receipt["stdout"]["text"] == "started\n"
+    assert exc.value.receipt["stdout"]["truncated"] is False
+    events = log.read_text(encoding="utf-8").splitlines()
+    assert f"rm --force {exc.value.receipt['container_name']}" in events
+
+
+def test_bounded_runner_returns_complete_output_under_the_cap(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    cfg = make_settings(tmp_path)
+    repo = make_repo(tmp_path)
+    _, log = real_fake_engine(tmp_path, monkeypatch, "ok")
+    plan = build_coding_container_plan(repo, image=PINNED, command=["pytest"], cfg=cfg, max_output_bytes=1000)
+
+    receipt = run_coding_container_plan(plan, cfg=cfg)
+
+    assert receipt["execution_status"] == "FAIL"
+    assert receipt["exit_code"] == 3
+    assert receipt["stdout"]["byte_size"] == 1000
+    assert receipt["stdout"]["truncated"] is False
+    assert receipt["stderr"]["text"] == "warn\n"
+    assert not any(line.startswith("rm ") for line in log.read_text(encoding="utf-8").splitlines())
