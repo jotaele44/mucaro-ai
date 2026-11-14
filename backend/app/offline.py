@@ -65,6 +65,8 @@ _TOOL_LOCAL_DEPENDENCIES: dict[str, tuple[str, str]] = {
     "coding.exec": ("binary_any", "docker,podman"),
     "coding.regression_run": ("binary_any", "docker,podman"),
     "coding.pr_request": ("binary", "git"),
+    "coding.push": ("binary", "git"),
+    "repo.clone": ("binary", "git"),
     "github.pr_open_update": ("binary", "gh"),
     "github.ci_status": ("binary", "gh"),
     "ocr.analyze_image": ("binary", "tesseract"),
