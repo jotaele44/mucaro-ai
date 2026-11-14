@@ -253,7 +253,7 @@ def test_run_read_only_never_authorizes_mutation(monkeypatch: pytest.MonkeyPatch
         allow_network=False,
         cfg=cfg,
     )
-    read = pending("memory.list", run_id="run-1", cfg=cfg)
+    read = pending("product.audit", run_id="run-1", cfg=cfg)
     unlisted = pending("test.read", run_id="run-1", cfg=cfg)
     write = pending("test.write", run_id="run-1", cfg=cfg)
 

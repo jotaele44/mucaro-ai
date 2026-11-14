@@ -224,7 +224,7 @@ granted.
 
 `RUN_READ_ONLY` and `TOOL_PREFIXES` leases cover only the read-only local
 inspection tools (`source_library.status`, `product.audit`,
-`workspace_profiles.list`, `memory.list`, `coding.repo_status`,
+`workspace_profiles.list`, `coding.repo_status`,
 `coding.read_file`, `coding.diff`, `coding.patch_check`). Any tool that
 executes a command (`coding.exec`, `coding.regression_run`), mutates files or
 repositories, pushes, or reaches a remote is covered only by an `EXACT_TOOLS`

@@ -17,7 +17,6 @@ READ_ONLY_LOCAL_INSPECTION_TOOLS = frozenset(
         "source_library.status",
         "product.audit",
         "workspace_profiles.list",
-        "memory.list",
         "coding.repo_status",
         "coding.read_file",
         "coding.diff",
