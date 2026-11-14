@@ -291,3 +291,90 @@ def test_terminal_lease_approval_consumes_exact_tui_run_scope(
     stored = list_permission_leases(run_id=f"tui:{conversation_id}", cfg=cfg)["leases"][0]
     assert stored["used_call_ids"] == [call["tool_call_id"]]
     assert stored["effective_state"] == "EXHAUSTED"
+
+
+def test_terminal_can_create_bounded_run_and_exact_tool_leases(cfg: Settings) -> None:
+    controller = TerminalController(cfg=cfg)
+    conversation_id = controller.ensure_conversation()
+
+    controller.command("allow-run uses=3 ttl=600")
+    leases = list_permission_leases(run_id=f"tui:{conversation_id}", cfg=cfg)["leases"]
+    assert len(leases) == 1
+    assert leases[0]["scope_type"] == "RUN_READ_ONLY"
+    assert leases[0]["allow_network"] is False
+    assert leases[0]["allow_mutating"] is False
+    assert leases[0]["max_uses"] == 3
+
+    controller.command("allow-tool github.issues_list network uses=2 ttl=300")
+    leases = list_permission_leases(run_id=f"tui:{conversation_id}", cfg=cfg)["leases"]
+    exact = next(row for row in leases if row["scope_type"] == "EXACT_TOOLS")
+    assert exact["tool_names"] == ["github.issues_list"]
+    assert exact["allow_network"] is True
+    assert exact["allow_mutating"] is False
+    assert exact["max_uses"] == 2
+
+
+def test_terminal_run_lease_refuses_network_and_mutation_broadening(cfg: Settings) -> None:
+    controller = TerminalController(cfg=cfg)
+    controller.ensure_conversation()
+
+    with pytest.raises(TerminalUIError) as network:
+        controller.command("allow-run network")
+    assert network.value.status == "ERROR_TUI_LEASE_SCOPE"
+
+    with pytest.raises(TerminalUIError) as mutating:
+        controller.command("allow-run mutating")
+    assert mutating.value.status == "ERROR_TUI_LEASE_SCOPE"
+
+
+def test_terminal_mutating_exact_lease_requires_workspace_or_argument_binding(cfg: Settings) -> None:
+    controller = TerminalController(cfg=cfg)
+    controller.ensure_conversation()
+
+    with pytest.raises(TerminalUIError) as unbound:
+        controller.command("allow-tool coding.patch_apply mutating")
+    assert unbound.value.status == "ERROR_TUI_LEASE_MUTATION_BINDING"
+
+    controller.command(
+        "allow-tool coding.patch_apply mutating "
+        f"args={'a' * 64} uses=1 ttl=60"
+    )
+    leases = list_permission_leases(run_id=f"tui:{controller.conversation_id}", cfg=cfg)["leases"]
+    exact = next(row for row in leases if row["scope_type"] == "EXACT_TOOLS")
+    assert exact["allow_mutating"] is True
+    assert exact["arguments_sha256"] == "a" * 64
+    assert exact["max_uses"] == 1
+
+
+def test_terminal_run_lease_never_covers_command_execution_and_every_lease_expires(cfg: Settings) -> None:
+    from backend.app.permission_leases import matching_permission_leases
+    from backend.app.tools import request_tool_call
+
+    controller = TerminalController(cfg=cfg)
+    conversation_id = controller.ensure_conversation()
+    run_id = f"tui:{conversation_id}"
+
+    with pytest.raises(TerminalUIError):
+        controller.command("allow-tool coding.exec ttl=none")
+    with pytest.raises(TerminalUIError) as unbounded:
+        controller.command("allow-tool coding.exec ttl=0")
+    assert unbounded.value.status == "ERROR_PERMISSION_LEASE_TTL"
+    assert list_permission_leases(run_id=run_id, cfg=cfg)["leases"] == []
+
+    controller.command("allow-run uses=5 ttl=600")
+    lease = list_permission_leases(run_id=run_id, cfg=cfg)["leases"][0]
+    assert lease["expires_at"] is not None
+    for tool_name in ("coding.exec", "coding.regression_run"):
+        call = request_tool_call(
+            tool_name,
+            {"command": ["true"]},
+            cfg=cfg,
+            requested_by="terminal",
+            reason="proof",
+            run_id=run_id,
+        )["tool_call"]
+        assert matching_permission_leases(call["tool_call_id"], cfg=cfg)["match_count"] == 0
+    with pytest.raises(TerminalUIError) as blocked:
+        controller.command("approve lease")
+    assert blocked.value.status == "ERROR_PERMISSION_LEASE_NO_MATCH"
+    assert all(row["status"] == "PENDING_APPROVAL" for row in list_tool_calls(cfg)["tool_calls"])

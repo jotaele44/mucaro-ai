@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import select
+import shlex
 import shutil
 import sys
 import textwrap
@@ -13,7 +14,11 @@ from .agent_checkpoints import CheckpointError, get_checkpoint
 from .autopilot import AutopilotError, authorize_autopilot, run_autopilot
 from .config import Settings, settings
 from .conversations import create_conversation, get_conversation
-from .permission_leases import PermissionLeaseError, authorize_tool_call_with_lease
+from .permission_leases import (
+    PermissionLeaseError,
+    authorize_tool_call_with_lease,
+    grant_permission_lease,
+)
 from .response_flow import InteractionError, resolve_interaction
 from .terminal_projection import TERMINAL_VIEWS, TerminalProjectionError, build_terminal_snapshot
 from .tools import (
@@ -473,8 +478,109 @@ class TerminalController:
         self.view = "current"
         self.notice = f"Run {submitted['run']['run_id']} submitted ({self.mode})"
 
+    def _lease_target_run_id(self) -> str:
+        snapshot = self.snapshot()
+        current_run = snapshot.get("current_run")
+        if isinstance(current_run, dict) and current_run.get("state") in ACTIVE_STATES:
+            return str(current_run["run_id"])
+        checkpoint = snapshot.get("checkpoint")
+        if (
+            isinstance(checkpoint, dict)
+            and checkpoint.get("run_id")
+            and checkpoint.get("state") not in {"COMPLETED", "FAILED"}
+        ):
+            return str(checkpoint["run_id"])
+        return f"tui:{self.ensure_conversation()}"
+
+    def _lease_options(self, tokens: list[str]) -> dict[str, Any]:
+        options: dict[str, Any] = {
+            "allow_network": False,
+            "allow_mutating": False,
+            "max_uses": 64,
+            "ttl_seconds": 3600,
+            "workspace_root": None,
+            "arguments_sha256": None,
+        }
+        for option in tokens:
+            if option == "network":
+                options["allow_network"] = True
+            elif option == "mutating":
+                options["allow_mutating"] = True
+            elif option.startswith("uses="):
+                try:
+                    options["max_uses"] = int(option.split("=", 1)[1])
+                except ValueError as exc:
+                    raise TerminalUIError("ERROR_TUI_LEASE_USES", option) from exc
+            elif option.startswith("ttl="):
+                # Every terminal lease expires: there is no "ttl=none".
+                try:
+                    options["ttl_seconds"] = int(option.split("=", 1)[1])
+                except ValueError as exc:
+                    raise TerminalUIError("ERROR_TUI_LEASE_TTL", option) from exc
+            elif option.startswith("workspace="):
+                options["workspace_root"] = option.split("=", 1)[1]
+            elif option.startswith("args="):
+                options["arguments_sha256"] = option.split("=", 1)[1]
+            else:
+                raise TerminalUIError("ERROR_TUI_LEASE_OPTION", option)
+        return options
+
+    def _grant_terminal_lease(
+        self,
+        *,
+        scope_type: str,
+        tool_names: list[str] | None = None,
+        option_tokens: list[str] | None = None,
+    ) -> None:
+        options = self._lease_options(list(option_tokens or []))
+        if scope_type == "RUN_READ_ONLY" and (
+            options["allow_mutating"] or options["allow_network"]
+        ):
+            raise TerminalUIError(
+                "ERROR_TUI_LEASE_SCOPE",
+                "RUN_READ_ONLY remains local/read-only; use :allow-tool TOOL with explicit network/mutating authority.",
+            )
+        if (
+            options["allow_mutating"]
+            and not options["workspace_root"]
+            and not options["arguments_sha256"]
+        ):
+            raise TerminalUIError(
+                "ERROR_TUI_LEASE_MUTATION_BINDING",
+                "Mutating terminal leases require workspace=PATH or args=SHA256.",
+            )
+        try:
+            granted = grant_permission_lease(
+                run_id=self._lease_target_run_id(),
+                scope_type=scope_type,
+                tool_names=tool_names,
+                granted_by="terminal",
+                workspace_root=options["workspace_root"],
+                arguments_sha256=options["arguments_sha256"],
+                allow_mutating=bool(options["allow_mutating"]),
+                allow_network=bool(options["allow_network"]),
+                ttl_seconds=options["ttl_seconds"],
+                max_uses=int(options["max_uses"]),
+                cfg=self.cfg,
+            )
+        except PermissionLeaseError as exc:
+            raise TerminalUIError(exc.status, exc.detail) from exc
+        lease = granted["lease"]
+        authority = []
+        if lease.get("allow_network"):
+            authority.append("network")
+        if lease.get("allow_mutating"):
+            authority.append("mutating")
+        self.notice = (
+            f"Granted {lease['lease_id']} to {lease['run_id']} "
+            f"scope={lease['scope_type']} authority={','.join(authority) or 'local-readonly'}"
+        )
+
     def command(self, command: str) -> None:
-        parts = command.strip().split()
+        try:
+            parts = shlex.split(command.strip())
+        except ValueError as exc:
+            raise TerminalUIError("ERROR_TUI_COMMAND_PARSE", str(exc)) from exc
         if not parts:
             return
         name = parts[0].lower()
@@ -515,6 +621,19 @@ class TerminalController:
             return
         if name == "gists" and len(args) <= 1:
             self.request_github("gists", args[0] if args else "")
+            return
+        if name == "allow-run":
+            self._grant_terminal_lease(
+                scope_type="RUN_READ_ONLY",
+                option_tokens=args,
+            )
+            return
+        if name == "allow-tool" and args:
+            self._grant_terminal_lease(
+                scope_type="EXACT_TOOLS",
+                tool_names=[args[0]],
+                option_tokens=args[1:],
+            )
             return
         if name == "approve":
             self.approve_latest(use_lease=bool(args and args[0].lower() == "lease"))
@@ -584,7 +703,8 @@ class TerminalController:
         if name == "help":
             self.notice = (
                 ":mode plan|interactive|auto|autopilot • :new • :open ID • "
-                ":issues REPO • :prs REPO • :gists [OWNER] • :approve [lease] • :deny • "
+                ":issues REPO • :prs REPO • :gists [OWNER] • :allow-run [uses=N] [ttl=N] • "
+                ":allow-tool TOOL [network] [mutating] [uses=N] [ttl=N] • :approve [lease] • :deny • "
                 ":answer OPTION • :answer-text TEXT • :stop"
             )
             return

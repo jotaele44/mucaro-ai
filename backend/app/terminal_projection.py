@@ -123,6 +123,8 @@ def _checkpoint_projection(
             }
     return {
         "checkpoint_id": checkpoint.get("checkpoint_id"),
+        "session_id": checkpoint.get("session_id"),
+        "run_id": checkpoint.get("run_id"),
         "state": checkpoint.get("state"),
         "sequence": checkpoint.get("sequence"),
         "objective": checkpoint.get("objective"),
