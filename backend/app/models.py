@@ -32,6 +32,16 @@ class ConversationCreateRequest(BaseModel):
     model: ConversationModelConfig | None = None
 
 
+class ConversationRepoRequest(BaseModel):
+    """The repository a chat's model may work on. An empty repo_root clears the binding."""
+
+    repo_root: str = Field(default="", max_length=2000)
+    # Immutable image identity for container runs: name@sha256:<digest> or a local sha256:<id>.
+    coding_image: str | None = Field(default=None, max_length=400)
+    # owner/name on GitHub, for opening a pull request and reading CI.
+    remote_repo: str | None = Field(default=None, max_length=200)
+
+
 class ModelServerSettings(BaseModel):
     base_url: str | None = Field(default=None, max_length=500)
     model: str | None = Field(default=None, max_length=200)

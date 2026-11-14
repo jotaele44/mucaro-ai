@@ -10,7 +10,9 @@
       "clause": "Audit all seven federation repositories",
       "satisfied_by": [
         "coding.repo_status",
-        "coding.read_file"
+        "coding.read_file",
+        "coding.list_files",
+        "coding.search"
       ],
       "state": "PRESENT",
       "owner_domain": "V13",
