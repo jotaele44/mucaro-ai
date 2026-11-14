@@ -1,5 +1,9 @@
 name: Web Render Certification
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 on:
   workflow_dispatch:
   pull_request:
@@ -19,14 +23,20 @@ on:
       - "scripts/certify_web_render_live.py"
       - ".github/workflows/web-render-cert.yml"
 
+permissions:
+  contents: read
+
 jobs:
   certify-rendered-browser:
     runs-on: ubuntu-24.04  # pinned: the pinned Playwright cannot install browsers on ubuntu-26.04
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
+          cache: pip
+          cache-dependency-path: pyproject.toml
       - name: Install Mucaro and Playwright
         run: |
           python -m pip install -e ".[dev]"
