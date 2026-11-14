@@ -24,6 +24,7 @@ class ConversationModelConfig(BaseModel):
     model_provider: str = Field(min_length=1, max_length=80)
     model_name: str | None = Field(default=None, max_length=200)
     allow_live: bool = False
+    agent: bool = False
 
 
 class ConversationCreateRequest(BaseModel):
@@ -147,6 +148,8 @@ class RunOptions(BaseModel):
     allow_mock_fallback: bool = False
     allow_live: bool = False
     require_offline: bool = False
+    # Let the chat's model propose tool calls; every proposal still goes through the approval gate.
+    agent: bool = False
 
 
 class MessageRequest(BaseModel):

@@ -117,6 +117,13 @@ another server, Claude, or no model. For a model server, enter its address, choo
 chat's **Model** button); Settings holds the default for new chats. The server address and
 any API key are saved on the computer that runs Mucaro; the key is never shown again.
 
+With **Let the model propose actions** on (the default for model servers), the chat's model can
+ask to run an action: check the library or memory, search the web, fetch a page, or read a git
+repository on this computer. It can only ask. Each request appears as a card with **Allow once**
+and **Deny**; in Auto mode only local read-only actions run without asking. What an action returns
+is handed back to the model as data, never as instructions. The model cannot apply patches,
+commit, or change permissions.
+
 A message that matches none of your sources is still answered by the chat's model and is
 marked **No sources used**; it is never presented as a cited answer. `mucaro ask` and
 `POST /ask` stay strict and return `ERROR_NO_RETRIEVAL_CONTEXT`.

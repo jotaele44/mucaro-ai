@@ -49,7 +49,7 @@
     "No claim of universal local-model compatibility: only the OpenAI-compatible chat-completions protocol subset above is exercised by tests.",
     "Answer quality and citation compliance depend on the selected local model; uncited answers are flagged ERROR_UNCITED_ANSWER rather than accepted.",
     "In chat, a message that matches no local source is answered by the selected model without evidence and marked NO_SOURCES_USED / WARN_NO_SOURCES_USED; it is never reported as CITATION_OK. The ask API and CLI stay strict and return ERROR_NO_RETRIEVAL_CONTEXT.",
-    "Models do not call tools; tool actions are explicit user commands through the approval gate.",
+    "Models never run or approve tools. With the per-chat option on, a model served through the OpenAI-compatible providers may propose a call from a fixed catalogue (source_library.status, memory.list, web.search, web.fetch, coding.repo_status, coding.read_file, coding.diff); each proposal is an ordinary tool call requested_by=model that waits in the approval gate, and only local read-only tools are pre-approved in Auto mode. Tool output returns to the model as fenced untrusted data. Anthropic and mock have no tool-calling adapter; agent turns are not streamed; tool-calling quality depends on the selected model and is exercised by tests against a scripted server only.",
     "Text-only modality; image/audio modalities route as MODALITY_UNSUPPORTED.",
     "Remote-provider behaviour is verified with gating tests only; live remote evaluation is blocked on credentials (BLK-LLM-001)."
   ],

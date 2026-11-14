@@ -8,7 +8,7 @@ import { EvidencePanel } from "./EvidencePanel.jsx";
 import { ExecutionEntryCard } from "./ExecutionEntryCard.jsx";
 import { NextVectorPicker } from "./NextVectorPicker.jsx";
 import { EditableMessage } from "./MessageActions.jsx";
-import { ModelSetup, modelLabel } from "./ModelSetup.jsx";
+import { ModelSetup, modelLabel, modelOf } from "./ModelSetup.jsx";
 import { RunBlock } from "./RunBlock.jsx";
 import { Sheet } from "./Sheet.jsx";
 
@@ -85,12 +85,6 @@ function ConversationMenu({ conversation, onRename, onDelete, onOpenTasks, annou
     </div>
   );
 }
-
-const modelOf = (options) => ({
-  model_provider: options?.model_provider || "mock",
-  model_name: options?.model_name || null,
-  allow_live: Boolean(options?.allow_live),
-});
 
 export function ChatView({ reconnect = 0, conversationId, onConversationCreated, onConversationsChanged, onOpenTasks, announce, modes, defaultOptions, onDefaultModelChange }) {
   const [conversation, setConversation] = useState(null);
