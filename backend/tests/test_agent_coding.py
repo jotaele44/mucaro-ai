@@ -309,3 +309,165 @@ def test_catalogue_never_lets_the_model_supply_what_mucaro_fills():
         if name.startswith(("coding.", "github.")):
             assert entry.get("needs_repo") is True, name
     json.dumps(agent_loop.agent_tool_specs({"repo_root": "/x"}))  # every schema is serialisable for the model
+
+
+# --- clone and push ----------------------------------------------------------------------------
+
+
+def _bare_remote(tmp_path: Path, source: Path) -> Path:
+    bare = tmp_path / "remote.git"
+    git(tmp_path, "clone", "--bare", str(source), str(bare))
+    return bare
+
+
+@pytest.fixture()
+def github_stub(monkeypatch, tmp_path, repo):
+    """Stand in for github.com: the octo/demo remote is a local bare repository."""
+    from backend.app import coding_remote
+
+    bare = _bare_remote(tmp_path, repo)
+    real_git = coding_remote._git
+
+    def redirected(cwd, args, *, timeout):
+        swapped = [str(bare) if part == "https://github.com/octo/demo.git" else part for part in args]
+        swapped = [part for part in swapped if part not in {"protocol.file.allow=never"}]
+        if "protocol.ext.allow=never" in swapped and "-c" in swapped:
+            swapped.remove("-c")  # the -c that belonged to the dropped protocol.file setting
+        return real_git(cwd, swapped, timeout=timeout)
+
+    monkeypatch.setattr(coding_remote, "_git", redirected)
+    real_parse = coding_remote.parse_github_remote
+    monkeypatch.setattr(coding_remote, "parse_github_remote", lambda url: "octo/demo" if url.strip() == str(bare) else real_parse(url))
+    git(repo, "remote", "add", "origin", str(bare))
+    return bare
+
+
+def test_push_sends_exactly_the_approved_commit_of_a_work_branch_and_never_forces(cfg, repo, github_stub):
+    from backend.app.coding_remote import CodingRemoteError, push_work_branch
+
+    git(repo, "checkout", "-b", "work/push")
+    (repo / "tracked.txt").write_text("alpha\nbeta\n", encoding="utf-8")
+    git(repo, "commit", "-am", "beta")
+    head = git(repo, "rev-parse", "HEAD").strip()
+    root = str(repo)
+
+    pushed = _finish(cfg, request_tool_call("coding.push", {"repo_root": root, "expected_head_sha": head, "expected_branch": "work/push"}, cfg=cfg))
+    assert pushed["status"] == "EXECUTED" and pushed["result"]["status"] == "CODING_PUSH_OK"
+    assert pushed["result"]["remote_head_sha"] == head and pushed["result"]["forced"] is False
+    assert git(github_stub, "rev-parse", "refs/heads/work/push").strip() == head
+    assert TOOL_REGISTRY["coding.push"].mutates_state and TOOL_REGISTRY["coding.push"].network == "remote"
+
+    for arguments, status in (
+        ({"expected_head_sha": "0" * 40, "expected_branch": "work/push"}, "ERROR_CODING_PUSH_HEAD_DRIFT"),
+        ({"expected_head_sha": head, "expected_branch": "work/other"}, "ERROR_CODING_PUSH_BRANCH_DRIFT"),
+        ({"expected_head_sha": head, "expected_branch": "main"}, "ERROR_CODING_PROTECTED_BRANCH"),
+        ({"expected_head_sha": "nope", "expected_branch": "work/push"}, "ERROR_CODING_PUSH_HEAD_REQUIRED"),
+    ):
+        with pytest.raises(CodingRemoteError) as refused:
+            push_work_branch(root, cfg=cfg, **arguments)
+        assert refused.value.status == status
+
+    (repo / "tracked.txt").write_text("dirty\n", encoding="utf-8")
+    with pytest.raises(CodingRemoteError) as dirty:
+        push_work_branch(root, expected_head_sha=head, expected_branch="work/push", cfg=cfg)
+    assert dirty.value.status == "ERROR_CODING_PUSH_DIRTY_REPOSITORY"
+    git(repo, "checkout", "--", "tracked.txt")
+
+    # History rewritten locally: the remote branch is not an ancestor, and the push is refused rather than forced.
+    git(repo, "commit", "--amend", "-m", "rewritten")
+    rewritten = git(repo, "rev-parse", "HEAD").strip()
+    with pytest.raises(CodingRemoteError) as rejected:
+        push_work_branch(root, expected_head_sha=rewritten, expected_branch="work/push", cfg=cfg)
+    assert rejected.value.status == "ERROR_CODING_PUSH_REJECTED"
+    assert git(github_stub, "rev-parse", "refs/heads/work/push").strip() == head
+
+
+def test_push_refuses_a_remote_that_is_not_github(cfg, repo, tmp_path):
+    from backend.app.coding_remote import CodingRemoteError, parse_github_remote, push_work_branch
+
+    git(repo, "remote", "add", "origin", "https://gitlab.example.com/octo/demo.git")
+    git(repo, "checkout", "-b", "work/x")
+    head = git(repo, "rev-parse", "HEAD").strip()
+    with pytest.raises(CodingRemoteError) as refused:
+        push_work_branch(str(repo), expected_head_sha=head, expected_branch="work/x", cfg=cfg)
+    assert refused.value.status == "ERROR_CODING_PUSH_REMOTE_INVALID"
+    assert parse_github_remote("https://github.com/octo/demo.git") == "octo/demo"
+    assert parse_github_remote("git@github.com:octo/demo.git") == "octo/demo"
+    for url in ("https://token@github.com/octo/demo.git", "https://github.com.evil.example/octo/demo", "https://github.com/octo/../demo",
+                "file:///tmp/x", "https://github.com/octo"):
+        assert parse_github_remote(url) is None
+
+
+def test_clone_takes_only_github_https_urls_and_lands_in_the_workspace_folder(cfg, repo, github_stub):
+    from backend.app.coding_remote import CodingRemoteError, clone_repository, workspaces_root
+
+    for url in ("git@github.com:octo/demo.git", "https://user:pw@github.com/octo/demo", "https://example.com/octo/demo",
+                "https://github.com/octo/demo/../../etc", "file:///etc", "--upload-pack=touch /tmp/x", "https://github.com/octo"):
+        with pytest.raises(CodingRemoteError) as refused:
+            clone_repository(url, cfg=cfg)
+        assert refused.value.status == "ERROR_CODING_CLONE_URL_INVALID"
+    assert not workspaces_root(cfg).exists()
+
+    cloned = _finish(cfg, request_tool_call("repo.clone", {"url": "https://github.com/octo/demo"}, cfg=cfg))
+    assert cloned["status"] == "EXECUTED"
+    receipt = cloned["result"]
+    destination = workspaces_root(cfg) / "octo__demo"
+    assert receipt["status"] == "CODING_CLONE_OK" and receipt["repo_root"] == str(destination) and receipt["remote_repo"] == "octo/demo"
+    assert (destination / "tracked.txt").read_text(encoding="utf-8") == "alpha\n"
+    assert receipt["head_sha"] == git(repo, "rev-parse", "HEAD").strip()
+    assert TOOL_REGISTRY["repo.clone"].mutates_state and TOOL_REGISTRY["repo.clone"].network == "remote"
+
+    again = _finish(cfg, request_tool_call("repo.clone", {"url": "https://github.com/octo/demo.git"}, cfg=cfg))
+    assert again["status"] == "FAILED" and again["result"]["status"] == "ERROR_CODING_CLONE_EXISTS"
+
+
+def test_model_clone_asks_first_then_binds_the_chat_and_a_push_uses_receipt_values(server, cfg, repo, github_stub):  # noqa: F811
+    _Scripted.script = [_call("repo.clone", {"url": "https://github.com/octo/demo"}, "c1")]
+    chat = _chat(cfg, None)
+    asked = _submit(cfg, chat, "clone octo/demo and work on it", approve=False)
+    assert asked["state"] == "AWAITING_APPROVAL"  # Auto mode never clones on its own: it is remote and writes to disk
+    pending = _calls(cfg, asked["run_id"])[0]
+    assert pending["arguments"] == {"url": "https://github.com/octo/demo", "then": "bind this chat to the cloned repository"}
+    assert "repo" not in get_conversation(chat, cfg)
+
+    _Scripted.script = [
+        _call("repo.clone", {"url": "https://github.com/octo/demo"}, "c1"),
+        _call("coding.repo_status", {}, "c2"),
+        _call("coding.branch_create", {"branch_name": "work/from-chat"}, "c3"),
+        _call("coding.push", {}, "c4"),
+        _text("Cloned, branched and pushed."),
+    ]
+    second = _chat(cfg, None)
+    # The first chat's clone is still pending, so the folder does not exist yet and this clone can run.
+    run = _submit(cfg, second, "clone octo/demo, make a branch and push it")
+    assert run["outcome"] == "ANSWERED"
+    bound = get_conversation(second, cfg)["repo"]
+    assert bound["repo_root"].endswith("workspaces/octo__demo") and bound["remote_repo"] == "octo/demo"
+    calls = {call["tool_name"]: call for call in _calls(cfg, run["run_id"])}
+    assert [call["status"] for call in calls.values()] == ["EXECUTED"] * 4
+    head = calls["coding.repo_status"]["result"]["head_sha"]
+    assert calls["coding.push"]["arguments"] == {"expected_head_sha": head, "expected_branch": "work/from-chat", "repo_root": bound["repo_root"]}
+    assert calls["coding.push"]["approved_by"] == "operator"
+    assert git(github_stub, "rev-parse", "refs/heads/work/from-chat").strip() == head
+    assert any(data["status"] == "NOTE_CHAT_BOUND_TO_CLONED_REPOSITORY" for data in _events(cfg, run["run_id"], "warning"))
+
+
+def test_a_clone_never_replaces_a_repository_the_person_chose(server, cfg, repo, github_stub):  # noqa: F811
+    _Scripted.script = [_call("repo.clone", {"url": "https://github.com/octo/demo"}, "c1"), _text("Cloned.")]
+    chat = _chat(cfg, repo)
+    run = _submit(cfg, chat, "clone octo/demo")
+    assert run["outcome"] == "ANSWERED"
+    assert get_conversation(chat, cfg)["repo"]["repo_root"] == str(repo)
+
+
+def test_binding_fills_in_the_github_repository_from_the_origin_remote(tmp_path):
+    app_root = tmp_path / "app"
+    app_root.mkdir()
+    cfg = make_settings(app_root)
+    inside = make_repo(app_root)
+    git(inside, "remote", "add", "origin", "git@github.com:octo/demo.git")
+    client = TestClient(create_app(cfg))
+    chat = client.post("/conversations", json={"title": "coding"}).json()["conversation_id"]
+    assert client.put(f"/conversations/{chat}/repo", json={"repo_root": str(inside)}).json()["repo"]["remote_repo"] == "octo/demo"
+    explicit = client.put(f"/conversations/{chat}/repo", json={"repo_root": str(inside), "remote_repo": "other/name"})
+    assert explicit.json()["repo"]["remote_repo"] == "other/name"

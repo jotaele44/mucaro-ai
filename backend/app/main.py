@@ -35,6 +35,7 @@ from .conversations import (
     set_conversation_repo,
 )
 from .coding_container import _validate_coding_image as validate_coding_image
+from .coding_remote import github_remote_of
 from .coding_workspace import CodingWorkspaceError, resolve_repository
 from .container_runtime import ContainerRuntimeError
 from .db import get_connection, init_db, list_payloads, upsert_payload
@@ -763,7 +764,9 @@ def create_app(cfg: Settings = settings) -> FastAPI:
             remote = (req.remote_repo or "").strip() or None
             if remote is not None and not GITHUB_REPO_PATTERN.fullmatch(remote):
                 raise api_error("ERROR_CONVERSATION_REPO_REMOTE_INVALID", "GitHub repository must be owner/name.")
-            binding = {"repo_root": str(context.repo_root), "coding_image": image, "remote_repo": remote}
+            # With no GitHub repository given, use the one the origin remote points at, if any.
+            binding = {"repo_root": str(context.repo_root), "coding_image": image,
+                       "remote_repo": remote or github_remote_of(context.repo_root, cfg)}
         try:
             return set_conversation_repo(conversation_id, binding, cfg)
         except KeyError as exc:
