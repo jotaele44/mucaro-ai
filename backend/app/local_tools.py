@@ -11,7 +11,7 @@ BUNDLED_TOOLS_ENV = "MUCARO_AI_BUNDLED_TOOLS_DIR"
 BUNDLED_ONLY_ENV = "MUCARO_AI_BUNDLED_TOOLS_ONLY"
 
 # Stable logical names keep callers independent of platform suffixes.
-KNOWN_LOCAL_TOOLS = frozenset({"git", "tesseract", "pdftoppm", "docker", "podman"})
+KNOWN_LOCAL_TOOLS = frozenset({"git", "gh", "tesseract", "pdftoppm", "docker", "podman"})
 
 # On macOS, /usr/bin/git is a stub. Without the Command Line Tools or Xcode, running it opens the
 # "install developer tools" dialog instead of running Git, so it only counts when those tools exist.
