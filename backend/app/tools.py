@@ -11,7 +11,14 @@ from .coding_lifecycle import CodingLifecycleError, build_pull_request_request, 
 from .coding_checks import CodingCheck, CodingCheckError, execute_coding_check_suite
 from .coding_mutation import CodingMutationError, apply_patch_transaction
 from .coding_patch import validate_patch_proposal
-from .coding_workspace import CodingWorkspaceError, inspect_repository, inspect_repository_diff, read_repository_file
+from .coding_workspace import (
+    CodingWorkspaceError,
+    inspect_repository,
+    inspect_repository_diff,
+    list_repository_files,
+    read_repository_file,
+    search_repository,
+)
 from .config import Settings, settings
 from .contracts import validate_contract
 from .github_ci import GitHubCIError, read_github_ci_status
@@ -186,6 +193,28 @@ def _coding_read_file(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any
         raise ToolRuntimeError("ERROR_CODING_FILE_PATH_REQUIRED", "coding.read_file requires a non-empty repository-relative path argument.")
     try:
         return read_repository_file(repo_root, path, cfg=cfg, max_bytes=arguments.get("max_bytes"))
+    except CodingWorkspaceError as exc:
+        raise ToolRuntimeError(exc.status, exc.detail) from exc
+
+
+def _coding_list_files(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
+    repo_root = arguments.get("repo_root")
+    if not isinstance(repo_root, str) or not repo_root.strip():
+        raise ToolRuntimeError("ERROR_CODING_REPO_ROOT_REQUIRED", "coding.list_files requires a non-empty repo_root argument.")
+    try:
+        return list_repository_files(repo_root, path_prefix=arguments.get("path_prefix"), cfg=cfg, max_entries=arguments.get("max_entries"))
+    except CodingWorkspaceError as exc:
+        raise ToolRuntimeError(exc.status, exc.detail) from exc
+
+
+def _coding_search(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
+    repo_root = arguments.get("repo_root")
+    if not isinstance(repo_root, str) or not repo_root.strip():
+        raise ToolRuntimeError("ERROR_CODING_REPO_ROOT_REQUIRED", "coding.search requires a non-empty repo_root argument.")
+    try:
+        return search_repository(
+            repo_root, arguments.get("pattern"), path_prefix=arguments.get("path_prefix"), cfg=cfg, max_matches=arguments.get("max_matches")
+        )
     except CodingWorkspaceError as exc:
         raise ToolRuntimeError(exc.status, exc.detail) from exc
 
@@ -620,6 +649,20 @@ TOOL_REGISTRY: dict[str, ToolDefinition] = {
         mutates_state=False,
         requires_approval=True,
         handler=_coding_read_file,
+    ),
+    "coding.list_files": ToolDefinition(
+        name="coding.list_files",
+        description="List tracked files of an approved local Git repository under an optional path prefix, names only, without mutation.",
+        mutates_state=False,
+        requires_approval=True,
+        handler=_coding_list_files,
+    ),
+    "coding.search": ToolDefinition(
+        name="coding.search",
+        description="Search tracked text files of an approved local Git repository for a fixed string and return bounded matching lines, without mutation.",
+        mutates_state=False,
+        requires_approval=True,
+        handler=_coding_search,
     ),
     "coding.diff": ToolDefinition(
         name="coding.diff",

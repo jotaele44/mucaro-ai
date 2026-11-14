@@ -152,7 +152,8 @@ def test_model_proposal_waits_for_the_person_then_its_result_feeds_the_answer(se
     tool_message = next(message for message in second["messages"] if message["role"] == "tool")
     assert tool_message["tool_call_id"] == "c1"
     assert '<tool_result tool="source_library.status" status="EXECUTED">' in tool_message["content"]
-    assert [tool["function"]["name"] for tool in second["tools"]] == [name.replace(".", "__") for name in agent_loop.AGENT_TOOLS]
+    # No repository is bound to this chat, so no coding or GitHub tool is offered.
+    assert [tool["function"]["name"] for tool in second["tools"]] == ["source_library__status", "web__search", "web__fetch"]
     step = _events(cfg, run["run_id"], "agent_step")[0]
     assert step == {"step": 1, "max_steps": agent_loop.MAX_AGENT_STEPS, "proposed": 1, "requested": 1, "tool_protocol": "native"}
     trace = done["answer_trace"] if "answer_trace" in done else None
@@ -228,7 +229,7 @@ def test_proposals_outside_the_catalogue_or_with_extra_arguments_are_refused_bef
     assert [call for call in list_tool_calls(cfg)["tool_calls"] if call.get("run_id") == run["run_id"]] == []
     refused = [data["detail"] for data in _events(cfg, run["run_id"], "warning") if data["status"] == "WARN_AGENT_PROPOSAL_REFUSED"]
     assert len(refused) == 3
-    assert "not a tool you can use" in refused[0] and "unsupported argument" in refused[1]
+    assert "needs a repository" in refused[0] and "unsupported argument" in refused[1] and "not a tool you can use" in refused[2]
     told = [message["content"] for message in _Scripted.requests[1]["messages"] if message["role"] == "tool"]
     assert 'status="REFUSED"' in told[0]
 
@@ -336,7 +337,9 @@ def test_catalogue_only_offers_registered_tools_and_no_state_changing_local_tool
         assert name in TOOL_REGISTRY
         assert TOOL_REGISTRY[name].requires_approval is True
         assert entry["parameters"]["additionalProperties"] is False
-    assert "coding.patch_apply" not in agent_loop.AGENT_TOOLS
+    # Tools that change a repository exist only for a chat bound to one, and take exact values from receipts.
+    assert agent_loop.AGENT_TOOLS["coding.patch_apply"]["needs_repo"] and agent_loop.AGENT_TOOLS["coding.patch_apply"]["fill"]
+    assert [tool["name"] for tool in agent_loop.agent_tool_specs()] == ["source_library.status", "web.search", "web.fetch"]
     # The administrative memory listing ignores enabled state and scope, so a model may not request it.
     assert "memory.list" not in agent_loop.AGENT_TOOLS
     assert agent_loop.validate_proposal("memory.list", {})[1]

@@ -46,7 +46,7 @@ function ApprovalCard({ request, onDecided, announce }) {
       <h3 className="card-title">{request.tool_name}</h3>
       <details open>
         <summary>Arguments</summary>
-        <Json value={request.arguments} />
+        <Arguments value={request.arguments} />
         <p className="muted small">Argument digest {request.arguments_sha256?.slice(0, 12)}… — your decision applies to exactly these arguments, once.</p>
       </details>
       {error && <p className="error-text" role="alert">{error}</p>}
@@ -123,6 +123,48 @@ function QuestionCard({ question, onAnswered, announce }) {
   );
 }
 
+/** A unified diff with added and removed lines marked, so a proposed change can be read before it is allowed. */
+function DiffView({ patch }) {
+  const lines = String(patch).replace(/\n$/, "").split("\n");
+  const kind = (line) =>
+    line.startsWith("+++") || line.startsWith("---") || line.startsWith("diff ") || line.startsWith("index ")
+      ? "meta"
+      : line.startsWith("@@")
+        ? "hunk"
+        : line.startsWith("+")
+          ? "add"
+          : line.startsWith("-")
+            ? "del"
+            : "ctx";
+  const added = lines.filter((line) => kind(line) === "add").length;
+  const removed = lines.filter((line) => kind(line) === "del").length;
+  return (
+    <figure className="diff-view">
+      <figcaption className="muted small">Proposed change: {added} line{added === 1 ? "" : "s"} added, {removed} removed</figcaption>
+      <pre className="diff-block" tabIndex={0} aria-label="Proposed change as a diff">
+        {lines.map((line, index) => (
+          <span key={index} className={`diff-line diff-${kind(line)}`}>
+            {line || " "}
+            {"\n"}
+          </span>
+        ))}
+      </pre>
+    </figure>
+  );
+}
+
+/** Tool arguments, with a patch shown as a diff instead of an escaped string. */
+function Arguments({ value }) {
+  const { patch, ...rest } = value || {};
+  if (typeof patch !== "string") return <Json value={value} />;
+  return (
+    <>
+      <DiffView patch={patch} />
+      {Object.keys(rest).length > 0 && <Json value={rest} />}
+    </>
+  );
+}
+
 function ToolDrawer({ calls, onClose }) {
   return (
     <Sheet title="Tool activity" onClose={onClose}>
@@ -137,7 +179,7 @@ function ToolDrawer({ calls, onClose }) {
             </div>
             <details>
               <summary>Input</summary>
-              <Json value={call.arguments} />
+              <Arguments value={call.arguments} />
             </details>
             {call.error && (
               <p className="error-text">
@@ -217,6 +259,9 @@ export function RunBlock({ view, onChanged, onOpenCitation, announce, messageEdi
         <div className="run-status">
           <span className={`status-chip status-${view.state.toLowerCase()}`}>{STATE_LABEL[view.state] || view.state}</span>
           {view.state === "RUNNING" && <span className="spinner" aria-hidden="true" />}
+          {view.agentStep && !view.final && (
+            <span className="muted small">Step {view.agentStep.step} of {view.agentStep.max_steps}</span>
+          )}
           {(planSteps.length > 0 || view.route) && (
             <details className="plan-details">
               <summary>Plan · {planSteps.length} step{planSteps.length === 1 ? "" : "s"}</summary>
