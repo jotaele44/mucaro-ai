@@ -43,8 +43,13 @@ def answer_question(
     checkpoint_id: str | None = None,
     failover_policy: FailoverPolicy | None = None,
     allow_ungrounded: bool = False,
+    answer_override: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Answer from local sources.
+
+    answer_override carries text an agent loop already produced with the routed model
+    ({"answer", "model_name"?, "model_usage"?, "agent"?}); no second model call is made, and the
+    text goes through the same retrieval, citation validation, export and persistence.
 
     allow_ungrounded=True (chat) lets the selected model reply when no source
     matches; that reply is marked NO_SOURCES_USED and never counts as cited.
@@ -177,6 +182,18 @@ def answer_question(
     stream_callback = None if streaming_suppressed or on_text_delta is None else timed_text_delta
 
     def attempt(provider: str, model_id: str | None) -> dict[str, Any]:
+        if answer_override is not None:
+            text = str(answer_override["answer"])
+            produced: dict[str, Any] = {
+                "model_provider": provider,
+                "model_name": answer_override.get("model_name") or model_id,
+                "answer": text,
+                # Only chunks retrieved for this message can be cited; an id the model invented is not one.
+                "cited_chunk_ids": [chunk["chunk_id"] for chunk in retrieved if chunk["chunk_id"] in text],
+            }
+            if answer_override.get("model_usage") is not None:
+                produced["model_usage"] = answer_override["model_usage"]
+            return produced
         try:
             return generate_answer(
                 normalized_query,
@@ -299,6 +316,9 @@ def answer_question(
         },
         "created_at": utc_now(),
     }
+    if answer_override is not None:
+        answer_trace["prompt_template_id"] = "agent_tools_v1"
+        answer_trace["agent"] = answer_override.get("agent") or {}
     if ungrounded:
         answer_trace["grounding"] = NO_SOURCES_USED
         answer_trace["retrieval_status"] = retrieval["status"]
@@ -311,6 +331,28 @@ def answer_question(
 
 def _elapsed_ms(started: float) -> float:
     return round((time.perf_counter() - started) * 1000, 1)
+
+
+def agent_context(
+    query: str,
+    *,
+    top_k: int = 5,
+    retrieval_strategy: str = "hybrid",
+    conversation_scope_id: str | None = None,
+    cfg: Settings = settings,
+) -> dict[str, Any]:
+    """Sources and memory an agent turn is shown: the same selection answer_question makes."""
+    cfg.ensure_dirs()
+    ensure_db(cfg.sqlite_path)
+    retrieval = retrieve(query.strip(), get_chunks(cfg), top_k=top_k, strategy=retrieval_strategy, cfg=cfg)
+    if retrieval["status"].startswith("ERROR_") and retrieval["status"] not in NO_EVIDENCE_STATUSES:
+        return {"status": retrieval["status"], "retrieved_chunks": [], "memory_context": []}
+    retrieved = [] if retrieval["status"] in NO_EVIDENCE_STATUSES else retrieval["retrieved_chunks"]
+    try:
+        memory = select_memory_context(cfg, items=None, conversation_scope_id=conversation_scope_id)["selected"]
+    except MemorySelectionError as exc:
+        return {"status": exc.status, "retrieved_chunks": [], "memory_context": []}
+    return {"status": "AGENT_CONTEXT_OK", "retrieved_chunks": retrieved, "memory_context": memory}
 
 
 _REASON_TEXT = {

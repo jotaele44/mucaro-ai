@@ -54,6 +54,7 @@ def _model_choice(model: dict[str, Any]) -> dict[str, Any]:
         "model_provider": str(model["model_provider"]).strip().lower(),
         "model_name": (str(model.get("model_name") or "").strip() or None),
         "allow_live": bool(model.get("allow_live")),
+        "agent": bool(model.get("agent")),
     }
 
 
