@@ -378,3 +378,77 @@ def test_terminal_run_lease_never_covers_command_execution_and_every_lease_expir
         controller.command("approve lease")
     assert blocked.value.status == "ERROR_PERMISSION_LEASE_NO_MATCH"
     assert all(row["status"] == "PENDING_APPROVAL" for row in list_tool_calls(cfg)["tool_calls"])
+def test_generic_terminal_tool_request_never_implies_approval(
+    monkeypatch: pytest.MonkeyPatch,
+    cfg: Settings,
+) -> None:
+    monkeypatch.setitem(
+        TOOL_REGISTRY,
+        "test.echo",
+        ToolDefinition(
+            name="test.echo",
+            description="echo fixture",
+            mutates_state=False,
+            requires_approval=True,
+            handler=lambda arguments, settings: {
+                "status": "TEST_ECHO_OK",
+                "arguments": arguments,
+            },
+            autopilot_success_statuses=("TEST_ECHO_OK",),
+        ),
+    )
+    controller = TerminalController(cfg=cfg)
+    conversation_id = controller.ensure_conversation()
+
+    controller.command(r'''tool test.echo '{"value":"alpha","count":2}' ''')
+
+    calls = list_tool_calls(cfg)["tool_calls"]
+    assert len(calls) == 1
+    call = calls[0]
+    assert call["tool_name"] == "test.echo"
+    assert call["run_id"] == f"tui:{conversation_id}"
+    assert call["arguments"] == {"value": "alpha", "count": 2}
+    assert call["status"] == "PENDING_APPROVAL"
+    assert call["approved_by"] is None
+    assert call["executed_at"] is None
+
+    controller.command("approve")
+    executed = list_tool_calls(cfg)["tool_calls"][0]
+    assert executed["status"] == "EXECUTED"
+    assert executed["result"]["status"] == "TEST_ECHO_OK"
+
+
+@pytest.mark.parametrize(
+    "command,status",
+    [
+        ("tool", "ERROR_TUI_TOOL_USAGE"),
+        ("tool test.echo not-json", "ERROR_TUI_TOOL_JSON"),
+        ("tool test.echo '[1,2]'", "ERROR_TUI_TOOL_ARGUMENTS"),
+        ("tool test.echo '{}' extra", "ERROR_TUI_TOOL_USAGE"),
+    ],
+)
+def test_generic_terminal_tool_request_fails_closed_before_call_creation(
+    monkeypatch: pytest.MonkeyPatch,
+    cfg: Settings,
+    command: str,
+    status: str,
+) -> None:
+    monkeypatch.setitem(
+        TOOL_REGISTRY,
+        "test.echo",
+        ToolDefinition(
+            name="test.echo",
+            description="echo fixture",
+            mutates_state=False,
+            requires_approval=True,
+            handler=lambda arguments, settings: {"status": "TEST_ECHO_OK"},
+        ),
+    )
+    controller = TerminalController(cfg=cfg)
+    controller.ensure_conversation()
+
+    with pytest.raises(TerminalUIError) as exc:
+        controller.command(command)
+
+    assert exc.value.status == status
+    assert list_tool_calls(cfg)["tool_calls"] == []
