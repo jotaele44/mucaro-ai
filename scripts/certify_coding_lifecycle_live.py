@@ -195,6 +195,8 @@ def run_certification(source_root: Path = ROOT) -> dict[str, Any]:
         )
         (rollback_repo / "tracked.txt").write_text("beta\n", encoding="utf-8")
         _git(rollback_repo, "config", "commit.gpgsign", "true")
+        # Pin the signing format so a host-level gpg.format=ssh cannot route around the missing program.
+        _git(rollback_repo, "config", "gpg.format", "openpgp")
         _git(rollback_repo, "config", "gpg.program", "/definitely/missing-mucaro-gpg")
         negative["failed_commit_rollback"] = _expect_status(
             lambda: commit_approved_changes(

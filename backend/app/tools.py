@@ -3,15 +3,24 @@ from __future__ import annotations
 import threading
 from collections.abc import Callable
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
+from .coding_container import CodingContainerError, build_coding_container_plan, run_coding_container_plan
+from .coding_lifecycle import CodingLifecycleError, build_pull_request_request, commit_approved_changes, create_work_branch_transaction
+from .coding_checks import CodingCheck, CodingCheckError, execute_coding_check_suite
 from .coding_mutation import CodingMutationError, apply_patch_transaction
 from .coding_patch import validate_patch_proposal
 from .coding_workspace import CodingWorkspaceError, inspect_repository, inspect_repository_diff, read_repository_file
 from .config import Settings, settings
 from .contracts import validate_contract
+from .github_ci import GitHubCIError, read_github_ci_status
+from .github_pull_requests import GitHubPullRequestError, open_or_update_pull_request
+from .gis_processing import GISProcessingError, inspect_geojson
 from .ingestion import get_chunks, get_index_status, get_sources
 from .memory import list_memory_items
+from .ocr_analysis import OCRAnalysisError, analyze_image_ocr
+from .permission_engine import PermissionEngineError, PermissionRequest, require as require_permission
 from .product_audit import build_product_audit
 from .utils import canonical_sha256, read_json, stable_id, update_json, utc_now
 from .web_browsing import (
@@ -31,6 +40,7 @@ TOOL_CALL_STATUSES = ("PENDING_APPROVAL", "APPROVED", "DENIED", "CANCELLED", "RU
 # Wall-clock bound for one in-process handler (MATRIX-011 TIMEOUT). Remote tools also carry their own
 # network timeouts; this bound covers everything else (slow disks, huge repositories, stuck parsers).
 DEFAULT_TOOL_TIMEOUT_SECONDS = 120.0
+OCR_TOOL_MAX_TIMEOUT_SECONDS = 90
 
 
 class ToolRuntimeError(RuntimeError):
@@ -88,6 +98,73 @@ def _workspace_profiles(arguments: dict[str, Any], cfg: Settings) -> dict[str, A
 def _memory_list(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
     include_disabled = bool(arguments.get("include_disabled", True))
     return list_memory_items(cfg, include_disabled=include_disabled)
+
+
+def _resolve_tool_input_path(value: str, cfg: Settings) -> Path:
+    path = Path(value).expanduser()
+    return path.resolve() if path.is_absolute() else (cfg.project_root / path).resolve()
+
+
+def _require_tool_filesystem_read(path: Path, cfg: Settings, *, subject: str) -> None:
+    try:
+        require_permission(
+            PermissionRequest(
+                capability="filesystem.read",
+                subject=subject,
+                target=str(path),
+                origin="operator",
+            ),
+            cfg=cfg,
+        )
+    except PermissionEngineError as exc:
+        raise ToolRuntimeError(exc.status, exc.detail) from exc
+
+
+def _gis_inspect(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
+    value = arguments.get("path")
+    if not isinstance(value, str) or not value.strip():
+        raise ToolRuntimeError("ERROR_GIS_TOOL_PATH_REQUIRED", "gis.inspect requires a non-empty path argument.")
+    path = _resolve_tool_input_path(value, cfg)
+    _require_tool_filesystem_read(path, cfg, subject="tools.gis.inspect")
+    try:
+        return inspect_geojson(path, cfg=cfg)
+    except GISProcessingError as exc:
+        raise ToolRuntimeError(exc.status, exc.detail) from exc
+
+
+def _ocr_analyze_image(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
+    value = arguments.get("path")
+    if not isinstance(value, str) or not value.strip():
+        raise ToolRuntimeError("ERROR_OCR_TOOL_PATH_REQUIRED", "ocr.analyze_image requires a non-empty path argument.")
+    path = _resolve_tool_input_path(value, cfg)
+    _require_tool_filesystem_read(path, cfg, subject="tools.ocr.analyze_image")
+    language = arguments.get("language", "eng")
+    layout_mode = arguments.get("layout_mode", "auto")
+    timeout_seconds = arguments.get("timeout_seconds", 30)
+    if not isinstance(language, str):
+        raise ToolRuntimeError("ERROR_OCR_LANGUAGE_INVALID", "OCR language must be a string.")
+    if not isinstance(layout_mode, str):
+        raise ToolRuntimeError("ERROR_OCR_LAYOUT_INVALID", "OCR layout_mode must be a string.")
+    if (
+        not isinstance(timeout_seconds, int)
+        or isinstance(timeout_seconds, bool)
+        or timeout_seconds <= 0
+        or timeout_seconds > OCR_TOOL_MAX_TIMEOUT_SECONDS
+    ):
+        raise ToolRuntimeError(
+            "ERROR_OCR_TIMEOUT_INVALID",
+            f"OCR timeout_seconds must be an integer from 1 through {OCR_TOOL_MAX_TIMEOUT_SECONDS}.",
+        )
+    try:
+        return analyze_image_ocr(
+            path,
+            cfg=cfg,
+            language=language,
+            layout_mode=layout_mode,
+            timeout_seconds=timeout_seconds,
+        )
+    except OCRAnalysisError as exc:
+        raise ToolRuntimeError(exc.status, exc.detail) from exc
 
 
 def _coding_repo_status(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
@@ -167,6 +244,256 @@ def _coding_patch_apply(arguments: dict[str, Any], cfg: Settings) -> dict[str, A
     except CodingMutationError as exc:
         raise ToolRuntimeError(exc.status, exc.detail) from exc
 
+
+CODING_EXEC_MAX_COMMAND_TIMEOUT_SECONDS = 120
+# Budget for the Git validation before and after the command plus stopping a runaway container, so the outer tool
+# bound can never expire while an in-policy command is still inside its own timeout.
+CODING_EXEC_VALIDATION_BUDGET_SECONDS = 60
+CODING_EXEC_TOOL_TIMEOUT_SECONDS = float(CODING_EXEC_MAX_COMMAND_TIMEOUT_SECONDS + CODING_EXEC_VALIDATION_BUDGET_SECONDS)
+
+
+def _coding_exec(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
+    repo_root = arguments.get("repo_root")
+    image = arguments.get("image")
+    command = arguments.get("command")
+    if not isinstance(repo_root, str) or not repo_root.strip():
+        raise ToolRuntimeError("ERROR_CODING_REPO_ROOT_REQUIRED", "coding.exec requires a non-empty repo_root argument.")
+    if not isinstance(image, str) or not image.strip():
+        raise ToolRuntimeError("ERROR_CODING_EXEC_IMAGE_REQUIRED", "coding.exec requires an immutable pinned image identity.")
+    if not isinstance(command, list) or not command or not all(isinstance(part, str) and part for part in command):
+        raise ToolRuntimeError("ERROR_CODING_EXEC_COMMAND_REQUIRED", "coding.exec requires a non-empty argv array of strings.")
+    if arguments.get("network_allowed") not in (None, False):
+        raise ToolRuntimeError("ERROR_CODING_EXEC_NETWORK_POLICY", "coding.exec does not permit network access.")
+
+    bounded_limits = {
+        "timeout_seconds": (1, CODING_EXEC_MAX_COMMAND_TIMEOUT_SECONDS),
+        "max_output_bytes": (1, 2 * 1024 * 1024),
+        "memory_mb": (128, 4096),
+        "cpus": (0.25, 4.0),
+        "pids_limit": (16, 512),
+        "workspace_mb": (64, 4096),
+    }
+    options: dict[str, Any] = {}
+    for key, (minimum, maximum) in bounded_limits.items():
+        if key not in arguments:
+            continue
+        value = arguments[key]
+        if (
+            not isinstance(value, (int, float))
+            or isinstance(value, bool)
+            or value < minimum
+            or value > maximum
+            or (key != "cpus" and not isinstance(value, int))
+        ):
+            raise ToolRuntimeError(
+                "ERROR_CODING_EXEC_RESOURCE_LIMIT",
+                f"coding.exec {key} must be within {minimum}..{maximum}.",
+            )
+        options[key] = value
+    if "engine" in arguments:
+        engine = arguments["engine"]
+        if not isinstance(engine, str) or engine not in {"docker", "podman"}:
+            raise ToolRuntimeError("ERROR_CODING_EXEC_ENGINE", "coding.exec engine must be docker or podman.")
+        options["engine"] = engine
+    try:
+        plan = build_coding_container_plan(
+            repo_root,
+            image=image,
+            command=command,
+            cfg=cfg,
+            network_allowed=False,
+            **options,
+        )
+        receipt = run_coding_container_plan(plan, cfg=cfg)
+    except CodingContainerError as exc:
+        detail = exc.detail
+        if exc.receipt is not None:
+            detail = f"{detail}; receipt_status={exc.receipt.get('status')}"
+        raise ToolRuntimeError(exc.status, detail) from exc
+
+    execution_status = str(receipt.get("execution_status") or "UNKNOWN")
+    return {
+        "status": "CODING_EXEC_OK" if execution_status == "PASS" else "CODING_EXEC_COMMAND_FAILED",
+        "execution_status": execution_status,
+        "plan_sha256": receipt.get("plan_sha256"),
+        "head_sha": receipt.get("head_sha"),
+        "command_argv": receipt.get("command_argv"),
+        "exit_code": receipt.get("exit_code"),
+        "duration_ms": receipt.get("duration_ms"),
+        "stdout": receipt.get("stdout"),
+        "stderr": receipt.get("stderr"),
+        "source_mount_read_only": receipt.get("source_mount_read_only"),
+        "workspace_ephemeral": receipt.get("workspace_ephemeral"),
+        "network_allowed": receipt.get("network_allowed"),
+        "container_receipt_sha256": receipt.get("receipt_sha256"),
+        "container_receipt": receipt,
+    }
+
+
+
+def _coding_branch_create(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
+    repo_root = arguments.get("repo_root")
+    branch_name = arguments.get("branch_name")
+    expected_head_sha = arguments.get("expected_head_sha")
+    if not isinstance(repo_root, str) or not repo_root.strip():
+        raise ToolRuntimeError("ERROR_CODING_REPO_ROOT_REQUIRED", "coding.branch_create requires a non-empty repo_root argument.")
+    if not isinstance(branch_name, str) or not branch_name.strip():
+        raise ToolRuntimeError("ERROR_CODING_BRANCH_REQUIRED", "coding.branch_create requires branch_name.")
+    if not isinstance(expected_head_sha, str) or not expected_head_sha:
+        raise ToolRuntimeError("ERROR_CODING_BRANCH_HEAD_REQUIRED", "coding.branch_create requires expected_head_sha.")
+    try:
+        return create_work_branch_transaction(
+            repo_root,
+            branch_name=branch_name,
+            expected_head_sha=expected_head_sha,
+            cfg=cfg,
+        )
+    except CodingLifecycleError as exc:
+        raise ToolRuntimeError(exc.status, exc.detail) from exc
+
+
+def _coding_commit(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
+    repo_root = arguments.get("repo_root")
+    expected_head_sha = arguments.get("expected_head_sha")
+    expected_branch = arguments.get("expected_branch")
+    approved_paths = arguments.get("approved_paths")
+    message = arguments.get("message")
+    if not isinstance(repo_root, str) or not repo_root.strip():
+        raise ToolRuntimeError("ERROR_CODING_REPO_ROOT_REQUIRED", "coding.commit requires a non-empty repo_root argument.")
+    if not isinstance(expected_head_sha, str) or not expected_head_sha:
+        raise ToolRuntimeError("ERROR_CODING_COMMIT_HEAD_REQUIRED", "coding.commit requires expected_head_sha.")
+    if not isinstance(expected_branch, str) or not expected_branch.strip():
+        raise ToolRuntimeError("ERROR_CODING_COMMIT_BRANCH_REQUIRED", "coding.commit requires expected_branch.")
+    if not isinstance(approved_paths, list) or not approved_paths:
+        raise ToolRuntimeError("ERROR_CODING_COMMIT_PATHS_REQUIRED", "coding.commit requires approved_paths.")
+    if not isinstance(message, str) or not message.strip():
+        raise ToolRuntimeError("ERROR_CODING_COMMIT_MESSAGE_REQUIRED", "coding.commit requires a non-empty message.")
+    try:
+        return commit_approved_changes(
+            repo_root,
+            expected_head_sha=expected_head_sha,
+            expected_branch=expected_branch,
+            approved_paths=approved_paths,
+            message=message,
+            cfg=cfg,
+        )
+    except CodingLifecycleError as exc:
+        raise ToolRuntimeError(exc.status, exc.detail) from exc
+
+
+def _coding_pr_request(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
+    repo_root = arguments.get("repo_root")
+    expected_head_sha = arguments.get("expected_head_sha")
+    head_branch = arguments.get("head_branch")
+    base_branch = arguments.get("base_branch")
+    title = arguments.get("title")
+    body = arguments.get("body", "")
+    if not isinstance(repo_root, str) or not repo_root.strip():
+        raise ToolRuntimeError("ERROR_CODING_REPO_ROOT_REQUIRED", "coding.pr_request requires a non-empty repo_root argument.")
+    if not isinstance(expected_head_sha, str) or not expected_head_sha:
+        raise ToolRuntimeError("ERROR_CODING_PR_HEAD_REQUIRED", "coding.pr_request requires expected_head_sha.")
+    if not isinstance(head_branch, str) or not head_branch.strip():
+        raise ToolRuntimeError("ERROR_CODING_PR_HEAD_BRANCH_REQUIRED", "coding.pr_request requires head_branch.")
+    if not isinstance(base_branch, str) or not base_branch.strip():
+        raise ToolRuntimeError("ERROR_CODING_PR_BASE_BRANCH_REQUIRED", "coding.pr_request requires base_branch.")
+    if not isinstance(title, str) or not title.strip():
+        raise ToolRuntimeError("ERROR_CODING_PR_TITLE_REQUIRED", "coding.pr_request requires title.")
+    if not isinstance(body, str):
+        raise ToolRuntimeError("ERROR_CODING_PR_BODY_INVALID", "coding.pr_request body must be a string.")
+    try:
+        return build_pull_request_request(
+            repo_root,
+            expected_head_sha=expected_head_sha,
+            head_branch=head_branch,
+            base_branch=base_branch,
+            title=title,
+            body=body,
+            cfg=cfg,
+        )
+    except CodingLifecycleError as exc:
+        raise ToolRuntimeError(exc.status, exc.detail) from exc
+
+
+def _github_pr_open_update(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
+    required = (
+        "repo_root",
+        "remote_repo",
+        "expected_head_sha",
+        "head_branch",
+        "base_branch",
+        "title",
+        "expected_request_sha256",
+    )
+    missing = [key for key in required if not isinstance(arguments.get(key), str) or not arguments.get(key).strip()]
+    if missing:
+        raise ToolRuntimeError("ERROR_GITHUB_PR_ARGUMENT_REQUIRED", f"missing required string arguments: {','.join(missing)}")
+    body = arguments.get("body", "")
+    if not isinstance(body, str):
+        raise ToolRuntimeError("ERROR_GITHUB_PR_BODY_INVALID", "github.pr_open_update body must be a string.")
+    try:
+        return open_or_update_pull_request(
+            arguments["repo_root"],
+            remote_repo=arguments["remote_repo"],
+            expected_head_sha=arguments["expected_head_sha"],
+            head_branch=arguments["head_branch"],
+            base_branch=arguments["base_branch"],
+            title=arguments["title"],
+            body=body,
+            expected_request_sha256=arguments["expected_request_sha256"],
+            cfg=cfg,
+        )
+    except GitHubPullRequestError as exc:
+        raise ToolRuntimeError(exc.status, exc.detail) from exc
+
+def _coding_regression_run(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
+    repo_root = arguments.get("repo_root")
+    image = arguments.get("image")
+    raw_checks = arguments.get("checks")
+    if not isinstance(repo_root, str) or not repo_root.strip():
+        raise ToolRuntimeError("ERROR_CODING_REPO_ROOT_REQUIRED", "coding.regression_run requires a non-empty repo_root argument.")
+    if not isinstance(image, str) or not image.strip():
+        raise ToolRuntimeError("ERROR_CODING_REGRESSION_IMAGE_REQUIRED", "coding.regression_run requires an immutable pinned image identity.")
+    if not isinstance(raw_checks, list) or not raw_checks or len(raw_checks) > 6:
+        raise ToolRuntimeError("ERROR_CODING_REGRESSION_CHECKS", "coding.regression_run requires 1..6 check definitions.")
+
+    checks: list[CodingCheck] = []
+    for index, raw in enumerate(raw_checks):
+        if not isinstance(raw, dict):
+            raise ToolRuntimeError("ERROR_CODING_REGRESSION_CHECK", f"check {index} must be an object.")
+        check_id = raw.get("check_id")
+        kind = raw.get("kind")
+        command = raw.get("command")
+        required = raw.get("required", True)
+        if not isinstance(check_id, str) or not check_id.strip():
+            raise ToolRuntimeError("ERROR_CODING_REGRESSION_CHECK", f"check {index} requires check_id.")
+        if not isinstance(kind, str):
+            raise ToolRuntimeError("ERROR_CODING_REGRESSION_CHECK", f"check {index} requires kind.")
+        if not isinstance(command, list) or not command or not all(isinstance(part, str) and part for part in command):
+            raise ToolRuntimeError("ERROR_CODING_REGRESSION_CHECK", f"check {index} requires a non-empty argv array.")
+        if not isinstance(required, bool):
+            raise ToolRuntimeError("ERROR_CODING_REGRESSION_CHECK", f"check {index} required must be boolean.")
+        checks.append(CodingCheck(check_id=check_id.strip(), kind=kind, command=tuple(command), required=required))
+    try:
+        return execute_coding_check_suite(repo_root, image=image, checks=checks, cfg=cfg)
+    except CodingCheckError as exc:
+        raise ToolRuntimeError(exc.status, exc.detail) from exc
+
+
+def _github_ci_status(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
+    repo = arguments.get("repo")
+    if not isinstance(repo, str):
+        raise ToolRuntimeError("ERROR_GITHUB_CI_REPO_REQUIRED", "github.ci_status requires repo in owner/name form.")
+    try:
+        return read_github_ci_status(
+            repo=repo,
+            branch=arguments.get("branch"),
+            workflow=arguments.get("workflow", "CI"),
+            expected_head_sha=arguments.get("expected_head_sha"),
+            limit=arguments.get("limit", 10),
+            cfg=cfg,
+        )
+    except GitHubCIError as exc:
+        raise ToolRuntimeError(exc.status, exc.detail) from exc
 
 def _web_fetch(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
     url = arguments.get("url")
@@ -266,6 +593,20 @@ TOOL_REGISTRY: dict[str, ToolDefinition] = {
         requires_approval=True,
         handler=_memory_list,
     ),
+    "gis.inspect": ToolDefinition(
+        name="gis.inspect",
+        description="Inspect one explicitly approved local GeoJSON FeatureCollection and emit a provenance-bound geometry/topology report without transforming the source.",
+        mutates_state=True,
+        requires_approval=True,
+        handler=_gis_inspect,
+    ),
+    "ocr.analyze_image": ToolDefinition(
+        name="ocr.analyze_image",
+        description="Run explicitly approved local image OCR through the governed filesystem and subprocess permission boundaries and emit a provenance-bound OCR report.",
+        mutates_state=True,
+        requires_approval=True,
+        handler=_ocr_analyze_image,
+    ),
     "coding.repo_status": ToolDefinition(
         name="coding.repo_status",
         description="Inspect an approved local Git repository, exact HEAD, branch, and dirty-state candidate sets without mutation.",
@@ -300,6 +641,64 @@ TOOL_REGISTRY: dict[str, ToolDefinition] = {
         mutates_state=True,
         requires_approval=True,
         handler=_coding_patch_apply,
+    ),
+    "coding.exec": ToolDefinition(
+        name="coding.exec",
+        description="Execute a bounded argv command in the isolated coding container with immutable image identity, network disabled, read-only host source, and an ephemeral writable workspace.",
+        mutates_state=False,
+        requires_approval=True,
+        handler=_coding_exec,
+        timeout_seconds=CODING_EXEC_TOOL_TIMEOUT_SECONDS,
+    ),
+    "coding.branch_create": ToolDefinition(
+        name="coding.branch_create",
+        description="Create one approved non-protected Git work branch only when the repository is clean and exact HEAD matches the approved source SHA.",
+        mutates_state=True,
+        requires_approval=True,
+        handler=_coding_branch_create,
+        timeout_seconds=60.0,
+    ),
+    "coding.commit": ToolDefinition(
+        name="coding.commit",
+        description="Commit exactly the approved dirty-path set on the exact approved non-protected branch and parent SHA, with rollback on commit or postcondition failure.",
+        mutates_state=True,
+        requires_approval=True,
+        handler=_coding_commit,
+        timeout_seconds=120.0,
+    ),
+    "coding.pr_request": ToolDefinition(
+        name="coding.pr_request",
+        description="Build an exact local pull-request request artifact from a clean work branch and current expected HEAD without performing a network action.",
+        mutates_state=False,
+        requires_approval=True,
+        handler=_coding_pr_request,
+        timeout_seconds=60.0,
+    ),
+    "github.pr_open_update": ToolDefinition(
+        name="github.pr_open_update",
+        description="Create or update the unique open GitHub pull request for an exact frozen local request only after the remote head branch SHA matches the approved local HEAD.",
+        mutates_state=True,
+        requires_approval=True,
+        network="remote",
+        handler=_github_pr_open_update,
+        timeout_seconds=180.0,
+    ),
+    "coding.regression_run": ToolDefinition(
+        name="coding.regression_run",
+        description="Execute 1..6 declared test/lint/type/build/security/benchmark checks through the isolated coding-container boundary and preserve PASS/FAIL/BLOCKED rows.",
+        mutates_state=False,
+        requires_approval=True,
+        handler=_coding_regression_run,
+        timeout_seconds=900.0,
+    ),
+    "github.ci_status": ToolDefinition(
+        name="github.ci_status",
+        description="Read bounded GitHub Actions workflow status and optional current-head binding without triggering or mutating remote workflows.",
+        mutates_state=False,
+        requires_approval=True,
+        network="remote",
+        handler=_github_ci_status,
+        timeout_seconds=75.0,
     ),
     "web.render": ToolDefinition(
         name="web.render",
