@@ -42,7 +42,7 @@ function ApprovalCard({ request, onDecided, announce }) {
 
   return (
     <section className="card approval-card" aria-label={`Permission request for ${request.tool_name}`}>
-      <p className="card-kicker">Permission needed</p>
+      <p className="card-kicker">{request.requested_by === "model" ? "The model wants to run an action" : "Permission needed"}</p>
       <h3 className="card-title">{request.tool_name}</h3>
       <details open>
         <summary>Arguments</summary>
