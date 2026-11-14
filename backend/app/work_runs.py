@@ -39,7 +39,7 @@ from typing import Any
 
 from .config import Settings, settings
 from .context_usage import ContextUsageError, build_context_usage_status
-from .conversations import append_turns, build_conversation_context, get_conversation
+from .conversations import append_turns, build_conversation_context, get_conversation, set_conversation_repo
 from .db import ensure_db, get_connection
 from .error_categories import classify_error
 from .execution_records import build_run_manifest
@@ -970,6 +970,21 @@ def _phase_tools_decision(run: dict[str, Any], cfg: Settings) -> bool:
     return True
 
 
+def _bind_cloned_repository(run: dict[str, Any], call: dict[str, Any], cfg: Settings) -> None:
+    """An approved clone the model proposed binds the chat to that repository, as its approval card said.
+
+    Only when the chat has no repository yet: a clone never replaces a binding the person chose.
+    """
+    result = call.get("result") or {}
+    if call.get("tool_name") != "repo.clone" or call.get("status") != "EXECUTED" or result.get("status") != "CODING_CLONE_OK":
+        return
+    conversation = get_conversation(run["conversation_id"], cfg) or {}
+    if conversation.get("repo"):
+        return
+    set_conversation_repo(run["conversation_id"], {"repo_root": result["repo_root"], "remote_repo": result.get("remote_repo")}, cfg)
+    _emit_only(run["run_id"], cfg, "warning", {"status": "NOTE_CHAT_BOUND_TO_CLONED_REPOSITORY", "detail": str(result["repo_root"])})
+
+
 def _phase_agent(run: dict[str, Any], cfg: Settings) -> bool:
     """One agent step: fold finished tool results in, ask the model, and turn its proposals into governed calls.
 
@@ -1004,6 +1019,7 @@ def _phase_agent(run: dict[str, Any], cfg: Settings) -> bool:
                 return True
             transcript.append({"role": "tool", "call_id": item["id"], "name": call["tool_name"],
                                "content": agent_loop.render_tool_result(call)})
+            _bind_cloned_repository(run, call, cfg)
 
     try:
         route = plan_model_route(

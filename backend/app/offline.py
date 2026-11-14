@@ -65,9 +65,17 @@ _TOOL_LOCAL_DEPENDENCIES: dict[str, tuple[str, str]] = {
     "coding.exec": ("binary_any", "docker,podman"),
     "coding.regression_run": ("binary_any", "docker,podman"),
     "coding.pr_request": ("binary", "git"),
+    "coding.push": ("binary", "git"),
+    "repo.clone": ("binary", "git"),
     "github.pr_open_update": ("binary", "gh"),
     "github.ci_status": ("binary", "gh"),
     "ocr.analyze_image": ("binary", "tesseract"),
+    "github.issues_list": ("binary", "gh"),
+    "github.issue_view": ("binary", "gh"),
+    "github.prs_list": ("binary", "gh"),
+    "github.pr_view": ("binary", "gh"),
+    "github.gists_list": ("binary", "gh"),
+    "github.gist_view": ("binary", "gh"),
     "web.render": ("python_module", "playwright"),
 }
 

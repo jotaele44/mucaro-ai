@@ -129,9 +129,14 @@ search and read files, propose a patch, and ask to apply it, create a work branc
 commands in the isolated container, and prepare a pull request. A proposed patch is shown as a diff
 on the approval card. The model cannot choose another repository, cannot apply a patch that was not
 checked first, cannot work on `main` or `master`, and every change, commit or command asks you, even
-in Auto mode for container runs. Running commands needs a pinned container image set for the chat;
-opening the pull request on GitHub uses your own `gh` login and needs the branch pushed, which Mucaro
-does not do yet.
+in Auto mode for container runs. Running commands needs a pinned container image set for the chat.
+
+The model can also ask to **clone** a GitHub repository (`https://github.com/owner/name` only) into
+Mucaro's workspace folder; allowing it binds the chat to that clone if the chat has no repository
+yet. It can ask to **push** the work branch: exactly the approved commit, to the GitHub `origin`
+remote, never forced and never `main` or `master`. After a push, the pull request can be opened from
+chat. Pushing and opening the pull request use your own Git and `gh` logins; Mucaro stores no GitHub
+credentials.
 
 A message that matches none of your sources is still answered by the chat's model and is
 marked **No sources used**; it is never presented as a cited answer. `mucaro ask` and
