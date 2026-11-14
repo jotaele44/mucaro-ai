@@ -33,7 +33,7 @@ permissions:
 
 jobs:
   certify-performance:
-    runs-on: macos-14
+    runs-on: macos-15
     timeout-minutes: 20
     env:
       HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
