@@ -73,3 +73,47 @@ def test_macos_runners_are_not_requested_for_pull_requests() -> None:
         if '"os":"macos-' in text:
             # A matrix may still name macOS, but only on the branch of an expression taken outside pull requests.
             assert "github.event_name == 'pull_request'\n          && '[{\"os\":\"ubuntu-latest\"" in text, path.name
+
+
+def _trigger_paths(text: str, trigger: str) -> list[str] | None:
+    """The `paths:` list under a top-level `on:` trigger, or None when the trigger has no path filter.
+
+    Workflows here use one fixed layout (two-space trigger, four-space `paths:`, six-space list items), so a line
+    reader is enough and the test needs no YAML dependency.
+    """
+    lines = text.splitlines()
+    try:
+        start = lines.index(f"  {trigger}:")
+    except ValueError:
+        return None
+    paths: list[str] | None = None
+    for line in lines[start + 1 :]:
+        if line and not line.startswith("   "):
+            break
+        if line == "    paths:":
+            paths = []
+        elif paths is not None and line.startswith("      - "):
+            paths.append(line[len("      - ") :].strip().strip("\"'"))
+        elif paths is not None and line.startswith("    ") and not line.startswith("      "):
+            break
+    return paths
+
+
+def test_macos_coverage_moved_off_pull_requests_still_runs_on_main_for_the_same_paths() -> None:
+    """A workflow whose macOS work runs only outside pull requests must watch every PR path on main pushes too.
+
+    Otherwise a change limited to a PR-only path gets no macOS run at all: skipped on the PR, never triggered on main.
+    """
+    checked = 0
+    for path in ALL_WORKFLOWS:
+        text = path.read_text(encoding="utf-8")
+        if "macos-" not in text:
+            continue
+        pr_paths = _trigger_paths(text, "pull_request")
+        push_paths = _trigger_paths(text, "push")
+        if not pr_paths or push_paths is None:
+            continue
+        checked += 1
+        missing = sorted(set(pr_paths) - set(push_paths))
+        assert not missing, f"{path.name}: pull-request paths with no main-push macOS coverage: {missing}"
+    assert checked, "expected at least one workflow with macOS work and path-filtered pull_request and push triggers"
