@@ -52,6 +52,7 @@ Generate a token with `python -c "import secrets; print(secrets.token_urlsafe(32
 | A public bind refuses to start unless the token has 32 or more characters, in every profile | `backend/app/security.py` |
 | Every API route except `/health`, `/config`, `/security` and `/tools` needs the token | `backend/app/auth.py` |
 | A request from another device is refused with `403 ERROR_REMOTE_ACCESS_REQUIRES_TOKEN` when no token is configured, which also covers a server started by hand with `uvicorn --host 0.0.0.0` | `backend/app/auth.py`, `backend/app/main.py` |
+| With no token, a request that reaches loopback under a non-local `Host` name is refused with `403 ERROR_HOST_NOT_ALLOWED` (DNS rebinding), and a state-changing request a browser sends from another site is refused with `403 ERROR_CROSS_SITE_REQUEST_DENIED` | `backend/app/auth.py`, `backend/app/main.py` |
 | Another device is not told the computer's file paths or allowed origins by `/health` or `/config` | `backend/app/main.py` |
 | The token is compared in constant time, and it travels in a header, never in a URL path or query | `backend/app/auth.py`, `frontend/src/api.js` |
 | The app's own window on the computer gets the token too, so nothing on the machine is left open | `scripts/launch_app.py` |

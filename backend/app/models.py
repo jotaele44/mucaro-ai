@@ -24,11 +24,22 @@ class ConversationModelConfig(BaseModel):
     model_provider: str = Field(min_length=1, max_length=80)
     model_name: str | None = Field(default=None, max_length=200)
     allow_live: bool = False
+    agent: bool = False
 
 
 class ConversationCreateRequest(BaseModel):
     title: str | None = Field(default=None, max_length=120)
     model: ConversationModelConfig | None = None
+
+
+class ConversationRepoRequest(BaseModel):
+    """The repository a chat's model may work on. An empty repo_root clears the binding."""
+
+    repo_root: str = Field(default="", max_length=2000)
+    # Immutable image identity for container runs: name@sha256:<digest> or a local sha256:<id>.
+    coding_image: str | None = Field(default=None, max_length=400)
+    # owner/name on GitHub, for opening a pull request and reading CI.
+    remote_repo: str | None = Field(default=None, max_length=200)
 
 
 class ModelServerSettings(BaseModel):
@@ -60,6 +71,8 @@ class WorkspaceProfileRequest(BaseModel):
 class MemoryCreateRequest(BaseModel):
     content: str = Field(min_length=1, max_length=800)
     kind: Literal["preference", "profile", "instruction", "fact"] = "preference"
+    scope: Literal["global", "workspace", "conversation"] = "global"
+    scope_id: str | None = Field(default=None, max_length=160)
 
 
 class MemoryUpdateRequest(BaseModel):
@@ -145,6 +158,8 @@ class RunOptions(BaseModel):
     allow_mock_fallback: bool = False
     allow_live: bool = False
     require_offline: bool = False
+    # Let the chat's model propose tool calls; every proposal still goes through the approval gate.
+    agent: bool = False
 
 
 class MessageRequest(BaseModel):

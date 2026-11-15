@@ -31,7 +31,7 @@ def test_matrix017_benchmark_is_frozen_and_complete() -> None:
     benchmark = load_benchmark()
     assert benchmark["benchmark_id"] == "mucaro-matrix017-workrun-v1"
     assert benchmark["profile"] == {
-        "runner": "macos-14",
+        "runner": "macos-15",
         "required_os": "Darwin",
         "required_machine": "arm64",
         "python_version": "3.11",

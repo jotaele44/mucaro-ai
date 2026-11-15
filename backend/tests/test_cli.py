@@ -5628,6 +5628,73 @@ def test_cli_tools_require_approval_and_audit_execution(tmp_path: Path, capsys):
     ]
 
 
+def test_cli_memory_scope_controls(tmp_path: Path, capsys):
+    cfg = make_settings(tmp_path)
+
+    assert (
+        main(
+            [
+                "memory",
+                "remember",
+                "Workspace",
+                "preference.",
+                "--kind",
+                "preference",
+                "--scope",
+                "workspace",
+                "--format",
+                "json",
+            ],
+            cfg=cfg,
+        )
+        == 0
+    )
+    workspace = json.loads(capsys.readouterr().out)["memory"]
+    assert workspace["scope"] == "workspace"
+    assert workspace["scope_id"].startswith("workspace_")
+
+    assert (
+        main(
+            [
+                "memory",
+                "remember",
+                "Conversation",
+                "preference.",
+                "--scope",
+                "conversation",
+                "--format",
+                "json",
+            ],
+            cfg=cfg,
+        )
+        == 2
+    )
+    missing = json.loads(capsys.readouterr().err)
+    assert missing["status"] == "ERROR_MEMORY_CONVERSATION_SCOPE_REQUIRED"
+
+    assert (
+        main(
+            [
+                "memory",
+                "remember",
+                "Scoped",
+                "conversation.",
+                "--scope",
+                "conversation",
+                "--scope-id",
+                "conv_example",
+                "--format",
+                "json",
+            ],
+            cfg=cfg,
+        )
+        == 0
+    )
+    conversation = json.loads(capsys.readouterr().out)["memory"]
+    assert conversation["scope"] == "conversation"
+    assert conversation["scope_id"] == "conv_example"
+
+
 def test_cli_memory_controls_and_export(tmp_path: Path, capsys):
     cfg = make_settings(tmp_path)
 
@@ -5973,3 +6040,80 @@ def test_cli_runs_context_missing_run_fails_closed(tmp_path: Path, capsys, monke
     assert main(["runs", "context", "missing", "--format", "json"], cfg=cfg) == 2
     payload = json.loads(capsys.readouterr().err)
     assert payload == {"status": "ERROR_RUN_NOT_FOUND", "detail": "missing"}
+
+
+def test_cli_permission_lease_grant_list_and_revoke(tmp_path: Path, capsys) -> None:
+    cfg = make_settings(tmp_path)
+
+    assert main(
+        [
+            "permissions",
+            "lease-grant",
+            "run-1",
+            "--scope",
+            "EXACT_TOOLS",
+            "--tool",
+            "coding.patch_apply",
+            "--allow-mutating",
+            "--arguments-sha256",
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "--ttl-seconds",
+            "600",
+            "--max-uses",
+            "3",
+            "--yes",
+            "--format",
+            "json",
+        ],
+        cfg=cfg,
+    ) == 0
+    granted = json.loads(capsys.readouterr().out)
+    assert granted["status"] == "PERMISSION_LEASE_GRANTED"
+    lease = granted["lease"]
+    assert lease["run_id"] == "run-1"
+    assert lease["tool_names"] == ["coding.patch_apply"]
+    assert lease["allow_mutating"] is True
+    assert lease["allow_network"] is False
+    assert lease["arguments_sha256"] == "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    assert lease["max_uses"] == 3
+
+    assert main(["permissions", "lease-list", "--run-id", "run-1", "--format", "json"], cfg=cfg) == 0
+    listed = json.loads(capsys.readouterr().out)
+    assert listed["status"] == "PERMISSION_LEASES_OK"
+    assert [row["lease_id"] for row in listed["leases"]] == [lease["lease_id"]]
+    assert listed["leases"][0]["effective_state"] == "ACTIVE"
+
+    assert main(
+        ["permissions", "lease-revoke", lease["lease_id"], "--yes", "--format", "json"],
+        cfg=cfg,
+    ) == 0
+    revoked = json.loads(capsys.readouterr().out)
+    assert revoked["status"] == "PERMISSION_LEASE_REVOKED"
+    assert revoked["lease"]["state"] == "REVOKED"
+
+
+def test_cli_permission_lease_grant_requires_explicit_confirmation_in_noninteractive_mode(
+    tmp_path: Path,
+    capsys,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    cfg = make_settings(tmp_path)
+    monkeypatch.setattr(sys.stdin, "isatty", lambda: False)
+
+    assert main(
+        [
+            "permissions",
+            "lease-grant",
+            "run-1",
+            "--scope",
+            "EXACT_TOOLS",
+            "--tool",
+            "coding.patch_apply",
+            "--allow-mutating",
+            "--format",
+            "json",
+        ],
+        cfg=cfg,
+    ) == 2
+    payload = json.loads(capsys.readouterr().err)
+    assert payload["status"] == "ERROR_PERMISSION_CONFIRMATION_REQUIRED"

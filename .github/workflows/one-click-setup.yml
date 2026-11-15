@@ -1,5 +1,9 @@
 name: One-click setup
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 # Runs the real double-click files ("Mucaro AI.command" / "Mucaro AI.cmd", then the silent
 # "Mucaro AI Setup.app" / "Mucaro AI.exe") on clean runners. PATH is cut down to OS directories (plus
 # tripwire stubs on macOS/Linux), so the job fails if setup ever depends on a preinstalled Python,
@@ -45,6 +49,15 @@ on:
       - "scripts/launch_app.py"
       - "pyproject.toml"
       - "frontend/package-lock.json"
+      - "frontend/package.json"
+      - "packaging/icons/**"
+      - "scripts/build_launchers.py"
+      - "scripts/lock_python_deps.py"
+      - "scripts/preflight.py"
+      - "scripts/ingest_folder.py"
+      - "backend/tests/test_native_launch.py"
+      - "backend/tests/test_windows_*"
+      - ".gitattributes"
       - ".github/workflows/one-click-setup.yml"
 
 permissions:
@@ -58,13 +71,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - os: macos-latest
-            label: macOS arm64
-          - os: macos-15-intel
-            label: macOS Intel
-          - os: ubuntu-latest
-            label: Linux x86_64
+        # macOS runners are not available to pull requests here, so those legs run on main and manual runs only.
+        include: >-
+          ${{ fromJSON(github.event_name == 'pull_request'
+          && '[{"os":"ubuntu-latest","label":"Linux x86_64"}]'
+          || '[{"os":"macos-latest","label":"macOS arm64"},{"os":"macos-15-intel","label":"macOS Intel"},{"os":"ubuntu-latest","label":"Linux x86_64"}]') }}
     steps:
       - uses: actions/checkout@v7
       - name: Prepare clean user environment
