@@ -1,5 +1,7 @@
 # Blockers and unblock plan — mucaro-ai (2026-09-28)
 
+> **Superseded snapshot.** This document records the state on 2026-09-28 and is kept unchanged as history; its counts and blocker states are out of date. Since then BLK-SPEC-001 was resolved on 2026-10-20 and BLK-ACTIONS-001 on 2026-10-13. Current release state is the generated block in `docs/RELEASE_STATUS.md` and the ledgers in `_architecture/release/`.
+
 **Audit date:** 2026-09-28 · **`main` at audit:** `64a097b` (private repository; not branch-protected) · **Release status:** `MUCARO AI RELEASE STATUS = PROVISIONAL`
 
 This document lists every blocker that the repository, its CI, and its GitHub pull requests recorded as of the audit date, then gives an ordered plan to clear them. It changes no code, ledger, release manifest, or generated status block. Authoritative release state stays in `_architecture/release/` and in the generated block of `docs/RELEASE_STATUS.md`.
