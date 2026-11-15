@@ -6,22 +6,6 @@ concurrency:
 
 on:
   workflow_dispatch:
-  pull_request:
-    paths:
-      - "backend/app/portable_runtime.py"
-      - "backend/app/portable_runtime_source.py"
-      - "backend/app/portable_install.py"
-      - "backend/app/clean_machine_macos.py"
-      - "scripts/certify_clean_machine_macos.py"
-      - "scripts/certify_portable_release_lane.py"
-      - "backend/tests/test_portable_release_lane.py"
-      - "packaging/runtime/macos-arm64.json"
-      - "packaging/runtime/requirements-macos-arm64.lock"
-      - "pyproject.toml"
-      - "backend/app/main.py"
-      - "frontend/package.json"
-      - "frontend/package-lock.json"
-      - ".github/workflows/arm64-portable-lifecycle-cert.yml"
   push:
     branches:
       - main
@@ -35,6 +19,10 @@ on:
       - "packaging/runtime/macos-arm64.json"
       - "packaging/runtime/requirements-macos-arm64.lock"
       - "pyproject.toml"
+      - "backend/tests/test_portable_release_lane.py"
+      - "backend/app/main.py"
+      - "frontend/package.json"
+      - "frontend/package-lock.json"
       - ".github/workflows/arm64-portable-lifecycle-cert.yml"
 
 permissions:
@@ -58,6 +46,8 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
+          cache: pip
+          cache-dependency-path: pyproject.toml
 
       - uses: actions/setup-node@v7
         with:

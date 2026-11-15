@@ -1,7 +1,9 @@
 name: ARM64 Portable Runtime Materialization Certification
 
 on:
-  pull_request:
+  push:
+    branches:
+      - main
     paths:
       - "packaging/runtime/macos-arm64.json"
       - "packaging/runtime/requirements-macos-arm64.lock"
@@ -29,6 +31,8 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
+          cache: pip
+          cache-dependency-path: pyproject.toml
 
       - name: Verify Apple-Silicon host identity
         run: |
