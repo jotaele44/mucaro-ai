@@ -39,7 +39,7 @@ from typing import Any
 
 from .config import Settings, settings
 from .context_usage import ContextUsageError, build_context_usage_status
-from .conversations import append_turns, build_conversation_context, get_conversation
+from .conversations import append_turns, build_conversation_context, get_conversation, set_conversation_repo
 from .db import ensure_db, get_connection
 from .error_categories import classify_error
 from .execution_records import build_run_manifest
@@ -970,6 +970,21 @@ def _phase_tools_decision(run: dict[str, Any], cfg: Settings) -> bool:
     return True
 
 
+def _bind_cloned_repository(run: dict[str, Any], call: dict[str, Any], cfg: Settings) -> None:
+    """An approved clone the model proposed binds the chat to that repository, as its approval card said.
+
+    Only when the chat has no repository yet: a clone never replaces a binding the person chose.
+    """
+    result = call.get("result") or {}
+    if call.get("tool_name") != "repo.clone" or call.get("status") != "EXECUTED" or result.get("status") != "CODING_CLONE_OK":
+        return
+    conversation = get_conversation(run["conversation_id"], cfg) or {}
+    if conversation.get("repo"):
+        return
+    set_conversation_repo(run["conversation_id"], {"repo_root": result["repo_root"], "remote_repo": result.get("remote_repo")}, cfg)
+    _emit_only(run["run_id"], cfg, "warning", {"status": "NOTE_CHAT_BOUND_TO_CLONED_REPOSITORY", "detail": str(result["repo_root"])})
+
+
 def _phase_agent(run: dict[str, Any], cfg: Settings) -> bool:
     """One agent step: fold finished tool results in, ask the model, and turn its proposals into governed calls.
 
@@ -1004,6 +1019,7 @@ def _phase_agent(run: dict[str, Any], cfg: Settings) -> bool:
                 return True
             transcript.append({"role": "tool", "call_id": item["id"], "name": call["tool_name"],
                                "content": agent_loop.render_tool_result(call)})
+            _bind_cloned_repository(run, call, cfg)
 
     try:
         route = plan_model_route(
@@ -1019,6 +1035,11 @@ def _phase_agent(run: dict[str, Any], cfg: Settings) -> bool:
     # The same consent and readiness rules as any answer: a remote model without allow_live never gets here.
     if route["status"] != "MODEL_ROUTE_READY" or not supports_tool_calls(route["selected_provider"]):
         return leave(route.get("selection_reason"))
+    conversation = get_conversation(run["conversation_id"], cfg) or {"turns": []}
+    # The repository this chat is bound to; a model can use coding tools on it and on nothing else.
+    repo = conversation.get("repo") or None
+    executed = [call for call in _run_calls(run, cfg) if call["status"] == "EXECUTED"]
+    step_limit = agent_loop.max_steps(repo)
     context = agent_context(
         question,
         top_k=int(options.get("top_k", 5)),
@@ -1028,8 +1049,7 @@ def _phase_agent(run: dict[str, Any], cfg: Settings) -> bool:
     )
     if context["status"] != "AGENT_CONTEXT_OK":
         return leave(context["status"])
-    conversation = get_conversation(run["conversation_id"], cfg) or {"turns": []}
-    exhausted = step >= agent_loop.MAX_AGENT_STEPS
+    exhausted = step >= step_limit
     messages = agent_loop.build_messages(
         question,
         retrieved_chunks=context["retrieved_chunks"],
@@ -1037,11 +1057,12 @@ def _phase_agent(run: dict[str, Any], cfg: Settings) -> bool:
         memory_context=context["memory_context"],
         transcript=transcript,
         budget_exhausted=exhausted,
+        repo=repo,
     )
     try:
         turn = generate_turn(
             messages,
-            [] if exhausted else agent_loop.agent_tool_specs(),
+            [] if exhausted else agent_loop.agent_tool_specs(repo),
             model_provider=route["selected_provider"],
             model_name=route["selected_model"],
             cfg=cfg,
@@ -1074,7 +1095,8 @@ def _phase_agent(run: dict[str, Any], cfg: Settings) -> bool:
     new_pending: list[dict[str, str]] = []
     events: list[tuple[str, dict[str, Any]]] = []
     for proposal in turn["tool_calls"]:
-        arguments, refusal = (None, proposal["error"]) if proposal.get("error") else agent_loop.validate_proposal(proposal["name"], proposal["arguments"])
+        arguments, refusal = (None, proposal["error"]) if proposal.get("error") else agent_loop.validate_proposal(
+            proposal["name"], proposal["arguments"], repo=repo, executed=executed)
         record = None
         if refusal is None:
             try:
@@ -1088,13 +1110,14 @@ def _phase_agent(run: dict[str, Any], cfg: Settings) -> bool:
             events.append(("warning", {"status": "WARN_AGENT_PROPOSAL_REFUSED", "category": "BLOCKED_ACTION",
                                        "detail": f"{str(proposal['name'])[:80]}: {refusal}"}))
             continue
-        if run["mode"] == "auto" and _auto_approvable(record["tool_name"]):
+        always_ask = bool(agent_loop.AGENT_TOOLS[record["tool_name"]].get("always_ask"))
+        if run["mode"] == "auto" and _auto_approvable(record["tool_name"]) and not always_ask:
             record = approve_tool_call(record["tool_call_id"], cfg=cfg, approved_by="policy:auto-local-read-only",
                                        expected_arguments_sha256=record["arguments_sha256"])["tool_call"]
         new_pending.append({"id": proposal["id"], "tool_call_id": record["tool_call_id"]})
         events.append(("tool_call", _call_view(record)))
     new_ids = [item["tool_call_id"] for item in new_pending]
-    events.append(("agent_step", {"step": step + 1, "max_steps": agent_loop.MAX_AGENT_STEPS, "proposed": len(turn["tool_calls"]),
+    events.append(("agent_step", {"step": step + 1, "max_steps": step_limit, "proposed": len(turn["tool_calls"]),
                                   "requested": len(new_ids), "tool_protocol": turn.get("tool_protocol")}))
 
     def record_step(current: dict[str, Any]) -> None:

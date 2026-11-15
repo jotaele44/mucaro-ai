@@ -555,6 +555,23 @@
         "current permission-hardened live certifier uses canonical backend.app.ocr_analysis.analyze_image_ocr boundary"
       ],
       "reason": "OCR-08 is the bounded printed multi-column/table/form reconstruction requirement. The current permission-hardened mainline replay executed real Tesseract and all six frozen benchmark cases successfully, including explicit ambiguity negatives and complete span accounting. This PASS is limited to the frozen OCR08 printed-structure scope; handwriting/difficult scans remain OCR-09 and representative real-world breadth remains OCR-10. Spanning headings, merged/headerless/rotated/nested tables and non-colon or multiline form semantics remain explicit nonclaims."
+    },
+    {
+      "event_id": "evt-cli09-governed-coding-agent-provisional-20261115",
+      "requirement_id": "CLI-09",
+      "from_state": "OPEN",
+      "to_state": "PROVISIONAL",
+      "evidence_type": "MERGED_SOURCE_WITH_LOCAL_TESTS_NO_HOSTED_OR_LIVE_EXECUTION",
+      "evidence": [
+        "main@6a2c396cb714fae9157fcf4a4bd920edfa98e68c",
+        "PR#357, PR#359 and successors: terminal agent workspace, governed coding.exec/regression_run/branch_create/commit/pr_request and github tools, chat agent bound to one repository, clone and push",
+        "backend/tests/test_terminal_ui.py::test_generic_terminal_tool_request_never_implies_approval",
+        "backend/tests/test_terminal_ui.py::test_terminal_autopilot_mode_refuses_unbound_natural_language",
+        "backend/tests/test_autopilot.py::test_self_approval_allowlist_contains_only_read_only_local_tools",
+        "backend/tests/test_agent_coding.py::test_model_reads_patches_branches_and_commits_with_values_taken_from_receipts",
+        "backend/tests/test_agent_coding.py::test_patch_cannot_be_applied_without_a_check_of_that_exact_patch"
+      ],
+      "reason": "A governed coding-agent workflow now exists in merged source: the model proposes coding actions that wait at the approval gate, exact-match values come only from receipts of executed calls, and no tool request implies approval. Not PASS: docs/CLI.md states natural-language Autopilot fails closed until model-driven planning is implemented and certified, and there is no hosted or live execution evidence at this head."
     }
   ]
 }
