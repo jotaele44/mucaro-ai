@@ -262,3 +262,37 @@ def test_pr_request_rejects_dirty_or_branch_mismatch(tmp_path: Path) -> None:
             cfg=cfg,
         )
     assert dirty.value.status == "ERROR_CODING_PR_DIRTY_REPOSITORY"
+
+def test_work_branch_verification_failure_restores_detached_head(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    cfg = make_settings(tmp_path)
+    repo = make_repo(tmp_path)
+    base = head(repo)
+    git(repo, "switch", "--detach", base)
+    assert git(repo, "branch", "--show-current").strip() == ""
+
+    original_inspect = lifecycle.inspect_repository
+    calls = {"n": 0}
+
+    def fail_after_switch(repo_root, *, cfg):
+        calls["n"] += 1
+        if calls["n"] == 2:
+            raise RuntimeError("forced post-switch verification failure")
+        return original_inspect(repo_root, cfg=cfg)
+
+    monkeypatch.setattr(lifecycle, "inspect_repository", fail_after_switch)
+
+    with pytest.raises(CodingLifecycleError) as exc:
+        create_work_branch_transaction(
+            repo,
+            branch_name="feature/detached-rollback",
+            expected_head_sha=base,
+            cfg=cfg,
+        )
+
+    assert exc.value.status == "ERROR_CODING_BRANCH_VERIFY_FAILED"
+    assert head(repo) == base
+    assert git(repo, "branch", "--show-current").strip() == ""
+

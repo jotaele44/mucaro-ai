@@ -25,6 +25,7 @@ export function deriveRun(run, events) {
     createdAt: run.created_at,
     plan: null,
     route: null,
+    agentStep: null,
     calls: new Map(),
     approvals: [],
     question: null,
@@ -48,6 +49,9 @@ export function deriveRun(run, events) {
         break;
       case "route":
         view.route = data;
+        break;
+      case "agent_step":
+        view.agentStep = data;
         break;
       case "tool_call":
       case "retry_requested":

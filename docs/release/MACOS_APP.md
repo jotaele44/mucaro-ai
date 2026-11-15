@@ -101,7 +101,7 @@ records:
 The launch token is never written to a receipt.
 
 The `macOS app` GitHub workflow (`.github/workflows/macos-app.yml`) runs both
-scripts on `macos-14`. It uploads the receipts, the screenshot and the zip.
+scripts on `macos-15`. It uploads the receipts, the screenshot and the zip.
 
 On Linux, `scripts/build_macos_app.py --structural --allow-dirty` builds the
 frozen onedir tree with the same spec. `verify_macos_app.py --executable
