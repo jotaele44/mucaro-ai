@@ -1,6 +1,6 @@
 {
   "schema_version": "mucaro-release-acceptance-ledger/1.0",
-  "updated_utc": "2026-11-15T01:30:13Z",
+  "updated_utc": "2026-11-16T19:20:08Z",
   "rows": [
     {
       "requirement_id": "GOAL-001",
@@ -1261,12 +1261,13 @@
         "backend/tests/test_contracts.py::test_summary_counts_close_arithmetically",
         "backend/tests/test_agent_loop.py::test_model_proposal_waits_for_the_person_then_its_result_feeds_the_answer",
         "backend/tests/test_agent_loop.py::test_denied_proposal_is_reported_to_the_model_and_never_runs",
-        "backend/tests/test_agent_loop.py::test_proposals_outside_the_catalogue_or_with_extra_arguments_are_refused_before_any_request"
+        "backend/tests/test_agent_loop.py::test_proposals_outside_the_catalogue_or_with_extra_arguments_are_refused_before_any_request",
+        "backend/tests/test_agent_loop.py::test_auto_mode_asks_per_call_when_the_model_is_remote"
       ],
       "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N05",
-      "notes": "Permission-aware, audited (hash chain), attributable, cancellable before start, failure-aware. Model-initiated calls now go through the same gate as ordinary calls with requested_by=model (main 6a2c396cb714fae9157fcf4a4bd920edfa98e68c). Residue: in Auto mode a model proposal for a local read-only tool (for example coding.read_file) is pre-approved even when the chat's model is a remote provider, so local content can reach that provider without per-call approval; consent is per chat (allow_live), not per call. Whether that meets 'consequential actions require applicable approval' is an owner policy decision. No rendered check of model attribution at the current head."
+      "notes": "Permission-aware, audited (hash chain), attributable, cancellable before start, failure-aware. Model-initiated calls go through the same gate as ordinary calls with requested_by=model. Owner decision 2026-11-16: in Auto mode a model's proposals are pre-approved only when the chat's model runs locally; with a remote model every proposed call asks first, so local content never reaches a remote provider without per-call approval (test_auto_mode_asks_per_call_when_the_model_is_remote). Residue: no rendered check of model attribution at the current head; DAG N05 still needs its tool-governance benchmark."
     },
     {
       "requirement_id": "TGT-015",

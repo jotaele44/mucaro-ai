@@ -44,7 +44,7 @@ from .db import ensure_db, get_connection
 from .error_categories import classify_error
 from .execution_records import build_run_manifest
 from . import agent_loop
-from .model_router import ModelProviderError, generate_turn, supports_tool_calls
+from .model_router import MODEL_PROVIDER_SPECS, ModelProviderError, generate_turn, supports_tool_calls
 from .model_routing_policy import ModelRoutingError, plan_model_route
 from .response_flow import (
     InteractionError,
@@ -84,7 +84,7 @@ MODES = {
 EVENT_TYPES = {
     "queued", "run_started", "route", "plan", "tool_call", "approval_request", "tool_started", "tool_result",
     "tool_summary", "question", "question_resolved", "retry_requested", "user_note", "retrieval", "text_delta",
-    "citation", "artifact", "warning", "error", "interrupted", "cancelled", "final", "agent_step",
+    "citation", "artifact", "warning", "error", "interrupted", "cancelled", "final", "agent_step", "context",
 }
 MAX_PROMPT_CHARS = 20_000
 TEXT_DELTA_CHARS = 160
@@ -1035,6 +1035,8 @@ def _phase_agent(run: dict[str, Any], cfg: Settings) -> bool:
     # The same consent and readiness rules as any answer: a remote model without allow_live never gets here.
     if route["status"] != "MODEL_ROUTE_READY" or not supports_tool_calls(route["selected_provider"]):
         return leave(route.get("selection_reason"))
+    selected_spec = MODEL_PROVIDER_SPECS.get(route["selected_provider"])
+    model_is_local = selected_spec is not None and selected_spec.locality == "local"
     conversation = get_conversation(run["conversation_id"], cfg) or {"turns": []}
     # The repository this chat is bound to; a model can use coding tools on it and on nothing else.
     repo = conversation.get("repo") or None
@@ -1111,7 +1113,9 @@ def _phase_agent(run: dict[str, Any], cfg: Settings) -> bool:
                                        "detail": f"{str(proposal['name'])[:80]}: {refusal}"}))
             continue
         always_ask = bool(agent_loop.AGENT_TOOLS[record["tool_name"]].get("always_ask"))
-        if run["mode"] == "auto" and _auto_approvable(record["tool_name"]) and not always_ask:
+        # Auto mode pre-approves local read-only tools only when the model itself runs on this machine. A remote
+        # model would receive the tool's result, so local content reaching it needs the person's approval per call.
+        if run["mode"] == "auto" and _auto_approvable(record["tool_name"]) and not always_ask and model_is_local:
             record = approve_tool_call(record["tool_call_id"], cfg=cfg, approved_by="policy:auto-local-read-only",
                                        expected_arguments_sha256=record["arguments_sha256"])["tool_call"]
         new_pending.append({"id": proposal["id"], "tool_call_id": record["tool_call_id"]})
@@ -1195,6 +1199,15 @@ def _phase_answer(run: dict[str, Any], cfg: Settings) -> None:
     events: list[tuple[str, dict[str, Any]]] = [
         ("retrieval", {"strategy": trace.get("retrieval_strategy"), "retrieved_chunk_ids": trace.get("retrieved_chunk_ids", []),
                        "source_ids": trace.get("source_ids", []), "grounding": trace.get("grounding") or "SOURCES"}),
+        # What this answer used besides sources: saved memory (kept across chats until the person turns it off or
+        # deletes it) and earlier messages of this chat (used only here, never saved as memory). Identifiers and
+        # counts only; memory content stays in the Memory workspace.
+        ("context", {
+            "conversation_context_turn_count": int(trace.get("conversation_context_turn_count") or 0),
+            "memory_context_count": int(trace.get("memory_context_count") or 0),
+            "memory_scope_counts": dict(trace.get("memory_scope_counts") or {}),
+            "memory_ids": [str(item) for item in trace.get("memory_ids") or []],
+        }),
     ]
     answer = str(trace["answer"])
     if not trace.get("answer_streamed"):

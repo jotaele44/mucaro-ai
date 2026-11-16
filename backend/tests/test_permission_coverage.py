@@ -36,6 +36,7 @@ EXEMPT = {
     "gis_eval.py": "certification harness spawning the project's own CLI",
     "local_tools.py": "read-only xcode-select -p probe while resolving local helper paths; runs no model/skill-chosen command",
     "macos_app_store.py": "release tooling",
+    "memory_benchmark.py": "certification harness re-running the project's own interpreter for the MATRIX-013 restart case",
     "macos_distribution.py": "release tooling",
     "packaging.py": "release tooling",
     "portable_runtime.py": "release tooling",
