@@ -18,8 +18,10 @@ from __future__ import annotations
 
 import base64
 import json
+import os
 import secrets
 import shutil
+import stat
 from pathlib import Path, PurePath
 from typing import Any
 
@@ -217,6 +219,30 @@ def reference_block(meta: dict[str, Any]) -> dict[str, Any]:
     return {"type": REF_TYPE, "attachment_id": meta["attachment_id"], "name": meta["name"], "kind": meta["kind"]}
 
 
+def _stored_text(folder: Path) -> str | None:
+    """Return the extracted text saved beside a document, or None when it cannot be trusted.
+
+    The file is opened without following a symlink and must be a regular file, so a swapped-in link
+    cannot pull a file from outside the attachment store into a model request. The read is bounded
+    by the most this module ever writes.
+    """
+    limit = MAX_DOCUMENT_CHARS * 4  # UTF-8 uses at most four bytes per character
+    try:
+        fd = os.open(folder / "text.txt", os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+    except OSError:
+        return None
+    try:
+        info = os.fstat(fd)
+        if not stat.S_ISREG(info.st_mode) or info.st_size > limit:
+            return None
+        data = os.read(fd, limit + 1)
+    except OSError:
+        return None
+    finally:
+        os.close(fd)
+    return data.decode("utf-8", errors="replace")[:MAX_DOCUMENT_CHARS]
+
+
 def _api_block(conversation_id: str, ref: dict[str, Any], cfg: Settings) -> dict[str, Any]:
     try:
         path, meta = attachment_file(conversation_id, str(ref.get("attachment_id") or ""), cfg)
@@ -232,10 +258,13 @@ def _api_block(conversation_id: str, ref: dict[str, Any], cfg: Settings) -> dict
             "title": meta["name"],
             "citations": {"enabled": True},
         }
+    text = _stored_text(folder)
+    if text is None:
+        return {"type": "text", "text": f"[Attachment {ref.get('name')} is no longer available.]"}
     note = " The text was cut to its first part because the file is long." if meta.get("text_truncated") else ""
     return {
         "type": "document",
-        "source": {"type": "text", "media_type": "text/plain", "data": (folder / "text.txt").read_text(encoding="utf-8")},
+        "source": {"type": "text", "media_type": "text/plain", "data": text},
         "title": meta["name"],
         "context": f"A file the user attached.{note}",
         "citations": {"enabled": True},
