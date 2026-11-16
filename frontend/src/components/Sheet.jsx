@@ -47,13 +47,13 @@ export function Sheet({ title, onClose, children, side = "right", labelledBy }) 
     return () => {
       document.removeEventListener("keydown", onKey);
       // React StrictMode replays effect cleanup while the mounted sheet is still connected.
-      // Restore only after a real unmount, and defer one microtask so WebKit has finalized
-      // removal of the focused dialog before moving focus back to the exact opener.
-      queueMicrotask(() => {
+      // Restore only after a real unmount, and defer to the next task so WebKit has finalized
+      // its own focus fallback after removal of the focused dialog.
+      setTimeout(() => {
         if (!node?.isConnected && previous?.isConnected && typeof previous.focus === "function") {
           previous.focus({ preventScroll: true });
         }
-      });
+      }, 0);
     };
   }, []);
 

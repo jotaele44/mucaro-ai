@@ -349,7 +349,7 @@ async function scenario(browser, base, viewport, contextOptions) {
   check(
     "Escape focus never falls back to document or dialog",
     viewport,
-    !["BODY", "HTML", "SECTION"].includes(focusAfterEscape.tagName) && focusAfterEscape.role !== "dialog",
+    !["BODY", "HTML", "MAIN", "SECTION"].includes(focusAfterEscape.tagName) && focusAfterEscape.role !== "dialog",
     JSON.stringify(focusAfterEscape),
   );
 
