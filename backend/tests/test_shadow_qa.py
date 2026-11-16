@@ -144,6 +144,21 @@ def test_shadow_exit_codes_distinguish_pass_fail_and_provisional():
     assert shadow_qa.exit_code_for_state("BLOCKED") != 0
 
 
+def test_shadow_workflow_builds_frontend_before_rendered_qa() -> None:
+    root = Path(__file__).resolve().parents[2]
+    workflow = (root / ".github" / "workflows" / "shadow-qa.yml").read_text(encoding="utf-8")
+
+    install = workflow.index("- name: Install frontend dependencies")
+    build = workflow.index("- name: Build frontend for rendered QA")
+    chromium = workflow.index("- name: Run exact-checkpoint rendered QA (Chromium)")
+    webkit = workflow.index("- name: Run exact-checkpoint rendered QA (WebKit)")
+
+    assert install < build < chromium < webkit
+    build_block = workflow[build:chromium]
+    assert "working-directory: frontend" in build_block
+    assert "run: npm run build" in build_block
+
+
 def test_shadow_workflow_invokes_runner_as_module() -> None:
     root = Path(__file__).resolve().parents[2]
     workflow = (root / ".github" / "workflows" / "shadow-qa.yml").read_text(encoding="utf-8")

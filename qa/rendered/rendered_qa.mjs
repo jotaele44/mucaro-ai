@@ -319,17 +319,21 @@ async function scenario(browser, base, viewport, contextOptions) {
       (await lastRun(page).locator(".assistant-bubble").getByText("Edited assistant display for rendered QA.").count()) === 1,
   );
 
-  // Evidence sheet (TGT-030), Escape closes and restores focus.
+  // Evidence sheet (TGT-030), Escape closes and restores focus to the exact opener across engines.
+  const citationOpenerName = await citations.first().getAttribute("aria-label");
   await citations.first().click();
   const evidence = page.getByRole("dialog", { name: /Evidence \[1\]/ });
   await evidence.waitFor();
   await evidence.getByText("Cited text").waitFor();
   check("citation opens exact source evidence", viewport, await evidence.getByText(/SHA-256|Byte identity/).count() > 0);
+  const focusInsideEvidence = await page.evaluate(() => Boolean(document.activeElement?.closest?.('[role="dialog"]')));
+  check("evidence sheet owns focus while open", viewport, focusInsideEvidence);
   await shot(page, viewport, "03-evidence");
   await page.keyboard.press("Escape");
   await evidence.waitFor({ state: "detached" });
   const focusedName = await page.evaluate(() => document.activeElement?.getAttribute("aria-label") || "");
-  check("Escape closes the sheet and returns focus", viewport, focusedName.startsWith("Open citation"), focusedName);
+  check("Escape closes the sheet and returns focus", viewport, focusedName === citationOpenerName, `${focusedName} expected ${citationOpenerName}`);
+  check("Escape never drops focus to the document body", viewport, Boolean(focusedName), focusedName || "BODY/UNNAMED");
 
   // Approval-bound action (F07) and tool summary / drawer (F08, F09).
   await send(page, "/status");
@@ -567,8 +571,10 @@ async function scenario(browser, base, viewport, contextOptions) {
         smallTargets: targets.filter((el) => el.getBoundingClientRect().height < 44).map(label),
       };
     });
+    const retrievalSelectHeight = await page.getByLabel("Strategy").evaluate((el) => el.getBoundingClientRect().height);
+    check("retrieval strategy select is at least 44px tall", viewport, retrievalSelectHeight >= 44, `${retrievalSelectHeight}px`);
     check("form fields are at least 16px (no iOS focus zoom)", viewport, touch.fields > 0 && touch.smallFonts.length === 0, touch.smallFonts.join(", ") || `${touch.fields} fields`);
-    check("touch targets are at least 44px tall", viewport, touch.targets > 0 && touch.smallTargets.length === 0, touch.smallTargets.join(", ") || `${touch.targets} targets`);
+    check("no visible touch target is below 44px", viewport, touch.targets > 0 && touch.smallTargets.length === 0, touch.smallTargets.join(", ") || `${touch.targets} targets`);
   }
 
   const layoutOverflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);

@@ -92,6 +92,10 @@ jobs:
           printf '%s\n' "$SHADOW_EVIDENCE_MANIFEST_JSON" > "$SHADOW_EVIDENCE_MANIFEST_PATH"
           python -m json.tool "$SHADOW_EVIDENCE_MANIFEST_PATH" >/dev/null
           echo "SHADOW_EVIDENCE_MANIFEST_PATH=$SHADOW_EVIDENCE_MANIFEST_PATH" >> "$GITHUB_ENV"
+      - name: Build frontend for rendered QA
+        if: github.event_name == 'workflow_dispatch' && inputs.historical_replay != true
+        working-directory: frontend
+        run: npm run build
       - name: Install rendered QA harness and browser engines
         if: github.event_name == 'workflow_dispatch' && inputs.historical_replay != true
         working-directory: qa/rendered
