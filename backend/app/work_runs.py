@@ -84,7 +84,7 @@ MODES = {
 EVENT_TYPES = {
     "queued", "run_started", "route", "plan", "tool_call", "approval_request", "tool_started", "tool_result",
     "tool_summary", "question", "question_resolved", "retry_requested", "user_note", "retrieval", "text_delta",
-    "citation", "artifact", "warning", "error", "interrupted", "cancelled", "final", "agent_step",
+    "citation", "artifact", "warning", "error", "interrupted", "cancelled", "final", "agent_step", "context",
 }
 MAX_PROMPT_CHARS = 20_000
 TEXT_DELTA_CHARS = 160
@@ -1199,6 +1199,15 @@ def _phase_answer(run: dict[str, Any], cfg: Settings) -> None:
     events: list[tuple[str, dict[str, Any]]] = [
         ("retrieval", {"strategy": trace.get("retrieval_strategy"), "retrieved_chunk_ids": trace.get("retrieved_chunk_ids", []),
                        "source_ids": trace.get("source_ids", []), "grounding": trace.get("grounding") or "SOURCES"}),
+        # What this answer used besides sources: saved memory (kept across chats until the person turns it off or
+        # deletes it) and earlier messages of this chat (used only here, never saved as memory). Identifiers and
+        # counts only; memory content stays in the Memory workspace.
+        ("context", {
+            "conversation_context_turn_count": int(trace.get("conversation_context_turn_count") or 0),
+            "memory_context_count": int(trace.get("memory_context_count") or 0),
+            "memory_scope_counts": dict(trace.get("memory_scope_counts") or {}),
+            "memory_ids": [str(item) for item in trace.get("memory_ids") or []],
+        }),
     ]
     answer = str(trace["answer"])
     if not trace.get("answer_streamed"):
