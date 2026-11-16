@@ -585,7 +585,8 @@ def _offline_route_blocks_remote(_cfg: Settings, _root: Path) -> tuple[str, dict
     from .model_routing_policy import plan_model_route
 
     remote = {name for name, spec in MODEL_PROVIDER_SPECS.items() if spec.locality != "local"}
-    with _environment(MUCARO_AI_LIVE_MODE="1", ANTHROPIC_API_KEY="benchmark-placeholder"):
+    # A placeholder key only makes the remote provider configured; nothing is sent while routing is planned.
+    with _environment(**{"MUCARO_AI_LIVE_MODE": "1", "ANTHROPIC_API_KEY": "benchmark-placeholder"}):
         online = plan_model_route(task_type="cited_qa", allow_live=True)
         offline = plan_model_route(task_type="cited_qa", allow_live=True, system_offline=True)
     offline_rows = {row["provider"]: row for row in offline["candidates"]}
