@@ -150,6 +150,12 @@ def test_shadow_workflow_invokes_runner_as_module() -> None:
 
     assert "python -m scripts.shadow_qa" in workflow
     assert "python scripts/shadow_qa.py" not in workflow
+    build_marker = "- name: Build frontend for rendered QA"
+    chromium_marker = "- name: Run exact-checkpoint rendered QA (Chromium)"
+    webkit_marker = "- name: Run exact-checkpoint rendered QA (WebKit)"
+    assert build_marker in workflow
+    assert "run: npm run build" in workflow
+    assert workflow.index(build_marker) < workflow.index(chromium_marker) < workflow.index(webkit_marker)
 
     completed = subprocess.run(
         [sys.executable, "-m", "scripts.shadow_qa", "--help"],

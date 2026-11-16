@@ -83,6 +83,10 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci --registry=https://registry.npmjs.org/
         working-directory: frontend
+      - name: Build frontend for rendered QA
+        if: github.event_name == 'workflow_dispatch' && inputs.historical_replay != true
+        working-directory: frontend
+        run: npm run build
       - name: Materialize checkpoint-bound evidence manifest
         if: github.event_name == 'workflow_dispatch'
         shell: bash

@@ -1318,6 +1318,11 @@ html {
     min-height: 44px;
   }
 
+  /* WebKit can preserve the native select's intrinsic height despite min-height. */
+  :root select {
+    height: 44px;
+  }
+
   /* An icon has no text to widen its button, so it needs the 44px width explicitly. */
   :root .message-actions .icon-action {
     min-width: 44px;

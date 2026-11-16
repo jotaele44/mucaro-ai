@@ -320,7 +320,9 @@ async function scenario(browser, base, viewport, contextOptions) {
   );
 
   // Evidence sheet (TGT-030), Escape closes and restores focus.
-  await citations.first().click();
+  const citationOpener = citations.first();
+  const citationOpenerName = await citationOpener.getAttribute("aria-label");
+  await citationOpener.click();
   const evidence = page.getByRole("dialog", { name: /Evidence \[1\]/ });
   await evidence.waitFor();
   await evidence.getByText("Cited text").waitFor();
@@ -328,8 +330,28 @@ async function scenario(browser, base, viewport, contextOptions) {
   await shot(page, viewport, "03-evidence");
   await page.keyboard.press("Escape");
   await evidence.waitFor({ state: "detached" });
-  const focusedName = await page.evaluate(() => document.activeElement?.getAttribute("aria-label") || "");
-  check("Escape closes the sheet and returns focus", viewport, focusedName.startsWith("Open citation"), focusedName);
+  await page.waitForFunction(
+    (expected) => document.activeElement?.getAttribute("aria-label") === expected,
+    citationOpenerName,
+    { timeout: 3000 },
+  ).catch(() => {});
+  const focusAfterEscape = await page.evaluate(() => ({
+    ariaLabel: document.activeElement?.getAttribute("aria-label") || "",
+    tagName: document.activeElement?.tagName || "",
+    role: document.activeElement?.getAttribute("role") || "",
+  }));
+  check(
+    "Escape closes the sheet and returns focus to the exact opener",
+    viewport,
+    Boolean(citationOpenerName) && focusAfterEscape.ariaLabel === citationOpenerName,
+    JSON.stringify(focusAfterEscape),
+  );
+  check(
+    "Escape focus never falls back to document or dialog",
+    viewport,
+    !["BODY", "HTML", "SECTION"].includes(focusAfterEscape.tagName) && focusAfterEscape.role !== "dialog",
+    JSON.stringify(focusAfterEscape),
+  );
 
   // Approval-bound action (F07) and tool summary / drawer (F08, F09).
   await send(page, "/status");
@@ -567,8 +589,18 @@ async function scenario(browser, base, viewport, contextOptions) {
         smallTargets: targets.filter((el) => el.getBoundingClientRect().height < 44).map(label),
       };
     });
+    const retrievalStrategyTarget = await page.getByLabel("Strategy").evaluate((el) => {
+      const box = el.getBoundingClientRect();
+      return { height: box.height, width: box.width, tagName: el.tagName };
+    });
+    check(
+      "retrieval strategy select is at least 44px tall on iPhone",
+      viewport,
+      retrievalStrategyTarget.height >= 44,
+      JSON.stringify(retrievalStrategyTarget),
+    );
     check("form fields are at least 16px (no iOS focus zoom)", viewport, touch.fields > 0 && touch.smallFonts.length === 0, touch.smallFonts.join(", ") || `${touch.fields} fields`);
-    check("touch targets are at least 44px tall", viewport, touch.targets > 0 && touch.smallTargets.length === 0, touch.smallTargets.join(", ") || `${touch.targets} targets`);
+    check("no visible touch target falls below 44px", viewport, touch.targets > 0 && touch.smallTargets.length === 0, touch.smallTargets.join(", ") || `${touch.targets} targets`);
   }
 
   const layoutOverflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
