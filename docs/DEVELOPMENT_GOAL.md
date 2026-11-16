@@ -106,6 +106,8 @@ byte-pinned proof layer for a particular commit. Verify them with
 
 ## Open Finish-Line Gaps
 
+> Narrative gap list, last revised 2026-10-22. The `State` column is not a ledger state and is not kept in step with the ledgers. Current states are the generated block in `docs/RELEASE_STATUS.md`; the current score is `python scripts/certify_mucaro_100.py --format text`.
+
 | Gap | State | Next proof |
 |---|---|---|
 | Hosted GitHub Actions | OPEN | Hosted CI is again admitting and executing jobs, and exact-SHA CI evidence artifact generation is merged; final release-grade proof still requires a retrievable receipt bound to the exact current `main` head plus required branch/tag governance |

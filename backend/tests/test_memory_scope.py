@@ -10,8 +10,10 @@ from backend.app.config import Settings
 import backend.app.main as main_module
 from backend.app.main import create_app
 from backend.app.memory import (
+    MEMORY_NAME,
     MemoryError,
     current_workspace_scope_id,
+    delete_memory_item,
     list_memory_items,
     remember_memory_item,
     set_memory_enabled,
@@ -265,3 +267,34 @@ def test_api_rejects_non_stable_conversation_scope_id(tmp_path: Path) -> None:
 
     assert response.status_code == 400
     assert response.json()["detail"]["status"] == "ERROR_MEMORY_CONVERSATION_SCOPE_ID"
+
+
+def test_deleting_one_memory_keeps_every_other_stored_row_unchanged(tmp_path: Path) -> None:
+    cfg = cfg_for(tmp_path)
+    kept = remember_memory_item("Keep this one", cfg)["memory"]
+    target = remember_memory_item("Delete this one", cfg)["memory"]
+    path = cfg.processed_dir / MEMORY_NAME
+    stored = json.loads(path.read_text(encoding="utf-8"))
+    unreadable = [{"content": "row written by another version, no memory_id"}, "not an object"]
+    path.write_text(json.dumps(stored + unreadable), encoding="utf-8")
+
+    result = delete_memory_item(target["memory_id"], cfg)
+
+    assert result["status"] == "MEMORY_DELETE_OK"
+    assert result["removed"] == 1
+    assert result["remaining_memories"] == 1
+    after = json.loads(path.read_text(encoding="utf-8"))
+    assert [row for row in after if isinstance(row, dict) and row.get("memory_id")] == [kept]
+    assert after[-2:] == unreadable
+
+
+def test_deleting_an_unknown_memory_changes_nothing(tmp_path: Path) -> None:
+    cfg = cfg_for(tmp_path)
+    remember_memory_item("Only memory", cfg)
+    path = cfg.processed_dir / MEMORY_NAME
+    before = path.read_text(encoding="utf-8")
+
+    result = delete_memory_item("mem_doesnotexist", cfg)
+
+    assert result["status"] == "ERROR_MEMORY_NOT_FOUND"
+    assert json.loads(path.read_text(encoding="utf-8")) == json.loads(before)

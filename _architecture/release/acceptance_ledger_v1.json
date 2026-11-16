@@ -1,6 +1,6 @@
 {
   "schema_version": "mucaro-release-acceptance-ledger/1.0",
-  "updated_utc": "2026-11-03T03:02:00Z",
+  "updated_utc": "2026-11-15T01:30:13Z",
   "rows": [
     {
       "requirement_id": "GOAL-001",
@@ -864,17 +864,23 @@
       "scope_state": "IN_SCOPE",
       "implementation_state": "PARTIAL",
       "implementation_refs": [
-        "backend/app/memory.py"
+        "backend/app/memory.py",
+        "backend/app/memory_policy.py"
       ],
       "dependencies": [],
       "positive_gate": null,
       "negative_gate": null,
       "benchmark": null,
-      "evidence_refs": [],
-      "state": "OPEN",
+      "evidence_refs": [
+        "backend/tests/test_api.py::test_api_memory_controls_are_explicit_and_user_managed",
+        "backend/tests/test_prompt_injection.py::test_memory_instructions_cannot_authorize_tools",
+        "backend/tests/test_agent_loop.py::test_model_only_sees_enabled_memory_in_scope_and_cannot_list_the_rest",
+        "backend/tests/test_memory_scope.py::test_conversation_memory_is_never_selected_without_conversation_context"
+      ],
+      "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N14",
-      "notes": ""
+      "notes": "Covered on main 6a2c396cb714fae9157fcf4a4bd920edfa98e68c: what is retained (list/export), provenance (source shown), scope (PR #143), mutation/disable/delete, and memory cannot authorize tools. Residue: the distinction between durable memory and current-conversation state is carried only by conversation-scoped durable rows and prompt wording; there is no explicit user-facing distinction, and no rendered check of it at the current head."
     },
     {
       "requirement_id": "INV-022",
@@ -1211,20 +1217,32 @@
       "requirement_id": "TGT-013",
       "requirement_text": "Explicit memory",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "PARTIAL",
+      "implementation_state": "IMPLEMENTED",
       "implementation_refs": [
         "backend/app/memory.py",
-        "backend/app/memory_policy.py"
+        "backend/app/memory_policy.py",
+        "backend/app/main.py",
+        "frontend/src/components/workspaces/MemoryWorkspace.jsx"
       ],
       "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
+      "positive_gate": "backend/tests/test_memory_scope.py::test_api_memory_scope_is_inspectable_and_workspace_scope_is_bound",
+      "negative_gate": "backend/tests/test_memory_scope.py::test_scope_combinations_fail_closed",
       "benchmark": null,
-      "evidence_refs": [],
-      "state": "OPEN",
+      "evidence_refs": [
+        "backend/tests/test_memory_scope.py::test_conversation_memory_is_never_selected_without_conversation_context",
+        "backend/tests/test_memory_scope.py::test_scope_selection_closes_row_accounting_and_excludes_mismatches",
+        "backend/tests/test_memory_scope.py::test_malformed_stored_scope_is_visible_but_cannot_be_enabled",
+        "backend/tests/test_memory_scope.py::test_api_rejects_non_stable_conversation_scope_id",
+        "backend/tests/test_memory_scope.py::test_deleting_one_memory_keeps_every_other_stored_row_unchanged",
+        "backend/tests/test_api.py::test_api_memory_controls_are_explicit_and_user_managed",
+        "backend/tests/test_prompt_injection.py::test_memory_instructions_cannot_authorize_tools",
+        "backend/tests/test_agent_loop.py::test_model_only_sees_enabled_memory_in_scope_and_cannot_list_the_rest",
+        "backend/tests/test_cli.py::test_cli_memory_scope_controls"
+      ],
+      "state": "PASS",
       "blocker_id": null,
       "dag_node": "N14",
-      "notes": "Memory has no scope."
+      "notes": "Closed the recorded residue (\"Memory has no scope\") on main 6a2c396cb714fae9157fcf4a4bd920edfa98e68c: explicit global/workspace/conversation scope (PR #143), malformed stored scope visible but fails closed, conversation memory never selected without that conversation, scope shown in the Memory workspace, memory.list kept away from the model. Deleting one memory no longer discards other stored rows. Verification method AUTOMATED_TEST. Node N14 stays OPEN until MATRIX-013 (memory benchmark) passes."
     },
     {
       "requirement_id": "TGT-014",
@@ -1240,12 +1258,15 @@
       "benchmark": null,
       "evidence_refs": [
         "backend/tests/test_contracts.py::test_api_cancel_and_summary_routes",
-        "backend/tests/test_contracts.py::test_summary_counts_close_arithmetically"
+        "backend/tests/test_contracts.py::test_summary_counts_close_arithmetically",
+        "backend/tests/test_agent_loop.py::test_model_proposal_waits_for_the_person_then_its_result_feeds_the_answer",
+        "backend/tests/test_agent_loop.py::test_denied_proposal_is_reported_to_the_model_and_never_runs",
+        "backend/tests/test_agent_loop.py::test_proposals_outside_the_catalogue_or_with_extra_arguments_are_refused_before_any_request"
       ],
       "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N05",
-      "notes": "Permission-aware, audited (hash chain), attributable, cancellable before start, failure-aware. OPEN: feed-level observability (M3/M6) and model-initiated calls through the same gate."
+      "notes": "Permission-aware, audited (hash chain), attributable, cancellable before start, failure-aware. Model-initiated calls now go through the same gate as ordinary calls with requested_by=model (main 6a2c396cb714fae9157fcf4a4bd920edfa98e68c). Residue: in Auto mode a model proposal for a local read-only tool (for example coding.read_file) is pre-approved even when the chat's model is a remote provider, so local content can reach that provider without per-call approval; consent is per chat (allow_live), not per call. Whether that meets 'consequential actions require applicable approval' is an owner policy decision. No rendered check of model attribution at the current head."
     },
     {
       "requirement_id": "TGT-015",
@@ -1287,7 +1308,7 @@
       "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N03",
-      "notes": "All nine families have schemas and a registry; runtime enforcement at source, provenance, grant, tool call/audit, citation/answer trace, memory, routing and receipt boundaries. OPEN: runtime enforcement for execution_contract/run_manifest/agent_checkpoint/artifact_identity producers."
+      "notes": "All nine families have schemas and a registry; runtime enforcement at source, provenance, grant, tool call/audit, citation/answer trace, memory, routing and receipt boundaries. Execution contract, run manifest and artifact identity producers now validate at runtime (PR #340). Residue: agent_checkpoint is validated by a module-local validator rather than the shared contract registry, and the newer permission_lease, agent_task_dag, autopilot_state and offline_independence schemas sit outside RECORD_SCHEMAS."
     },
     {
       "requirement_id": "TGT-017",
@@ -1400,7 +1421,7 @@
       "state": "OPEN",
       "blocker_id": null,
       "dag_node": "N02",
-      "notes": ""
+      "notes": "Browser ingress: cross-site state-changing requests and DNS-rebound hosts are refused on the tokenless local API, and directory grants refuse home, its parents, hidden settings directories and /etc (PR #338, test_browser_request_guard.py). Not audited here against every security class of INV-015; secrets isolation depends on TGT-024 (no Keychain)."
     },
     {
       "requirement_id": "TGT-022",
@@ -1475,7 +1496,7 @@
       "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N22",
-      "notes": "Secrets are not committed (secret scan) or surfaced in evidence (evidence-field scan). The launch token stays out of receipts and logs, is kept in a 0600 instance file, and reaches the window only through the URL fragment. Prompts and exports never contain credentials. Residue: production API keys still come from environment variables; macOS Keychain storage is not implemented."
+      "notes": "Secrets are not committed (secret scan) or surfaced in evidence (evidence-field scan). The launch token stays out of receipts and logs, is kept in a 0600 instance file, and reaches the window only through the URL fragment. Prompts and exports never contain credentials. Residue: production API keys still come from environment variables, and the remote model API key is kept in a 0600 file; macOS Keychain storage is not implemented."
     },
     {
       "requirement_id": "TGT-025",
@@ -1802,7 +1823,7 @@
       "state": "OPEN",
       "blocker_id": null,
       "dag_node": "N03",
-      "notes": "GIS/OCR/coding extras are CLI-only, outside the governed tool registry."
+      "notes": "GIS (gis.inspect) and OCR (ocr.analyze_image) are now registered governed tools (PR #344) and coding tools are in the registry. Residue: _architecture/coherent_architecture_v1.json is not loaded by any test or validator, its own limitation keeps TGT-038 non-PASS until the matrix executes on a real runner, and its coding bridge list omits exec, commit and push."
     },
     {
       "requirement_id": "MATRIX-001",
@@ -2112,7 +2133,7 @@
       "state": "OPEN",
       "blocker_id": null,
       "dag_node": "N14",
-      "notes": ""
+      "notes": "Scope and conversation isolation, creation, disable, delete and auth are tested (test_memory_scope.py, test_api.py). Residue: no restart/persistence test and no single frozen memory-benchmark denominator (verification method is BENCHMARK)."
     },
     {
       "requirement_id": "MATRIX-014",
@@ -2637,7 +2658,7 @@
       "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N15",
-      "notes": "Action state comes from call records (final.action_ledger, envelope); narration-vs-receipt conflict flagging for model prose is not implemented (mock/local models do not narrate actions yet)."
+      "notes": "Action state comes from call records (final.action_ledger, envelope). The chat model now proposes and narrates actions through the agent loop. Residue: narration-vs-receipt conflict flagging for model prose is not implemented."
     },
     {
       "requirement_id": "MOB-F16",
@@ -2714,7 +2735,7 @@
       "state": "OPEN",
       "blocker_id": null,
       "dag_node": "N15",
-      "notes": ""
+      "notes": "Governed github.prs_list and pr_view tools exist with retrieved_utc (test_github_resources.py). Residue: no linked-PR list or detail surface in the conversation feed; live gh reads need credentials."
     },
     {
       "requirement_id": "MOB-F20",

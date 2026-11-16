@@ -201,10 +201,12 @@ def set_memory_enabled(
 
 def delete_memory_item(memory_id: str, cfg: Settings = settings) -> dict[str, Any]:
     def mutate(rows: list[Any]) -> tuple[int, int]:
-        valid = _valid_rows(rows)
-        kept = [row for row in valid if row.get("memory_id") != memory_id]
+        # Remove only the matching row. Every other stored row, including one this version cannot read, is kept
+        # byte-for-byte, so deleting one memory never silently discards others.
+        kept = [row for row in rows if not (isinstance(row, dict) and row.get("memory_id") == memory_id)]
+        removed = len(rows) - len(kept)
         rows[:] = kept
-        return len(valid) - len(kept), len(kept)
+        return removed, len(_valid_rows(kept))
 
     removed, remaining = update_json(_memory_path(cfg), [], mutate)
     return {

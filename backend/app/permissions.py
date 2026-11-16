@@ -94,15 +94,38 @@ def ensure_directory_permission(path: str | Path, cfg: Settings = settings) -> d
     return result
 
 
+SYSTEM_CONFIG_ROOTS = (Path("/etc"), Path("/private/etc"))
+
+
+def too_broad_grant_reason(root: Path) -> str | None:
+    """Why a directory is too broad or too sensitive to grant as a whole, or None.
+
+    A grant covers everything beneath it, so the filesystem root, the home directory and anything above it would
+    expose credentials and unrelated private files. Hidden directories directly under home (~/.ssh, ~/.config,
+    ~/.aws) and the system configuration tree hold little except secrets and settings.
+    """
+    if root.anchor == str(root):
+        return "Refusing to grant filesystem root access."
+    try:
+        home = Path.home().resolve()
+    except (RuntimeError, OSError):
+        home = None
+    if home is not None:
+        if root == home or is_within_path(home, root):
+            return "Refusing to grant the whole home directory or a directory that contains it."
+        if is_within_path(root, home) and root.relative_to(home).parts[0].startswith("."):
+            return "Refusing to grant a hidden settings directory in the home directory."
+    if any(root == system or is_within_path(root, system) for system in SYSTEM_CONFIG_ROOTS):
+        return "Refusing to grant the system configuration directory."
+    return None
+
+
 def grant_directory(path: str | Path, cfg: Settings = settings, *, granted_by: str, reason: str | None = None) -> dict[str, Any]:
     resolved = resolve_existing_path(path)
     root = directory_root_for(resolved)
-    if root.anchor == str(root):
-        raise DirectoryPermissionError(
-            "ERROR_DIRECTORY_PERMISSION_TOO_BROAD",
-            "Refusing to grant filesystem root access.",
-            path=root,
-        )
+    too_broad = too_broad_grant_reason(root)
+    if too_broad:
+        raise DirectoryPermissionError("ERROR_DIRECTORY_PERMISSION_TOO_BROAD", too_broad, path=root)
     cfg.ensure_dirs()
     canonical_root = str(root)
     grant = validate_contract(

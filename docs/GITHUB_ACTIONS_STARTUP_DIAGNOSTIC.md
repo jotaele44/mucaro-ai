@@ -1,5 +1,7 @@
 # GitHub Actions Startup Diagnostic
 
+> **Superseded snapshot.** This document records the state on 2026-09-19 and is kept unchanged as history; its counts and blocker states are out of date. The hosted-CI blocker it describes, BLK-ACTIONS-001, was resolved on 2026-10-13 (`_architecture/release/evidence/actions_runner_admission_resolved_20261013.json`). Current release state is the generated block in `docs/RELEASE_STATUS.md` and the ledgers in `_architecture/release/`.
+
 This document records the current hosted-CI blocker for the `v0.1.23`
 governance candidate.
 

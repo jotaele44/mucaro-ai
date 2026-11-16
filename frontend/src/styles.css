@@ -1374,3 +1374,72 @@ html {
   white-space: nowrap;
   border-color: var(--border);
 }
+
+/* Repository binding and proposed changes shown as a diff. */
+.repo-setup,
+.repo-details {
+  text-align: left;
+  min-width: 0;
+}
+
+.empty-state .repo-details {
+  max-width: 620px;
+  margin: 12px auto 0;
+}
+
+.repo-details > summary {
+  cursor: pointer;
+  padding: 8px 4px;
+}
+
+.panel-title {
+  margin: 0;
+  font-weight: 650;
+}
+
+.diff-view {
+  margin: 0;
+  min-width: 0;
+}
+
+.diff-block {
+  margin: 4px 0 0;
+  padding: 8px 0;
+  background: var(--surface-2);
+  border-radius: 8px;
+  overflow-x: auto;
+  max-height: 360px;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.diff-line {
+  display: block;
+  padding: 0 12px;
+  white-space: pre;
+  min-width: max-content;
+}
+
+.diff-add {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.diff-del {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.diff-hunk,
+.diff-meta {
+  color: var(--muted);
+}
+
+.chat-controls {
+  display: flex;
+  gap: 6px;
+  min-width: 0;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}

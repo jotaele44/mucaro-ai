@@ -1,5 +1,7 @@
 # Release-certification audit: desktop and mobile (2026-09-29)
 
+> **Superseded snapshot.** This document records the state on 2026-09-29 and is kept unchanged as history; its counts and blocker states are out of date. Since then BLK-SPEC-001 was resolved on 2026-10-20 and BLK-ACTIONS-001 on 2026-10-13. Current release state is the generated block in `docs/RELEASE_STATUS.md` and the ledgers in `_architecture/release/`.
+
 **Scope:** development completion and the blockers to final release
 certification for the packaged desktop app and the mobile (iPhone-width) UI.
 **Base:** the first pass was at `0ed1643`. Every finding was re-checked on `main`
