@@ -207,6 +207,34 @@ function hostOf(url) {
   }
 }
 
+function plural(count, one, many) {
+  return `${count} ${count === 1 ? one : many}`;
+}
+
+// What an answer used besides sources: saved memory, kept across chats, and this chat's own earlier messages,
+// used only here. Counts only; the memories themselves are listed in the Memory workspace (INV-021).
+function AnswerContext({ context, onOpenMemory }) {
+  if (!context) return null;
+  const memories = Number(context.memory_context_count || 0);
+  const turns = Number(context.conversation_context_turn_count || 0);
+  if (!memories && !turns) return null;
+  return (
+    <p className="muted small answer-context" data-testid="answer-context">
+      Also used:{" "}
+      {memories > 0 &&
+        (onOpenMemory ? (
+          <button type="button" className="link-button" onClick={onOpenMemory}>
+            {plural(memories, "saved memory", "saved memories")}
+          </button>
+        ) : (
+          plural(memories, "saved memory", "saved memories")
+        ))}
+      {memories > 0 && turns > 0 && " · "}
+      {turns > 0 && `${plural(turns, "earlier message", "earlier messages")} from this chat`}
+    </p>
+  );
+}
+
 function Citations({ citations, onOpenCitation }) {
   if (!citations.length) return null;
   return (
@@ -227,7 +255,7 @@ function Citations({ citations, onOpenCitation }) {
   );
 }
 
-export function RunBlock({ view, onChanged, onOpenCitation, announce, messageEdits = {}, onEditMessage }) {
+export function RunBlock({ view, onChanged, onOpenCitation, onOpenMemory, announce, messageEdits = {}, onEditMessage }) {
   const [toolsOpen, setToolsOpen] = useState(false);
   const toolLabel = toolSummaryLabel(view.calls);
   const planSteps = view.plan?.steps || [];
@@ -322,6 +350,7 @@ export function RunBlock({ view, onChanged, onOpenCitation, announce, messageEdi
           </div>
         )}
         <Citations citations={view.citations} onOpenCitation={onOpenCitation} />
+        {view.answer && <AnswerContext context={view.context} onOpenMemory={onOpenMemory} />}
 
         {view.warnings.map((warning, index) => (
           <p key={index} className="notice" role="note">

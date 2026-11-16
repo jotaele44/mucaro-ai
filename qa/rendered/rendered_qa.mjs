@@ -820,6 +820,39 @@ async function guarded(label, viewport, body) {
   }
 }
 
+// INV-021: an answer says which saved memory and how much of this chat it used, and the Memory workspace
+// separates saved memory (kept across chats) from a chat's own earlier messages (used only in that chat).
+// Runs after the main scenarios, which saved one global memory ("Prefer tables for comparisons").
+async function memoryContextScenario(browser, base, viewport, profile) {
+  await guarded("memory context (INV-021)", viewport, async () => {
+    const context = await browser.newContext({ ...profile, baseURL: base });
+    const page = await context.newPage();
+    try {
+      await page.goto("/");
+      await page.locator("#composer-input").waitFor();
+      await ask(page, "How does source lineage work?");
+      const first = page.locator("article.run").last().getByTestId("answer-context");
+      await first.waitFor({ timeout: 8000 });
+      const firstText = (await first.innerText()).replace(/\s+/g, " ");
+      check("an answer names the saved memory it used (INV-021)", viewport, /\b1 saved memory\b/.test(firstText) && !/earlier message/.test(firstText), firstText);
+      await ask(page, "And how are chunks identified?");
+      const second = page.locator("article.run").last().getByTestId("answer-context");
+      await second.waitFor({ timeout: 8000 });
+      const secondText = (await second.innerText()).replace(/\s+/g, " ");
+      check("a follow-up names this chat's earlier messages separately from saved memory (INV-021)", viewport,
+        /saved memor/.test(secondText) && /earlier messages? from this chat/.test(secondText), secondText);
+      await second.getByRole("button", { name: /saved memor/ }).click();
+      await page.getByRole("heading", { name: "Memory" }).waitFor();
+      const note = (await page.getByTestId("memory-durable-note").innerText()).replace(/\s+/g, " ");
+      check("Memory separates saved memory from a chat's own messages (INV-021)", viewport,
+        /kept across chats/.test(note) && /used only in that chat/.test(note), note);
+      await shot(page, viewport, "memory-context");
+    } finally {
+      await context.close();
+    }
+  });
+}
+
 // The focused element as a short string; runs inside the page.
 const describeActive = () => {
   const el = document.activeElement;
@@ -1783,6 +1816,8 @@ try {
     axeResults.push(...(await executionEntryScenario(browser, base, "entry-393", { ...entryPhone, viewport: { width: 393, height: 852 } })));
     axeResults.push(...(await executionEntryScenario(browser, base, "entry-430", { ...entryPhone, viewport: { width: 430, height: 932 } })));
     await launchTokenScenario(browser, "desktop");
+    await memoryContextScenario(browser, base, "memory-desktop", desktopProfile());
+    await memoryContextScenario(browser, base, "memory-iphone", iphoneProfile());
     const headers = (await fetch(`${base}/`)).headers;
     check("security headers served with the UI", "desktop", headers.get("x-frame-options") === "DENY" && (headers.get("content-security-policy") || "").includes("frame-ancestors 'none'"));
   }

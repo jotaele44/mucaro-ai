@@ -87,7 +87,7 @@ function ConversationMenu({ conversation, onRename, onDelete, onOpenTasks, annou
   );
 }
 
-export function ChatView({ reconnect = 0, conversationId, onConversationCreated, onConversationsChanged, onOpenTasks, announce, modes, defaultOptions, onDefaultModelChange }) {
+export function ChatView({ reconnect = 0, conversationId, onConversationCreated, onConversationsChanged, onOpenTasks, announce, modes, defaultOptions, onDefaultModelChange, onOpenMemory }) {
   const [conversation, setConversation] = useState(null);
   // The model for a chat that has not started yet; it becomes the conversation's model on the first message.
   const [draftModel, setDraftModel] = useState(() => modelOf(defaultOptions));
@@ -482,6 +482,7 @@ export function ChatView({ reconnect = 0, conversationId, onConversationCreated,
             view={view}
             onChanged={() => loadRun(view.runId).then(refresh)}
             onOpenCitation={setCitation}
+            onOpenMemory={onOpenMemory}
             announce={announce}
             messageEdits={messageEdits}
             onEditMessage={saveMessageEdit}

@@ -32,6 +32,7 @@ export function deriveRun(run, events) {
     questionResolution: null,
     answer: "",
     citations: [],
+    context: null,
     artifacts: [],
     warnings: [],
     error: null,
@@ -97,6 +98,9 @@ export function deriveRun(run, events) {
         break;
       case "final":
         view.final = data;
+        break;
+      case "context":
+        view.context = data;
         break;
       default:
         break;
