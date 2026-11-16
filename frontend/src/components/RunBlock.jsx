@@ -216,7 +216,12 @@ function Citations({ citations, onOpenCitation }) {
           key={`${citation.chunk_id}-${citation.citation_order}`}
           type="button"
           className="citation-chip"
-          onClick={() => onOpenCitation(citation)}
+          onClick={(event) => {
+            // WebKit does not consistently focus buttons on pointer activation. Bind the
+            // modal opener explicitly so Sheet can restore focus to this exact citation.
+            event.currentTarget.focus({ preventScroll: true });
+            onOpenCitation(citation);
+          }}
           aria-label={`Open citation ${citation.citation_order}: ${citation.source_url || citation.source_id}`}
         >
           [{citation.citation_order}] {citation.source_url ? hostOf(citation.source_url) : citation.source_id.slice(0, 14)}
