@@ -320,6 +320,12 @@ async function scenario(browser, base, viewport, contextOptions) {
   );
 
   // Evidence sheet (TGT-030), Escape closes and restores focus.
+  // Negative regression: WebKit pointer activation does not reliably focus a button.
+  // Start from a competing composer focus and require the clicked citation to become
+  // the explicit return target rather than restoring this stale focus.
+  await page.getByLabel("Message Mucaro").focus();
+  const staleFocusId = await page.evaluate(() => document.activeElement?.id || "");
+  check("citation focus regression starts from stale composer focus", viewport, staleFocusId === "composer-input", staleFocusId);
   await citations.first().click();
   const evidence = page.getByRole("dialog", { name: /Evidence \[1\]/ });
   await evidence.waitFor();
@@ -328,8 +334,17 @@ async function scenario(browser, base, viewport, contextOptions) {
   await shot(page, viewport, "03-evidence");
   await page.keyboard.press("Escape");
   await evidence.waitFor({ state: "detached" });
-  const focusedName = await page.evaluate(() => document.activeElement?.getAttribute("aria-label") || "");
-  check("Escape closes the sheet and returns focus", viewport, focusedName.startsWith("Open citation"), focusedName);
+  const restoredFocus = await page.evaluate(() => ({
+    id: document.activeElement?.id || "",
+    name: document.activeElement?.getAttribute("aria-label") || "",
+  }));
+  check("Escape closes the sheet and returns focus", viewport, restoredFocus.name.startsWith("Open citation"), restoredFocus.name);
+  check(
+    "Escape does not restore stale pre-open focus",
+    viewport,
+    restoredFocus.id !== "composer-input" && restoredFocus.name.startsWith("Open citation"),
+    JSON.stringify(restoredFocus),
+  );
 
   // Approval-bound action (F07) and tool summary / drawer (F08, F09).
   await send(page, "/status");
@@ -567,6 +582,16 @@ async function scenario(browser, base, viewport, contextOptions) {
         smallTargets: targets.filter((el) => el.getBoundingClientRect().height < 44).map(label),
       };
     });
+    const retrievalSelect = await page.getByLabel("Strategy").evaluate((el) => {
+      const box = el.getBoundingClientRect();
+      return { height: box.height, minHeight: getComputedStyle(el).minHeight };
+    });
+    check(
+      "retrieval strategy select is at least 44px tall",
+      viewport,
+      retrievalSelect.height >= 44,
+      JSON.stringify(retrievalSelect),
+    );
     check("form fields are at least 16px (no iOS focus zoom)", viewport, touch.fields > 0 && touch.smallFonts.length === 0, touch.smallFonts.join(", ") || `${touch.fields} fields`);
     check("touch targets are at least 44px tall", viewport, touch.targets > 0 && touch.smallTargets.length === 0, touch.smallTargets.join(", ") || `${touch.targets} targets`);
   }

@@ -1318,6 +1318,12 @@ html {
     min-height: 44px;
   }
 
+  /* WebKit may keep native <select> intrinsic height below min-height; bind the
+     visible field control itself to the required touch target without changing appearance. */
+  :root .field select {
+    height: 44px;
+  }
+
   /* An icon has no text to widen its button, so it needs the 44px width explicitly. */
   :root .message-actions .icon-action {
     min-width: 44px;
