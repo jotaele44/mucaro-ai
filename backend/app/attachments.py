@@ -227,8 +227,11 @@ def _stored_text(folder: Path) -> str | None:
     by the most this module ever writes.
     """
     limit = MAX_DOCUMENT_CHARS * 4  # UTF-8 uses at most four bytes per character
+    path = folder / "text.txt"
+    if path.is_symlink():  # the only symlink guard on platforms without O_NOFOLLOW
+        return None
     try:
-        fd = os.open(folder / "text.txt", os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+        fd = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
     except OSError:
         return None
     try:
