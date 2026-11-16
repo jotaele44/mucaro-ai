@@ -1,6 +1,6 @@
 {
   "schema_version": "mucaro-release-acceptance-ledger/1.0",
-  "updated_utc": "2026-11-16T19:20:08Z",
+  "updated_utc": "2026-11-16T19:51:58Z",
   "rows": [
     {
       "requirement_id": "GOAL-001",
@@ -862,25 +862,33 @@
       "requirement_id": "INV-021",
       "requirement_text": "Memory authority",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "PARTIAL",
+      "implementation_state": "IMPLEMENTED",
       "implementation_refs": [
         "backend/app/memory.py",
-        "backend/app/memory_policy.py"
+        "backend/app/memory_policy.py",
+        "backend/app/work_runs.py",
+        "frontend/src/components/RunBlock.jsx",
+        "frontend/src/components/workspaces/MemoryWorkspace.jsx"
       ],
       "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
+      "positive_gate": "backend/tests/test_work_runs.py::test_answer_reports_saved_memory_and_chat_history_it_used_without_their_content",
+      "negative_gate": "backend/tests/test_prompt_injection.py::test_memory_instructions_cannot_authorize_tools",
       "benchmark": null,
       "evidence_refs": [
         "backend/tests/test_api.py::test_api_memory_controls_are_explicit_and_user_managed",
         "backend/tests/test_prompt_injection.py::test_memory_instructions_cannot_authorize_tools",
         "backend/tests/test_agent_loop.py::test_model_only_sees_enabled_memory_in_scope_and_cannot_list_the_rest",
-        "backend/tests/test_memory_scope.py::test_conversation_memory_is_never_selected_without_conversation_context"
+        "backend/tests/test_memory_scope.py::test_conversation_memory_is_never_selected_without_conversation_context",
+        "backend/tests/test_work_runs.py::test_answer_reports_saved_memory_and_chat_history_it_used_without_their_content",
+        "backend/tests/test_work_runs.py::test_disabled_memory_is_not_reported_as_used",
+        "qa/rendered/rendered_qa.mjs",
+        "https://github.com/jotaele44/mucaro-ai/actions/runs/43940319899",
+        "https://github.com/jotaele44/mucaro-ai/actions/runs/43941725229"
       ],
-      "state": "PROVISIONAL",
+      "state": "PASS",
       "blocker_id": null,
       "dag_node": "N14",
-      "notes": "Covered on main 6a2c396cb714fae9157fcf4a4bd920edfa98e68c: what is retained (list/export), provenance (source shown), scope (PR #143), mutation/disable/delete, and memory cannot authorize tools. Residue: the distinction between durable memory and current-conversation state is carried only by conversation-scoped durable rows and prompt wording; there is no explicit user-facing distinction, and no rendered check of it at the current head."
+      "notes": "PASS at main f67baceb067643b77fc94814319be05e0f556f41. Retained items (list/export), provenance, scope, mutation/disable/delete and memory-cannot-authorize-tools were already covered. The former residue is closed by PR #370: each answered run emits a context event with the count of saved memories and earlier chat messages used (ids and scope counts, never content); the answer shows 'Also used: N saved memory · N earlier messages from this chat' linking to Memory; the Memory workspace states that saved memory is kept across chats until turned off or deleted, while a chat's own earlier messages are used only in that chat and never saved; the conversation scope is bound to the current chat instead of a typed id. Rendered checks (memoryContextScenario, desktop and iPhone) passed in CI on chromium and webkit at PR #370 run 43940319899 and again at PR #371 run 43941725229, whose tree is the current main."
     },
     {
       "requirement_id": "INV-022",
@@ -2122,19 +2130,33 @@
       "requirement_id": "MATRIX-013",
       "requirement_text": "Memory benchmark",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "PARTIAL",
+      "implementation_state": "IMPLEMENTED",
       "implementation_refs": [
-        "backend/tests/test_memory_policy.py"
+        "backend/app/memory_benchmark.py",
+        "_architecture/memory_benchmark_v1.json",
+        "backend/tests/test_matrix013_memory_benchmark.py",
+        "scripts/certify_matrix013_memory.py",
+        ".github/workflows/matrix013-memory-cert.yml"
       ],
       "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
-      "benchmark": null,
-      "evidence_refs": [],
-      "state": "OPEN",
+      "positive_gate": ".github/workflows/matrix013-memory-cert.yml",
+      "negative_gate": "backend/tests/test_matrix013_memory_benchmark.py::test_matrix013_a_case_with_the_wrong_outcome_fails_the_receipt",
+      "benchmark": "_architecture/memory_benchmark_v1.json",
+      "evidence_refs": [
+        "_architecture/memory_benchmark_v1.json",
+        "backend/app/memory_benchmark.py",
+        "scripts/certify_matrix013_memory.py",
+        "backend/tests/test_matrix013_memory_benchmark.py::test_matrix013_frozen_manifest_matches_runtime_declaration",
+        "backend/tests/test_matrix013_memory_benchmark.py::test_matrix013_full_benchmark_closes_its_frozen_denominator",
+        "backend/tests/test_matrix013_memory_benchmark.py::test_matrix013_a_dropped_case_fails_the_denominator",
+        "backend/tests/test_matrix013_memory_benchmark.py::test_matrix013_a_crashing_case_is_recorded_as_a_failure",
+        "https://github.com/jotaele44/mucaro-ai/actions/runs/43943390101",
+        "https://github.com/jotaele44/mucaro-ai/actions/runs/43943390101/artifacts/14263257534"
+      ],
+      "state": "PASS",
       "blocker_id": null,
       "dag_node": "N14",
-      "notes": "Scope and conversation isolation, creation, disable, delete and auth are tested (test_memory_scope.py, test_api.py). Residue: no restart/persistence test and no single frozen memory-benchmark denominator (verification method is BENCHMARK)."
+      "notes": "PASS: exact-head MATRIX-013 certification at f67baceb067643b77fc94814319be05e0f556f41 (merge of PR #371) ran the frozen 13-case memory denominator covering all 10 contract categories (creation, retrieval, mutation, disablement, deletion, scope, conversation isolation, restart in a separate process, permission boundary, memory cannot authorize tools). Run 43943390101 completed SUCCESS and emitted MATRIX013_MEMORY_CERT_OK: 13/13 PASS, zero failures, arithmetic closed, failed_terminal_checks=[], receipt SHA-256 83155117eb65d18e4e0980698c071fcb29238e74726de1e0ede637936af778d1. Artifact 14263257534 is 5,344 bytes with GitHub artifact digest sha256:ca57a1b73d3e2ac9f1bf291223a156a664781d4c017e7e71d1fdef49d6019a88. Falsification: a forced wrong outcome, a dropped case and a crashing case each fail the receipt."
     },
     {
       "requirement_id": "MATRIX-014",
