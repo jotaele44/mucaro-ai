@@ -1,6 +1,6 @@
 {
   "schema_version": "mucaro-release-dag/1.0",
-  "updated_utc": "2026-11-16T19:51:58Z",
+  "updated_utc": "2026-11-17T03:33:09Z",
   "nodes": [
     {
       "node_id": "N00",
@@ -542,7 +542,7 @@
         "frozen thresholds + recovery benchmark"
       ],
       "blocker": null,
-      "notes": "MATRIX-017 PASS: frozen Apple-Silicon work-run performance benchmark run 38972805642 completed 20/20 with zero errors, p95 first-word 37.5 ms and p95 total 44.6 ms under pre-execution ceilings; RT-10 independently covers retrieval-scale performance. TGT-020 and MATRIX-017 are PASS. TGT-019 and MATRIX-016 recovery/offline-transition evidence remain open."
+      "notes": "MATRIX-017 PASS: frozen Apple-Silicon work-run performance benchmark run 38972805642 completed 20/20 with zero errors, p95 first-word 37.5 ms and p95 total 44.6 ms under pre-execution ceilings; RT-10 independently covers retrieval-scale performance. MATRIX-016 PASS: frozen 13-case recovery benchmark run 44008775914 at 8164989 (receipt 3a098ccd44c53363a9af9753728c818f38c4ccfb4b3441f47665818d6598da9a). TGT-020, MATRIX-016 and MATRIX-017 are PASS; the node stays OPEN while TGT-019 (offline) is PROVISIONAL."
     },
     {
       "node_id": "N22",
