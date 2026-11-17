@@ -14,10 +14,10 @@ Requirement denominator: 139 (arithmetic closes: yes).
 
 | State | Requirements |
 | --- | ---: |
-| PASS | 70 |
+| PASS | 71 |
 | FAIL | 0 |
 | OPEN | 33 |
-| BLOCKED | 6 |
+| BLOCKED | 5 |
 | PROVISIONAL | 29 |
 | NOT_APPLICABLE | 1 |
 
@@ -36,11 +36,11 @@ Requirement denominator: 139 (arithmetic closes: yes).
 Residue:
 
 - fail (0): none
-- blocked (5): `MATRIX-018`, `TGT-001`, `TGT-009`, `TGT-026`, `TGT-028`
+- blocked (4): `MATRIX-018`, `TGT-001`, `TGT-026`, `TGT-028`
 - externally blocked (1): `TGT-027`
 - provisional (29): 29 requirements (see `mucaro release scope status`)
 - open (33): 33 requirements (see `mucaro release scope status`)
-- active blockers: `BLK-LLM-001`, `BLK-PHYS-001`, `BLK-SIGN-001`, `BLK-WEB-001`
+- active blockers: `BLK-PHYS-001`, `BLK-SIGN-001`, `BLK-WEB-001`
 - unresolved material contradictions: none
 - open specification bindings: none
 <!-- END GENERATED: release-scope-status -->
