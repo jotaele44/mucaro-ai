@@ -80,17 +80,18 @@
       "external_dependency": "ANTHROPIC_API_KEY (operator-held).",
       "evidence": [
         "backend/app/model_router.py anthropic provider requires ANTHROPIC_API_KEY and MUCARO_AI_LIVE_MODE=1",
-        "current_state_snapshot_v1.json credentials: ANTHROPIC_API_KEY present=false"
+        "current_state_snapshot_v1.json credentials: ANTHROPIC_API_KEY present=false",
+        "_architecture/release/evidence/tgt009_live_9e8659bb22b3.json"
       ],
-      "what_would_unblock": "Operator runs the remote-provider evaluation with a key in a permissioned environment.",
+      "what_would_unblock": "RESOLVED",
       "dependent_nodes": [
         "N25"
       ],
       "independent_work_remaining": [
         "local provider, routing policy, offline behavior"
       ],
-      "status": "ACTIVE",
-      "resolution": null
+      "status": "RESOLVED",
+      "resolution": "Resolved 2026-11-17: the operator supplied an Anthropic API key for a one-off live evaluation. scripts/certify_tgt009_live.py ran at clean commit 9e8659bb22b35876e0fbb5e23b128d0f8b977fc6 and passed 5/5 (receipt _architecture/release/evidence/tgt009_live_9e8659bb22b3.json). The key was used only inside that process and is not stored in the repository."
     },
     {
       "blocker_id": "BLK-PHYS-001",

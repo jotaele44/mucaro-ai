@@ -1,6 +1,6 @@
 {
   "schema_version": "mucaro-release-dag/1.0",
-  "updated_utc": "2026-11-17T07:48:07Z",
+  "updated_utc": "2026-11-17T13:45:20Z",
   "nodes": [
     {
       "node_id": "N00",
@@ -333,7 +333,7 @@
         "model-routing benchmark"
       ],
       "blocker": null,
-      "notes": "Routing and MATRIX-012 PASS; local provider verified against a protocol-faithful fake server; real-model evaluation and live remote evaluation remain."
+      "notes": "Routing, MATRIX-012 and TGT-009 PASS (live remote evaluation 2026-11-17, receipt _architecture/release/evidence/tgt009_live_9e8659bb22b3.json); local provider verified against a protocol-faithful fake server. Remaining: real local-model evaluation (TGT-008) and INV-004 residue."
     },
     {
       "node_id": "N14",

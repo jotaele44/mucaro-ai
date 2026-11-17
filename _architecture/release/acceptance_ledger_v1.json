@@ -1,6 +1,6 @@
 {
   "schema_version": "mucaro-release-acceptance-ledger/1.0",
-  "updated_utc": "2026-11-17T07:48:07Z",
+  "updated_utc": "2026-11-17T13:45:20Z",
   "rows": [
     {
       "requirement_id": "GOAL-001",
@@ -1125,23 +1125,29 @@
       "requirement_id": "TGT-009",
       "requirement_text": "Permissioned remote AI",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "PARTIAL",
+      "implementation_state": "IMPLEMENTED",
       "implementation_refs": [
         "backend/app/model_router.py",
-        "backend/app/model_routing_policy.py"
+        "backend/app/model_routing_policy.py",
+        "backend/app/services.py",
+        "scripts/certify_tgt009_live.py"
       ],
       "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
+      "positive_gate": "_architecture/release/evidence/tgt009_live_9e8659bb22b3.json",
+      "negative_gate": "backend/tests/test_local_model.py::test_remote_forbidden_blocks_a_preferred_remote_provider",
       "benchmark": null,
       "evidence_refs": [
+        "_architecture/release/evidence/tgt009_live_9e8659bb22b3.json",
+        "scripts/certify_tgt009_live.py",
         "backend/tests/test_mock_model.py",
-        "backend/tests/test_local_model.py::test_remote_forbidden_blocks_a_preferred_remote_provider"
+        "backend/tests/test_local_model.py::test_remote_forbidden_blocks_a_preferred_remote_provider",
+        "backend/tests/test_local_model.py::test_system_offline_makes_remote_providers_ineligible",
+        "backend/tests/test_model_permission.py::test_anthropic_permission_denial_happens_before_sdk_transport"
       ],
-      "state": "BLOCKED",
-      "blocker_id": "BLK-LLM-001",
+      "state": "PASS",
+      "blocker_id": null,
       "dag_node": "N13",
-      "notes": "Credential-free work complete: remote use requires live mode + key + per-request allow_live, never implicit; the remote prompt uses the same fenced grounded prompt. Live remote evaluation needs an operator key."
+      "notes": "PASS: live remote evaluation with the operator's Anthropic key on 2026-11-17 at clean commit 9e8659bb22b35876e0fbb5e23b128d0f8b977fc6 (scripts/certify_tgt009_live.py; receipt _architecture/release/evidence/tgt009_live_9e8659bb22b3.json, TGT009_LIVE_CERT_OK, 5/5, receipt sha256 1537597542c11cc5c319e8a0d8f4239bb944616d47079995e7bc225ed4e40770). Through the app's own answer pipeline with every outbound request captured at the SDK client: (1) live mode off, (2) no per-request allow_live, (3) no API key and (4) an offline-only chat each refuse with ERROR_MODEL_ROUTE_BLOCKED and a plain reason, with zero requests sent; (5) with every permission given, claude-sonnet-5 answered in 1.5 s (251 input / 55 output tokens), CITATION_OK citing the one retrieved chunk, and exactly one request carried only that chunk: an unselected private document in the same workspace was never transmitted, and the key never appears in the request body or the receipt. Limits: one live request (path, not quality at scale); run from a cloud development container, not the packaged app; no CI run because the key is not a GitHub Actions secret."
     },
     {
       "requirement_id": "TGT-010",

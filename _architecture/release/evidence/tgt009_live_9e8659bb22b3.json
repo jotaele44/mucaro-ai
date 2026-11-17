@@ -1,0 +1,109 @@
+{
+  "arithmetic": {
+    "cases": 5,
+    "failed": 0,
+    "passed": 5
+  },
+  "case_rows": [
+    {
+      "case_id": "LIVE_MODE_OFF_REFUSED",
+      "expected": "ERROR_MODEL_ROUTE_BLOCKED (live mode is off), nothing transmitted",
+      "observed_detail": "The model provider anthropic cannot run: live mode is off (set MUCARO_AI_LIVE_MODE=1).",
+      "observed_status": "ERROR_MODEL_ROUTE_BLOCKED",
+      "passed": true,
+      "requests_transmitted": 0
+    },
+    {
+      "case_id": "NO_PER_REQUEST_PERMISSION_REFUSED",
+      "expected": "ERROR_MODEL_ROUTE_BLOCKED (has not been allowed for this chat), nothing transmitted",
+      "observed_detail": "The model provider anthropic cannot run: sending content to a remote model has not been allowed for this chat.",
+      "observed_status": "ERROR_MODEL_ROUTE_BLOCKED",
+      "passed": true,
+      "requests_transmitted": 0
+    },
+    {
+      "case_id": "NO_KEY_REFUSED",
+      "expected": "ERROR_MODEL_ROUTE_BLOCKED (is not set), nothing transmitted",
+      "observed_detail": "The model provider anthropic cannot run: the API key ANTHROPIC_API_KEY is not set.",
+      "observed_status": "ERROR_MODEL_ROUTE_BLOCKED",
+      "passed": true,
+      "requests_transmitted": 0
+    },
+    {
+      "case_id": "OFFLINE_CHAT_REFUSED",
+      "expected": "ERROR_MODEL_ROUTE_BLOCKED (restricted to offline models), nothing transmitted",
+      "observed_detail": "The model provider anthropic cannot run: this chat is restricted to offline models.",
+      "observed_status": "ERROR_MODEL_ROUTE_BLOCKED",
+      "passed": true,
+      "requests_transmitted": 0
+    },
+    {
+      "answer_excerpt": "Source lineage binds every chunk to a SHA-256 source identity and a stable chunk id (chunk_id=chunk_aaaed34b960bad2f).",
+      "answer_sha256": "8a3fb59cca7c6675017e3b53443256382152fe3cc12527f1f7b65c5772f8ef6e",
+      "case_id": "LIVE_ANSWER_SENDS_ONLY_RETRIEVED_CONTENT",
+      "checks": {
+        "answer_cites_a_retrieved_chunk": true,
+        "answered_by_remote_provider": true,
+        "citation_status_ok": true,
+        "exactly_one_request": true,
+        "key_not_in_request_body": true,
+        "retrieved_source_was_sent": true,
+        "unselected_private_source_not_sent": true
+      },
+      "citation_status": "CITATION_OK",
+      "cited_chunk_ids": [
+        "chunk_aaaed34b960bad2f"
+      ],
+      "elapsed_ms": 1452,
+      "expected": "remote answer citing the retrieved chunk; only that chunk transmitted",
+      "model_name": "claude-sonnet-5",
+      "model_provider": "anthropic",
+      "model_stop_reason": "end_turn",
+      "model_usage": {
+        "cache_creation_input_tokens": {
+          "basis": [],
+          "classification": "PROVIDER_REPORTED",
+          "source": "anthropic.response.usage.cache_creation_input_tokens",
+          "value": 0
+        },
+        "cache_read_input_tokens": {
+          "basis": [],
+          "classification": "PROVIDER_REPORTED",
+          "source": "anthropic.response.usage.cache_read_input_tokens",
+          "value": 0
+        },
+        "input_tokens": {
+          "basis": [],
+          "classification": "PROVIDER_REPORTED",
+          "source": "anthropic.response.usage.input_tokens",
+          "value": 251
+        },
+        "output_tokens": {
+          "basis": [],
+          "classification": "PROVIDER_REPORTED",
+          "source": "anthropic.response.usage.output_tokens",
+          "value": 55
+        }
+      },
+      "passed": true,
+      "request_body_sha256": "791554767b912a4e27ed44dd681946a4d59e64bc82cfde64f9df43f06c8e022d",
+      "requests_transmitted": 1,
+      "retrieved_chunk_ids": [
+        "chunk_aaaed34b960bad2f"
+      ]
+    }
+  ],
+  "executed_utc": "2026-11-17T13:48:42Z",
+  "head_sha": "9e8659bb22b35876e0fbb5e23b128d0f8b977fc6",
+  "limitations": [
+    "One live request to the default Anthropic model; it shows the governed path works end to end, not answer quality at scale.",
+    "Run from a cloud development container with the operator's key, not from the packaged macOS app.",
+    "The API key is never recorded; requests are recorded as digests plus the checks above."
+  ],
+  "provider": "anthropic",
+  "receipt_sha256": "1537597542c11cc5c319e8a0d8f4239bb944616d47079995e7bc225ed4e40770",
+  "requirement_id": "TGT-009",
+  "schema_version": "mucaro-tgt009-live-cert/1.0",
+  "status": "TGT009_LIVE_CERT_OK",
+  "worktree_clean": true
+}
