@@ -853,6 +853,89 @@ async function memoryContextScenario(browser, base, viewport, profile) {
   });
 }
 
+// TGT-014: a tool call the chat's model proposes is shown as the model's request, in the approval card and in the
+// Provenance record. A scripted OpenAI-compatible server stands in for a local model; nothing leaves the machine.
+async function startScriptedModel(model) {
+  const requests = [];
+  const server = http.createServer((req, res) => {
+    let body = "";
+    req.on("data", (chunk) => (body += chunk));
+    req.on("end", () => {
+      const send = (status, payload) => {
+        res.writeHead(status, { "content-type": "application/json" });
+        res.end(JSON.stringify(payload));
+      };
+      if (req.method === "GET" && req.url === "/v1/models") return send(200, { data: [{ id: model }] });
+      if (req.method !== "POST") return send(404, {});
+      requests.push(JSON.parse(body || "{}"));
+      const message = requests.length === 1
+        ? { role: "assistant", content: null, tool_calls: [{ id: "c1", type: "function", function: { name: "source_library__status", arguments: "{}" } }] }
+        : { role: "assistant", content: "Your library is ready." };
+      return send(200, { choices: [{ message }], usage: { prompt_tokens: 9, completion_tokens: 4, total_tokens: 13 } });
+    });
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  return { url: `http://127.0.0.1:${server.address().port}/v1`, requests, close: () => server.close() };
+}
+
+async function modelAttributionScenario(browser) {
+  const model = "qa-tool-model:1b";
+  const scripted = await startScriptedModel(model);
+  const modelPort = await freePort();
+  const modelBase = `http://127.0.0.1:${modelPort}`;
+  const noProxy = { HTTP_PROXY: "", HTTPS_PROXY: "", http_proxy: "", https_proxy: "", ALL_PROXY: "", all_proxy: "" };
+  const modelBackend = await startBackend(mkdtempSync(path.join(tmpdir(), "mucaro-qa-model-")), modelPort, {
+    ...noProxy,
+    MUCARO_AI_LOCAL_MODEL_URL: scripted.url,
+    MUCARO_AI_LOCAL_MODEL: model,
+  });
+  try {
+    if (!(await waitForHealth(modelBase))) throw new Error(`model backend did not start:\n${modelBackend.log()}`);
+    const created = await (await fetch(`${modelBase}/conversations`, jsonPost({ title: "Model attribution" }))).json();
+    const sent = await fetch(
+      `${modelBase}/conversations/${created.conversation_id}/messages`,
+      jsonPost({
+        prompt: "Check my library",
+        mode: "ask",
+        idempotency_key: `qa-${randomBytes(6).toString("hex")}`,
+        options: { model_provider: "openai_compatible_local", agent: true },
+      }),
+    );
+    if (!sent.ok) throw new Error(`send to scripted model: HTTP ${sent.status} ${await sent.text()}`);
+    const runId = (await sent.json()).run.run_id;
+    await waitServerRun(modelBase, runId, ["AWAITING_APPROVAL"]);
+    for (const [viewport, profile] of [["attribution-desktop", desktopProfile()], ["attribution-iphone", iphoneProfile()]]) {
+      await guarded("model attribution (TGT-014)", viewport, async () => {
+        const context = await browser.newContext({ ...profile, baseURL: modelBase });
+        await context.addInitScript((id) => localStorage.setItem("mucaro.activeConversation", JSON.stringify(id)), created.conversation_id);
+        const page = await context.newPage();
+        try {
+          await page.goto("/");
+          const card = page.getByRole("region", { name: "Permission request for source_library.status" });
+          await card.waitFor({ timeout: 15000 });
+          const kicker = ((await card.locator(".card-kicker").textContent()) || "").trim(); // DOM text; CSS uppercases it
+          check("a tool call the model proposed is labelled as the model's request (TGT-014)", viewport, kicker === "The model wants to run an action", kicker);
+          await shot(page, viewport, "model-attribution");
+          if (viewport === "attribution-iphone") await page.getByRole("button", { name: "Open navigation" }).click();
+          await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Provenance", exact: true }).click();
+          const row = page.locator(".tool-row").filter({ hasText: "source_library.status" }).first();
+          await row.waitFor({ timeout: 10000 });
+          await row.locator("summary").click();
+          const requestedBy = (await row.locator("dt:has-text('Requested by') + dd").innerText()).trim();
+          check("the Provenance record names the model as the requester (TGT-014)", viewport, requestedBy === "model", requestedBy);
+        } finally {
+          await context.close();
+        }
+      });
+    }
+    const call = (await (await fetch(`${modelBase}/tools/requests`)).json()).tool_calls.find((row) => row.run_id === runId);
+    check("the model's proposal waited for the person and did not run (TGT-014)", "attribution", call && call.status === "PENDING_APPROVAL" && !call.approved_by, JSON.stringify(call && { status: call.status, approved_by: call.approved_by }));
+  } finally {
+    modelBackend.kill("SIGTERM");
+    scripted.close();
+  }
+}
+
 // The focused element as a short string; runs inside the page.
 const describeActive = () => {
   const el = document.activeElement;
@@ -1818,6 +1901,7 @@ try {
     await launchTokenScenario(browser, "desktop");
     await memoryContextScenario(browser, base, "memory-desktop", desktopProfile());
     await memoryContextScenario(browser, base, "memory-iphone", iphoneProfile());
+    await modelAttributionScenario(browser);
     const headers = (await fetch(`${base}/`)).headers;
     check("security headers served with the UI", "desktop", headers.get("x-frame-options") === "DENY" && (headers.get("content-security-policy") || "").includes("frame-ancestors 'none'"));
   }
