@@ -146,8 +146,10 @@ from .validation import validate_project_json
 from .work_runs import (
     RunError,
     available_modes,
+    conversation_activity,
     edit_queued_run,
     get_run,
+    idle_activity,
     list_run_events,
     list_runs,
     reconcile_runs_on_startup,
@@ -736,7 +738,19 @@ def create_app(cfg: Settings = settings) -> FastAPI:
 
     @app.get("/conversations")
     def conversations() -> dict:
-        return {"conversations": list_conversations(cfg)}
+        # Each row carries its thread status so the list can show what is working, waiting or newly finished.
+        activity = conversation_activity(cfg)
+        return {
+            "conversations": [
+                {**row, "activity": activity.get(row["conversation_id"]) or idle_activity()} for row in list_conversations(cfg)
+            ]
+        }
+
+    @app.get("/conversations/activity")
+    def conversations_activity() -> dict:
+        # The light read the thread list polls while a run is active: run state only, no transcripts.
+        # Declared before /conversations/{conversation_id} so "activity" is never taken for an id.
+        return {"status": "CONVERSATION_ACTIVITY_OK", "activity": conversation_activity(cfg)}
 
     @app.post("/conversations")
     def create_chat(req: ConversationCreateRequest, _auth: dict = Depends(require_auth)) -> dict:
