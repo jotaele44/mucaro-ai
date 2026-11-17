@@ -3,6 +3,7 @@ import { api, authIssueOf, onAuthIssue } from "./api.js";
 import { ChatView } from "./components/ChatView.jsx";
 import { TasksDrawer } from "./components/TasksDrawer.jsx";
 import { TokenGate } from "./components/TokenGate.jsx";
+import { ACTIVITY_POLL_MS, anyBusy, applyActivity, attentionCount, reconcileSeen, threadMarker } from "./threadActivity.js";
 import { MemoryWorkspace } from "./components/workspaces/MemoryWorkspace.jsx";
 import { ProvenanceWorkspace } from "./components/workspaces/ProvenanceWorkspace.jsx";
 import { SettingsWorkspace } from "./components/workspaces/SettingsWorkspace.jsx";
@@ -45,6 +46,10 @@ const locked = (current, reason) => (current.state === "locked" && current.reaso
 export function App() {
   const [view, setView] = useState("chat");
   const [conversations, setConversations] = useState([]);
+  // False until the list has been read once: an empty list before that says nothing about what was seen.
+  const [listLoaded, setListLoaded] = useState(false);
+  // conversation id -> the newest result this browser has opened that chat at (see threadActivity.js).
+  const [seen, setSeen] = useState(() => stored("mucaro.seenResults", null));
   const [activeId, setActiveId] = useState(() => stored("mucaro.activeConversation", null));
   const [filter, setFilter] = useState("");
   const [navOpen, setNavOpen] = useState(false);
@@ -59,11 +64,13 @@ export function App() {
   const [gateBusy, setGateBusy] = useState(false);
   const [reconnect, setReconnect] = useState(0);
   const healthRef = useRef(health);
+  const rowsRef = useRef(conversations);
   const polling = useRef(false);
   const offline = useRef(false);
 
   useEffect(() => {
     healthRef.current = health;
+    rowsRef.current = conversations;
   });
 
   const announce = useCallback((text) => {
@@ -75,10 +82,26 @@ export function App() {
     try {
       const payload = await api.conversations();
       setConversations(payload.conversations || []);
+      setListLoaded(true);
     } catch {
       /* surfaced by the health banner */
     }
   }, []);
+
+  // While a run is active somewhere, re-read run state only (no transcripts) so the list shows each chat
+  // finishing. The list itself is read in full only when that shows it is stale (a run finished, or a chat
+  // this browser has not listed yet).
+  const pollActivity = useCallback(async () => {
+    try {
+      const payload = await api.conversationActivity();
+      const stale = applyActivity(rowsRef.current, payload.activity).stale;
+      // Applied to whatever the list is by then, so a list reloaded meanwhile is not replaced by an older one.
+      setConversations((current) => applyActivity(current, payload.activity).rows);
+      if (stale) loadConversations();
+    } catch {
+      /* surfaced by the health banner */
+    }
+  }, [loadConversations]);
 
   // Startup and Retry: decides between ready and unreachable.
   const checkHealth = useCallback(async () => {
@@ -180,6 +203,27 @@ export function App() {
   }
 
   useEffect(() => persist("mucaro.activeConversation", activeId), [activeId]);
+
+  // The chat on screen is seen up to its newest result; every other chat keeps its marker until it is opened.
+  const openId = view === "chat" ? activeId : null;
+  useEffect(() => {
+    if (listLoaded) setSeen((current) => reconcileSeen(current, conversations, openId));
+  }, [listLoaded, conversations, openId]);
+  useEffect(() => {
+    if (seen != null) persist("mucaro.seenResults", seen);
+  }, [seen]);
+
+  const busy = anyBusy(conversations);
+  const serviceUp = health.state === "ok" && !health.offline;
+  useEffect(() => {
+    if (!busy || !serviceUp) return undefined;
+    const timer = window.setInterval(() => {
+      if (!document.hidden) pollActivity();
+    }, ACTIVITY_POLL_MS);
+    return () => window.clearInterval(timer);
+  }, [busy, serviceUp, pollActivity]);
+  // Markers wait for the seen record, so a first load never flashes every finished chat as new.
+  const attention = seen ? attentionCount(conversations, seen, openId) : 0;
   useEffect(() => persist("mucaro.options", options), [options]);
 
   function openConversation(id) {
@@ -225,14 +269,25 @@ export function App() {
             <input type="search" placeholder="Filter conversations" value={filter} onChange={(event) => setFilter(event.target.value)} />
           </label>
           <ul className="conversation-list" aria-label="Conversations">
-            {visible.map((row) => (
-              <li key={row.conversation_id}>
-                <button type="button" aria-current={row.conversation_id === activeId && view === "chat" ? "true" : undefined} onClick={() => openConversation(row.conversation_id)}>
-                  <span className="conversation-title">{row.title}</span>
-                  <span className="muted small">{row.turn_count} turns</span>
-                </button>
-              </li>
-            ))}
+            {visible.map((row) => {
+              const marker = seen ? threadMarker(row, seen) : null;
+              return (
+                <li key={row.conversation_id}>
+                  <button type="button" aria-current={row.conversation_id === activeId && view === "chat" ? "true" : undefined} onClick={() => openConversation(row.conversation_id)}>
+                    <span className="conversation-title">{row.title}</span>
+                    <span className="conversation-meta muted small">
+                      <span>{row.turn_count} turns</span>
+                      {marker && (
+                        <span className={`thread-marker thread-${marker.kind}`}>
+                          <span className="thread-dot" aria-hidden="true" />
+                          {marker.label}
+                        </span>
+                      )}
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
             {!visible.length && <li className="muted small pad">{conversations.length ? "No matches." : "No conversations yet."}</li>}
           </ul>
         </div>
@@ -240,9 +295,22 @@ export function App() {
       <div className="nav-scrim" onClick={() => setNavOpen(false)} aria-hidden="true" />
       <main id="main" className="main" tabIndex={-1}>
         <div className="mobile-bar">
-          <button type="button" className="icon-button" aria-label="Open navigation" aria-expanded={navOpen} onClick={() => setNavOpen(true)}>
+          <button
+            type="button"
+            className="icon-button nav-toggle"
+            aria-label="Open navigation"
+            aria-describedby={attention ? "nav-attention" : undefined}
+            aria-expanded={navOpen}
+            onClick={() => setNavOpen(true)}
+          >
             ☰
+            {attention > 0 && <span className="thread-dot nav-dot" aria-hidden="true" />}
           </button>
+          {attention > 0 && (
+            <span id="nav-attention" className="sr-only">
+              {attention === 1 ? "1 other conversation has something new." : `${attention} other conversations have something new.`}
+            </span>
+          )}
           <span className="brand-inline">Mucaro</span>
         </div>
         {(health.state === "error" || health.offline) && (

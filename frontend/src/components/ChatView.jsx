@@ -302,6 +302,7 @@ export function ChatView({ reconnect = 0, conversationId, onConversationCreated,
         }
         const runList = await api.conversationRuns(id);
         setSummaries(runList.runs);
+        onConversationsChanged(); // the thread list shows this conversation as working at once
       }
       announce(result.run.state === "QUEUED" ? "Message queued." : "Message sent.");
     } catch (err) {
@@ -492,6 +493,9 @@ export function ChatView({ reconnect = 0, conversationId, onConversationCreated,
           <NextVectorPicker
             key={views[views.length - 1].runId}
             request={views[views.length - 1].prompt}
+            // The vector this run's answer closed with, if any: offered first, sent only by Start.
+            proposal={views[views.length - 1].nextVector}
+            announce={announce}
             // Follow-up selection is not tool approval. Use the canonical ask-first mode.
             onStart={(prompt, idempotencyKey) => send(prompt, "ask", idempotencyKey)}
           />

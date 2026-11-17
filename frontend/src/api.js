@@ -255,6 +255,7 @@ export const api = {
   workbenchPlan: (payload) => request("/workbench/plan", json("POST", payload)),
 
   conversations: () => request("/conversations"),
+  conversationActivity: () => request("/conversations/activity"),
   createConversation: (title, model) => request("/conversations", json("POST", model ? { title, model } : { title })),
   setConversationModel: (id, model) => request(`/conversations/${id}/model`, json("PUT", model)),
   setConversationRepo: (id, repo) => request(`/conversations/${id}/repo`, json("PUT", repo)),

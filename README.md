@@ -195,6 +195,24 @@ the desktop app asks where to save it. **Share** opens the system share sheet wi
 `.txt` file. Browsers offer the share sheet only on https or on the computer itself, so a phone
 that opens Mucaro over plain http saves the file instead; see `docs/PHONE_ACCESS.md`.
 
+## Relaying the next vector
+
+After a finished answer Mucaro offers a next step: **Choose the next vector**, then **Start selected vector**.
+The four built-in choices ask the model to close its reply with a `NEXT VECTOR:` block (an anchor line and `→`
+steps, then `CROSS ALL T'S:`, `MAXIMIZE YIELD:` and `FINAL GATE:` rows). When a reply closes with such a block,
+that vector is listed first and one tap on **Start selected vector** sends it as your next message. **Preview
+exact prompt** shows exactly what will be sent. Each code block also has its own copy button, and **Copy
+proposed vector** copies the block alone.
+
+A proposed vector is the model's suggestion. It is never sent for you, actions it leads to still ask first, and
+the gate states in it are what the model wrote, not something Mucaro checked. A block that contains a line
+starting with `/` is not offered, because Mucaro reads such a line in a message as a command.
+
+The conversation list shows what each chat is doing: **Working**, **Needs your approval**, **New result** and
+**Next vector ready**. A chat keeps working after you open another one. Which results you have opened is
+remembered per browser. The built-in mock answerer only quotes sources and never writes a block; use a local,
+remote or Claude model for the relay. See `docs/VIDEO_VECTOR_RELAY_V1.md` for what is and is not verified.
+
 ## Measuring latency
 
 ```bash
