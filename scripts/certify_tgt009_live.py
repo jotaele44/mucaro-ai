@@ -116,7 +116,7 @@ def _gate_case(case_id: str, cfg: Settings, sent: list, key: str, env: dict[str,
 
 
 def _live_case(cfg: Settings, sent: list, key: str) -> dict[str, Any]:
-    _set_env(key, ANTHROPIC_API_KEY="<key>", MUCARO_AI_LIVE_MODE="1")
+    _set_env(key, **{"ANTHROPIC_API_KEY": "<key>", "MUCARO_AI_LIVE_MODE": "1"})
     before = len(sent)
     started = time.monotonic()
     result = answer_question(QUESTION, model_provider="anthropic", allow_live=True, top_k=1, cfg=cfg, persist=False)
