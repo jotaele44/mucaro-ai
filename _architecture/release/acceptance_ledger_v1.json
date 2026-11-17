@@ -1,6 +1,6 @@
 {
   "schema_version": "mucaro-release-acceptance-ledger/1.0",
-  "updated_utc": "2026-11-17T03:33:09Z",
+  "updated_utc": "2026-11-17T07:48:07Z",
   "rows": [
     {
       "requirement_id": "GOAL-001",
@@ -575,16 +575,18 @@
       "dependencies": [],
       "positive_gate": "backend/tests/test_work_runs.py::test_ask_mode_waits_for_approval_then_resumes",
       "negative_gate": "backend/tests/test_work_runs.py::test_auto_mode_preapproves_only_local_read_only_tools",
-      "benchmark": null,
+      "benchmark": "_architecture/tool_governance_benchmark_v1.json",
       "evidence_refs": [
         "backend/tests/test_contracts.py::test_decision_against_stale_arguments_is_refused",
         "backend/tests/test_work_runs.py::test_retry_in_ask_mode_needs_a_fresh_approval",
-        "backend/tests/test_work_runs.py::test_plan_mode_executes_nothing"
+        "backend/tests/test_work_runs.py::test_plan_mode_executes_nothing",
+        "_architecture/tool_governance_benchmark_v1.json",
+        "https://github.com/jotaele44/mucaro-ai/actions/runs/44041191535"
       ],
       "state": "PASS",
       "blocker_id": null,
       "dag_node": "N05",
-      "notes": "All run actions use the approval-gated tool runtime; auto mode pre-approves only local, non-mutating tools; retries need fresh approval; approvals bind to immutable calls."
+      "notes": "All run actions use the approval-gated tool runtime; auto mode pre-approves only local, non-mutating tools; retries need fresh approval; approvals bind to immutable calls. The authority rules (planning never authorizes, no undeclared escalation, approval bound to the arguments, tamper-evident audit, memory and revoked leases cannot authorize) are cases in the frozen MATRIX-011 benchmark: Frozen tool-governance benchmark MATRIX-011-v1 certified on main 0da925cf2c1059060fbd5f69ab2358d08e6808aa (merge of PR #377): run 44041191535 SUCCESS, MATRIX011_TOOL_GOVERNANCE_CERT_OK, 23/23 cases over 21 categories (the nine action classes, the permission taxonomy, the authority rules), arithmetic closed, receipt SHA-256 aeb1c9f5535661c4b04848478b0891f326f95d9e3d98edf574b9bc7ef0f7d5d2; artifact 14309382150, 9,819 bytes, digest sha256:92c06be0c9c3078e1ccb89ebbb03166bf4ff35b951149a20a845b1c59192a188. A forced wrong outcome, a dropped case and a crashing case each fail the receipt."
     },
     {
       "requirement_id": "INV-007",
@@ -1256,26 +1258,36 @@
       "requirement_id": "TGT-014",
       "requirement_text": "Governed tool execution",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "PARTIAL",
+      "implementation_state": "IMPLEMENTED",
       "implementation_refs": [
-        "backend/app/tools.py"
+        "backend/app/tools.py",
+        "backend/app/work_runs.py",
+        "backend/app/agent_loop.py",
+        "frontend/src/components/RunBlock.jsx",
+        "frontend/src/components/workspaces/ProvenanceWorkspace.jsx"
       ],
       "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
-      "benchmark": null,
+      "positive_gate": "backend/tests/test_agent_loop.py::test_model_proposal_waits_for_the_person_then_its_result_feeds_the_answer",
+      "negative_gate": "backend/tests/test_agent_loop.py::test_auto_mode_asks_per_call_when_the_model_is_remote",
+      "benchmark": "_architecture/tool_governance_benchmark_v1.json",
       "evidence_refs": [
         "backend/tests/test_contracts.py::test_api_cancel_and_summary_routes",
         "backend/tests/test_contracts.py::test_summary_counts_close_arithmetically",
         "backend/tests/test_agent_loop.py::test_model_proposal_waits_for_the_person_then_its_result_feeds_the_answer",
         "backend/tests/test_agent_loop.py::test_denied_proposal_is_reported_to_the_model_and_never_runs",
         "backend/tests/test_agent_loop.py::test_proposals_outside_the_catalogue_or_with_extra_arguments_are_refused_before_any_request",
-        "backend/tests/test_agent_loop.py::test_auto_mode_asks_per_call_when_the_model_is_remote"
+        "backend/tests/test_agent_loop.py::test_auto_mode_asks_per_call_when_the_model_is_remote",
+        "_architecture/tool_governance_benchmark_v1.json",
+        "backend/tests/test_matrix011_tool_governance_benchmark.py::test_matrix011_full_benchmark_closes_its_frozen_denominator",
+        "qa/rendered/rendered_qa.mjs",
+        "https://github.com/jotaele44/mucaro-ai/actions/runs/44041191535",
+        "https://github.com/jotaele44/mucaro-ai/actions/runs/44041191535/artifacts/14309382150",
+        "https://github.com/jotaele44/mucaro-ai/actions/runs/44026675626"
       ],
-      "state": "PROVISIONAL",
+      "state": "PASS",
       "blocker_id": null,
       "dag_node": "N05",
-      "notes": "Permission-aware, audited (hash chain), attributable, cancellable before start, failure-aware. Model-initiated calls go through the same gate as ordinary calls with requested_by=model. Owner decision 2026-11-16: in Auto mode a model's proposals are pre-approved only when the chat's model runs locally; with a remote model every proposed call asks first, so local content never reaches a remote provider without per-call approval (test_auto_mode_asks_per_call_when_the_model_is_remote). Residue: no rendered check of model attribution at the current head; DAG N05 still needs its tool-governance benchmark."
+      "notes": "PASS at main 0da925cf2c1059060fbd5f69ab2358d08e6808aa. Permission-aware, audited (hash chain), attributable, cancellable before start, failure-aware; model-initiated calls go through the same gate with requested_by=model; in Auto mode a remote model's proposals ask per call (owner decision 2026-11-16). Both former residues are closed: (1) DAG N05's tool-governance benchmark: Frozen tool-governance benchmark MATRIX-011-v1 certified on main 0da925cf2c1059060fbd5f69ab2358d08e6808aa (merge of PR #377): run 44041191535 SUCCESS, MATRIX011_TOOL_GOVERNANCE_CERT_OK, 23/23 cases over 21 categories (the nine action classes, the permission taxonomy, the authority rules), arithmetic closed, receipt SHA-256 aeb1c9f5535661c4b04848478b0891f326f95d9e3d98edf574b9bc7ef0f7d5d2; artifact 14309382150, 9,819 bytes, digest sha256:92c06be0c9c3078e1ccb89ebbb03166bf4ff35b951149a20a845b1c59192a188. A forced wrong outcome, a dropped case and a crashing case each fail the receipt. (2) Rendered model attribution: rendered QA starts a scripted local model that proposes source_library.status; on desktop and iPhone the approval card reads 'The model wants to run an action', the Provenance record shows Requested by: model, and the call stays PENDING_APPROVAL; passed on chromium and webkit in PR #377 run 44026675626, whose tree is main's merge parent (rendered QA does not run on main pushes)."
     },
     {
       "requirement_id": "TGT-015",
@@ -1522,7 +1534,7 @@
       "dependencies": [],
       "positive_gate": "backend/tests/test_permissions.py::test_external_path_requires_then_accepts_directory_grant",
       "negative_gate": "backend/tests/test_tools.py::test_tool_runtime_requires_approval_before_execution",
-      "benchmark": null,
+      "benchmark": "_architecture/tool_governance_benchmark_v1.json",
       "evidence_refs": [
         "backend/tests/test_permissions.py::test_directory_grant_rejects_filesystem_root",
         "backend/tests/test_web_browsing.py::test_validate_web_fetch_url_blocks_private_dns_resolution",
@@ -1534,12 +1546,14 @@
         "backend/tests/test_tools.py::test_tool_runtime_web_search_stays_fail_closed_without_live_permission",
         "backend/tests/test_work_runs.py::test_retry_in_ask_mode_needs_a_fresh_approval",
         "backend/tests/test_prompt_injection.py::test_injected_document_cannot_create_tool_calls_or_approvals",
-        "backend/tests/test_api_auth_boundary.py::test_data_bearing_routes_reject_missing_token_when_configured"
+        "backend/tests/test_api_auth_boundary.py::test_data_bearing_routes_reject_missing_token_when_configured",
+        "_architecture/tool_governance_benchmark_v1.json",
+        "https://github.com/jotaele44/mucaro-ai/actions/runs/44041191535"
       ],
       "state": "PASS",
       "blocker_id": null,
       "dag_node": "N05",
-      "notes": "Permissions and their negative gates:\n- Filesystem: directory grants.\n- Network: remote tools need approval; SSRF/private-address blocking; the service listens on loopback only.\n- Models: loopback-only local provider; routing modes local-only, remote-forbidden and offline.\n- Tools: per-call approval bound to the argument digest; unknown tools are refused.\n- External services: web search stays fail-closed without live permission and a key.\n- Consequential actions: mutating tools need approval; a retry needs a fresh approval; untrusted content cannot create approvals.\n- API: token boundary.\nThe security gate permission_boundaries checks the registry on every run."
+      "notes": "Permissions and their negative gates:\n- Filesystem: directory grants.\n- Network: remote tools need approval; SSRF/private-address blocking; the service listens on loopback only.\n- Models: loopback-only local provider; routing modes local-only, remote-forbidden and offline.\n- Tools: per-call approval bound to the argument digest; unknown tools are refused.\n- External services: web search stays fail-closed without live permission and a key.\n- Consequential actions: mutating tools need approval; a retry needs a fresh approval; untrusted content cannot create approvals.\n- API: token boundary.\nThe security gate permission_boundaries checks the registry on every run. The permission taxonomy (filesystem grants and escapes, network gates, model denial before transport, side-effecting capabilities, distribution channel, unknown inputs) is part of the frozen MATRIX-011 benchmark: Frozen tool-governance benchmark MATRIX-011-v1 certified on main 0da925cf2c1059060fbd5f69ab2358d08e6808aa (merge of PR #377): run 44041191535 SUCCESS, MATRIX011_TOOL_GOVERNANCE_CERT_OK, 23/23 cases over 21 categories (the nine action classes, the permission taxonomy, the authority rules), arithmetic closed, receipt SHA-256 aeb1c9f5535661c4b04848478b0891f326f95d9e3d98edf574b9bc7ef0f7d5d2; artifact 14309382150, 9,819 bytes, digest sha256:92c06be0c9c3078e1ccb89ebbb03166bf4ff35b951149a20a845b1c59192a188. A forced wrong outcome, a dropped case and a crashing case each fail the receipt."
     },
     {
       "requirement_id": "TGT-026",
@@ -2091,12 +2105,16 @@
       "implementation_refs": [
         "backend/app/tools.py",
         "backend/app/work_runs.py",
-        "backend/app/error_categories.py"
+        "backend/app/error_categories.py",
+        "backend/app/tool_governance_benchmark.py",
+        "_architecture/tool_governance_benchmark_v1.json",
+        "scripts/certify_matrix011_tool_governance.py",
+        ".github/workflows/matrix011-tool-governance-cert.yml"
       ],
       "dependencies": [],
       "positive_gate": "backend/tests/test_contracts.py::test_allowed_approved_action_executes_once_and_duplicate_invocation_is_refused",
       "negative_gate": "backend/tests/test_tools.py::test_a_hung_handler_times_out_and_is_never_recorded_as_executed",
-      "benchmark": null,
+      "benchmark": "_architecture/tool_governance_benchmark_v1.json",
       "evidence_refs": [
         "backend/tests/test_contracts.py::test_denied_and_cancelled_actions_never_execute",
         "backend/tests/test_tools.py::test_tool_runtime_requires_approval_before_execution",
@@ -2105,12 +2123,18 @@
         "backend/tests/test_work_runs.py::test_failed_action_asks_and_retry_repeats_only_the_failed_target",
         "backend/tests/test_contracts.py::test_restart_marks_running_calls_interrupted_without_retrying",
         "backend/tests/test_contracts.py::test_concurrent_runs_execute_the_handler_exactly_once",
-        "backend/tests/test_contracts.py::test_audit_chain_verifies_and_detects_tampering"
+        "backend/tests/test_contracts.py::test_audit_chain_verifies_and_detects_tampering",
+        "_architecture/tool_governance_benchmark_v1.json",
+        "backend/tests/test_matrix011_tool_governance_benchmark.py::test_matrix011_full_benchmark_closes_its_frozen_denominator",
+        "backend/tests/test_matrix011_tool_governance_benchmark.py::test_matrix011_a_case_with_the_wrong_outcome_fails_the_receipt",
+        "backend/tests/test_matrix011_tool_governance_benchmark.py::test_matrix011_a_dropped_case_fails_the_denominator",
+        "https://github.com/jotaele44/mucaro-ai/actions/runs/44041191535",
+        "https://github.com/jotaele44/mucaro-ai/actions/runs/44041191535/artifacts/14309382150"
       ],
       "state": "PASS",
       "blocker_id": null,
       "dag_node": "N05",
-      "notes": "All nine action classes are covered with audit and state truthfulness: allowed, denied, approval-required, cancelled, tool error/crash (FAILED, never left RUNNING), TIMEOUT, retry (failed target only, fresh approval), restart (RUNNING -> INTERRUPTED, no auto-retry) and duplicate invocation (atomic claim, handler runs exactly once). TIMEOUT: every handler runs under a per-tool wall-clock bound (default 120 s). On expiry the call is FAILED with ERROR_TOOL_TIMEOUT (category TOOL_FAILURE) and handler_abandoned=true. A mutating tool is marked side_effects=UNKNOWN because Python cannot kill the thread. A late return is discarded and never recorded as EXECUTED. The audit log is hash-chained and tamper-evident."
+      "notes": "All nine action classes are covered with audit and state truthfulness: allowed, denied, approval-required, cancelled, tool error/crash (FAILED, never left RUNNING), TIMEOUT, retry (failed target only, fresh approval), restart (RUNNING -> INTERRUPTED, no auto-retry) and duplicate invocation (atomic claim, handler runs exactly once). TIMEOUT: every handler runs under a per-tool wall-clock bound (default 120 s). On expiry the call is FAILED with ERROR_TOOL_TIMEOUT (category TOOL_FAILURE) and handler_abandoned=true. A mutating tool is marked side_effects=UNKNOWN because Python cannot kill the thread. A late return is discarded and never recorded as EXECUTED. The audit log is hash-chained and tamper-evident. Frozen tool-governance benchmark MATRIX-011-v1 certified on main 0da925cf2c1059060fbd5f69ab2358d08e6808aa (merge of PR #377): run 44041191535 SUCCESS, MATRIX011_TOOL_GOVERNANCE_CERT_OK, 23/23 cases over 21 categories (the nine action classes, the permission taxonomy, the authority rules), arithmetic closed, receipt SHA-256 aeb1c9f5535661c4b04848478b0891f326f95d9e3d98edf574b9bc7ef0f7d5d2; artifact 14309382150, 9,819 bytes, digest sha256:92c06be0c9c3078e1ccb89ebbb03166bf4ff35b951149a20a845b1c59192a188. A forced wrong outcome, a dropped case and a crashing case each fail the receipt."
     },
     {
       "requirement_id": "MATRIX-012",
