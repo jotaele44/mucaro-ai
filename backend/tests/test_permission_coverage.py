@@ -38,6 +38,7 @@ EXEMPT = {
     "macos_app_store.py": "release tooling",
     "memory_benchmark.py": "certification harness re-running the project's own interpreter for the MATRIX-013 restart case",
     "macos_distribution.py": "release tooling",
+    "recovery_benchmark.py": "certification harness re-running the project's own interpreter for the MATRIX-016 restart cases",
     "packaging.py": "release tooling",
     "portable_runtime.py": "release tooling",
     "portable_runtime_source.py": "release/runtime acquisition tooling",
