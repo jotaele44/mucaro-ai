@@ -1,6 +1,6 @@
 {
   "schema_version": "mucaro-release-dag/1.0",
-  "updated_utc": "2026-11-17T03:33:09Z",
+  "updated_utc": "2026-11-17T07:48:07Z",
   "nodes": [
     {
       "node_id": "N00",
@@ -138,7 +138,7 @@
         "N02",
         "N03"
       ],
-      "state": "OPEN",
+      "state": "PASS",
       "risk": "HIGH",
       "user_value": "HIGH",
       "downstream_unlock_value": "HIGH",
@@ -147,7 +147,7 @@
         "tool-governance benchmark"
       ],
       "blocker": null,
-      "notes": ""
+      "notes": "PASS at main 0da925cf2c1059060fbd5f69ab2358d08e6808aa: TGT-014, TGT-025, INV-006 and MATRIX-011 are all PASS, and the required tool-governance benchmark is met by MATRIX-011 run 44041191535 (23/23, receipt aeb1c9f5535661c4b04848478b0891f326f95d9e3d98edf574b9bc7ef0f7d5d2). Dependency N03 is still PROVISIONAL (TGT-016, INV-005, TGT-038), so this node's PASS stands on its own rows, not on N03."
     },
     {
       "node_id": "N06",
