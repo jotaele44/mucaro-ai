@@ -613,3 +613,30 @@ def test_disabled_memory_is_not_reported_as_used(cfg, conversation):
     context = next(event["data"] for event in list_run_events(run["run_id"], cfg=cfg) if event["type"] == "context")
     assert context["memory_context_count"] == 0
     assert context["memory_ids"] == []
+
+
+# --- TGT-019: an offline device is told so, at once -------------------------------------------
+
+
+def test_offline_device_refuses_a_remote_model_at_once_and_says_why(cfg, conversation, monkeypatch):
+    from backend.app import model_router
+
+    monkeypatch.setenv("MUCARO_AI_LIVE_MODE", "1")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-placeholder")
+    reached = []
+    monkeypatch.setattr(model_router, "_anthropic_answer", lambda *a, **k: reached.append(1) or {})
+    options = {"model_provider": "anthropic", "allow_live": True, "system_offline": True}
+    run = get_run(_submit(conversation, "How does source lineage work?", cfg, options=options)["run_id"], cfg)
+    assert run["state"] == "FAILED"
+    assert run["error"]["status"] == "ERROR_MODEL_ROUTE_BLOCKED"
+    assert "the network is unavailable" in run["error"]["detail"]
+    assert reached == []
+    route = next(event for event in list_run_events(run["run_id"], cfg=cfg) if event["type"] == "route")["data"]
+    assert route["selected_provider"] != "anthropic"
+
+
+def test_offline_device_still_answers_with_a_local_model(cfg, conversation):
+    options = {"model_provider": "mock", "system_offline": True}
+    run = get_run(_submit(conversation, "How does source lineage work?", cfg, options=options)["run_id"], cfg)
+    assert run["state"] == "COMPLETED"
+    assert run["outcome"] == "ANSWERED"

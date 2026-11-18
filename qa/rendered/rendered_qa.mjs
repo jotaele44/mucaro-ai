@@ -936,6 +936,64 @@ async function modelAttributionScenario(browser) {
   }
 }
 
+// TGT-019: when the device reports no network, the app says so, keeps local work running, sends the fact with each
+// message (remote models are then refused at once rather than timing out), and Settings marks network-only items as
+// unavailable offline. navigator.onLine is overridden because emulating offline in the browser would also cut the
+// loopback service, which keeps running on a real offline computer.
+async function deviceOfflineScenario(browser, base, viewport, profile) {
+  await guarded("device offline (TGT-019)", viewport, async () => {
+    const context = await browser.newContext({ ...profile, baseURL: base });
+    await context.addInitScript(() => {
+      window.__mucaroOffline = false;
+      Object.defineProperty(Navigator.prototype, "onLine", { configurable: true, get: () => !window.__mucaroOffline });
+    });
+    const page = await context.newPage();
+    const setOffline = (value) => page.evaluate((offline) => {
+      window.__mucaroOffline = offline;
+      window.dispatchEvent(new Event(offline ? "offline" : "online"));
+    }, value);
+    const openSettings = async () => {
+      if (viewport.includes("iphone")) await page.getByRole("button", { name: "Open navigation" }).click();
+      await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Settings", exact: true }).click();
+      await page.getByText("What works offline").waitFor();
+    };
+    const openChat = async () => {
+      if (viewport.includes("iphone")) await page.getByRole("button", { name: "Open navigation" }).click();
+      await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Chat", exact: true }).click();
+      await page.locator("#composer-input").waitFor();
+    };
+    try {
+      await page.goto("/");
+      await page.locator("#composer-input").waitFor();
+      check("no offline notice while the device is online (TGT-019)", viewport, (await page.getByTestId("device-offline").count()) === 0);
+      await setOffline(true);
+      const notice = await appears(page.getByTestId("device-offline"));
+      check("going offline shows that local work continues and network items are unavailable (TGT-019)", viewport,
+        notice && /Local features keep working/.test(await page.getByTestId("device-offline").innerText()));
+      const sent = page.waitForRequest((req) => req.method() === "POST" && /\/conversations\/[^/]+\/messages$/.test(new URL(req.url()).pathname));
+      await ask(page, "How does source lineage work?");
+      const options = JSON.parse((await sent).postData() || "{}").options || {};
+      check("a local answer still completes while offline, and the message says the device is offline (TGT-019)", viewport,
+        options.system_offline === true, JSON.stringify({ system_offline: options.system_offline }));
+      await openSettings();
+      const unavailable = await page.locator('[data-state="UNAVAILABLE_OFFLINE"]').count();
+      const needsNetworkOffline = await page.locator(".offline-list").getByText("Needs network", { exact: true }).count();
+      const statusOffline = await page.getByTestId("offline-status").innerText();
+      check("Settings marks network-only capabilities Unavailable offline while offline (TGT-019)", viewport,
+        unavailable > 0 && needsNetworkOffline === 0 && /offline/.test(statusOffline), `unavailable=${unavailable}, needs network=${needsNetworkOffline}`);
+      await shot(page, viewport, "device-offline-settings");
+      await setOffline(false);
+      await page.locator(".offline-list").getByText("Needs network", { exact: true }).first().waitFor({ timeout: 8000 });
+      const unavailableOnline = await page.locator('[data-state="UNAVAILABLE_OFFLINE"]').count();
+      check("back online, the same capabilities read Needs network and the notice clears (TGT-019)", viewport,
+        unavailableOnline === 0 && (await page.getByTestId("device-offline").count()) === 0, `unavailable=${unavailableOnline}`);
+      await openChat();
+    } finally {
+      await context.close();
+    }
+  });
+}
+
 // The focused element as a short string; runs inside the page.
 const describeActive = () => {
   const el = document.activeElement;
@@ -1902,6 +1960,8 @@ try {
     await memoryContextScenario(browser, base, "memory-desktop", desktopProfile());
     await memoryContextScenario(browser, base, "memory-iphone", iphoneProfile());
     await modelAttributionScenario(browser);
+    await deviceOfflineScenario(browser, base, "offline-desktop", desktopProfile());
+    await deviceOfflineScenario(browser, base, "offline-iphone", iphoneProfile());
     const headers = (await fetch(`${base}/`)).headers;
     check("security headers served with the UI", "desktop", headers.get("x-frame-options") === "DENY" && (headers.get("content-security-policy") || "").includes("frame-ancestors 'none'"));
   }

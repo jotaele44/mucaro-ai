@@ -805,6 +805,7 @@ def _phase_start(run: dict[str, Any], cfg: Settings) -> None:
             preferred_model=options.get("model_name"),
             allow_live=bool(options.get("allow_live")),
             require_offline=bool(options.get("require_offline")),
+            system_offline=bool(options.get("system_offline")),
             cfg=cfg,
         )
         route_event = {
@@ -1088,6 +1089,7 @@ def _phase_agent(run: dict[str, Any], cfg: Settings) -> bool:
             preferred_model=options.get("model_name"),
             allow_live=bool(options.get("allow_live")),
             require_offline=bool(options.get("require_offline")),
+            system_offline=bool(options.get("system_offline")),
             cfg=cfg,
         )
     except (ModelRoutingError, ModelProviderError) as exc:
@@ -1228,6 +1230,7 @@ def _phase_answer(run: dict[str, Any], cfg: Settings) -> None:
             allow_mock_fallback=bool(options.get("allow_mock_fallback")),
             allow_live=bool(options.get("allow_live")),
             require_offline=bool(options.get("require_offline")),
+            system_offline=bool(options.get("system_offline")),
             conversation_context=build_conversation_context(conversation),
             conversation_scope_id=run["conversation_id"],
             cfg=cfg,

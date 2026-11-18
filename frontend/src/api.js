@@ -250,7 +250,7 @@ export const api = {
   models: () => request("/models"),
   saveModelSettings: (payload) => request("/models/settings", json("PUT", payload)),
   probeModels: (baseUrl, apiKey) => request("/models/probe", json("POST", apiKey ? { base_url: baseUrl, api_key: apiKey } : { base_url: baseUrl })),
-  offlineManifest: () => request("/offline-manifest"),
+  offlineManifest: (offline = false) => request(`/offline-manifest?offline=${offline ? "true" : "false"}`),
   modes: () => request("/work-runs/modes"),
   workbenchPlan: (payload) => request("/workbench/plan", json("POST", payload)),
 

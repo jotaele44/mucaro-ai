@@ -9,6 +9,7 @@ import { ProvenanceWorkspace } from "./components/workspaces/ProvenanceWorkspace
 import { SettingsWorkspace } from "./components/workspaces/SettingsWorkspace.jsx";
 import { SourcesWorkspace } from "./components/workspaces/SourcesWorkspace.jsx";
 import { WorkbenchWorkspace } from "./components/workspaces/WorkbenchWorkspace.jsx";
+import { useOnline } from "./online.js";
 
 const WORKSPACES = [
   { id: "chat", label: "Chat" },
@@ -67,6 +68,7 @@ export function App() {
   const rowsRef = useRef(conversations);
   const polling = useRef(false);
   const offline = useRef(false);
+  const online = useOnline();
 
   useEffect(() => {
     healthRef.current = health;
@@ -313,6 +315,11 @@ export function App() {
           )}
           <span className="brand-inline">Mucaro</span>
         </div>
+        {!online && health.state === "ok" && (
+          <p className="device-offline banner" role="status" data-testid="device-offline">
+            <strong>You're offline.</strong> Local features keep working; anything that needs the network is unavailable until you reconnect.
+          </p>
+        )}
         {(health.state === "error" || health.offline) && (
           <div className="error-card banner" role="alert">
             <strong>Mucaro's local service is not reachable.</strong> {health.offline ? "Reconnecting…" : "Your data stays on the computer that runs Mucaro."}
