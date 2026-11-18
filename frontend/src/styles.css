@@ -774,6 +774,13 @@ details summary {
   color: var(--danger);
 }
 
+.device-offline {
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+
 .banner {
   margin: 12px;
   display: flex;

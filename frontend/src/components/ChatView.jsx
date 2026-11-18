@@ -12,6 +12,7 @@ import { ModelSetup, modelLabel, modelOf } from "./ModelSetup.jsx";
 import { RepoSetup, repoLabel } from "./RepoSetup.jsx";
 import { RunBlock } from "./RunBlock.jsx";
 import { Sheet } from "./Sheet.jsx";
+import { isDeviceOnline } from "../online.js";
 
 // A stream route that keeps failing is retried with backoff, then paused until the user (or a reconnect) resumes it.
 const MAX_STREAM_RETRIES = 10;
@@ -291,7 +292,7 @@ export function ChatView({ reconnect = 0, conversationId, onConversationCreated,
         }
       }
       const key = suppliedIdempotencyKey || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-      const result = await api.sendMessage(id, { prompt, mode: modeOverride || mode, idempotency_key: key, options: { ...defaultOptions, ...chatModel } });
+      const result = await api.sendMessage(id, { prompt, mode: modeOverride || mode, idempotency_key: key, options: { ...defaultOptions, ...chatModel, system_offline: !isDeviceOnline() } });
       // Switch to a new conversation only after its first run exists, so the reload sees and follows it.
       if (creating) onConversationCreated(id);
       else {
