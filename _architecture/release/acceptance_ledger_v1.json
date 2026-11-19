@@ -1,6 +1,6 @@
 {
   "schema_version": "mucaro-release-acceptance-ledger/1.0",
-  "updated_utc": "2026-11-17T13:45:20Z",
+  "updated_utc": "2026-11-18T19:14:53Z",
   "rows": [
     {
       "requirement_id": "GOAL-001",
@@ -1389,23 +1389,36 @@
       "requirement_id": "TGT-019",
       "requirement_text": "Offline behavior",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "PARTIAL",
+      "implementation_state": "IMPLEMENTED",
       "implementation_refs": [
         "backend/app/offline.py",
-        "backend/app/model_routing_policy.py"
+        "backend/app/model_routing_policy.py",
+        "backend/app/services.py",
+        "backend/app/work_runs.py",
+        "backend/app/models.py",
+        "frontend/src/online.js",
+        "frontend/src/App.jsx",
+        "frontend/src/components/workspaces/SettingsWorkspace.jsx"
       ],
       "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
+      "positive_gate": "backend/tests/test_work_runs.py::test_offline_device_still_answers_with_a_local_model",
+      "negative_gate": "backend/tests/test_work_runs.py::test_offline_device_refuses_a_remote_model_at_once_and_says_why",
       "benchmark": null,
       "evidence_refs": [
         "backend/tests/test_local_model.py::test_offline_manifest_classifies_every_capability_and_closes",
-        "backend/tests/test_web_render.py::offline_dns"
+        "backend/tests/test_local_model.py::test_system_offline_makes_remote_providers_ineligible",
+        "backend/tests/test_web_render.py::offline_dns",
+        "backend/tests/test_work_runs.py::test_offline_device_refuses_a_remote_model_at_once_and_says_why",
+        "backend/tests/test_work_runs.py::test_offline_device_still_answers_with_a_local_model",
+        "qa/rendered/rendered_qa.mjs",
+        "_architecture/recovery_benchmark_v1.json",
+        "https://github.com/jotaele44/mucaro-ai/actions/runs/44344285395",
+        "https://github.com/jotaele44/mucaro-ai/actions/runs/44008775914"
       ],
-      "state": "PROVISIONAL",
+      "state": "PASS",
       "blocker_id": null,
       "dag_node": "N21",
-      "notes": "Every capability classified AVAILABLE_LOCALLY / UNAVAILABLE_OFFLINE / REQUIRES_REMOTE_SERVICE (plus LOCAL_DEPENDENCY_MISSING); remote providers ineligible when offline. OPEN: UI offline states and network-interruption tests (MATRIX-016)."
+      "notes": "PASS at main d12dfb1b57adcd276bb3a71f07c046d50ab07f1e (PR #380). Every capability is classified AVAILABLE_LOCALLY / UNAVAILABLE_OFFLINE / REQUIRES_REMOTE_SERVICE (plus LOCAL_DEPENDENCY_MISSING). The device's offline state now reaches the backend: each message carries system_offline, and routing refuses remote models at once with 'the network is unavailable' before any transport (test_offline_device_refuses_a_remote_model_at_once_and_says_why) while local models still answer. The UI shows an offline notice and Settings lists network-only capabilities as Unavailable offline (Needs network when back online); rendered checks pass on desktop and iPhone in chromium and webkit (PR #380 run 44344285395; rendered QA does not run on main pushes). Network interruption and offline transition are covered by the MATRIX-016 benchmark (run 44008775914). Limit: offline is what the device reports (navigator.onLine); a captive portal or an unreachable host still looks online and is handled by typed failures (e.g. DNS errors)."
     },
     {
       "requirement_id": "TGT-020",
