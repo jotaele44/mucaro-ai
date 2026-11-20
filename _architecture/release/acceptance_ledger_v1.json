@@ -1,6 +1,6 @@
 {
   "schema_version": "mucaro-release-acceptance-ledger/1.0",
-  "updated_utc": "2026-11-18T19:14:53Z",
+  "updated_utc": "2026-11-20T01:38:17Z",
   "rows": [
     {
       "requirement_id": "GOAL-001",
@@ -548,21 +548,26 @@
       "requirement_id": "INV-005",
       "requirement_text": "Common contracts",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "PARTIAL",
+      "implementation_state": "IMPLEMENTED",
       "implementation_refs": [
-        "backend/app/contracts.py"
+        "backend/app/contracts.py",
+        "backend/tests/test_contract_registry.py"
       ],
       "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
+      "positive_gate": "backend/tests/test_contract_registry.py::test_every_schema_is_registered_or_declared_domain_local",
+      "negative_gate": "backend/tests/test_contract_registry.py::test_registered_schemas_are_loaded_only_through_the_registry",
       "benchmark": null,
       "evidence_refs": [
-        "backend/tests/test_contracts.py::test_export_refuses_a_trace_with_a_fabricated_citation"
+        "backend/tests/test_contracts.py::test_export_refuses_a_trace_with_a_fabricated_citation",
+        "backend/tests/test_contract_registry.py::test_every_schema_is_registered_or_declared_domain_local",
+        "backend/tests/test_contract_registry.py::test_registered_schemas_are_loaded_only_through_the_registry",
+        "backend/tests/test_contract_registry.py::test_real_records_satisfy_the_shared_contracts_and_corruption_is_refused",
+        "backend/tests/test_contract_registry.py::test_producers_use_the_shipped_schemas_even_when_the_root_points_at_a_data_folder"
       ],
-      "state": "PROVISIONAL",
+      "state": "PASS",
       "blocker_id": null,
       "dag_node": "N03",
-      "notes": "Same residue as TGT-016."
+      "notes": "PASS. Consequential subsystems operate under the shared SOURCE, PERMISSION, EXECUTION, PROVENANCE, ARTIFACT, CITATION, MEMORY, MODEL_ROUTING and CERTIFICATION contracts; a subsystem can extend a contract only by registering it, and the ratchets make a silent bypass fail CI. Residue closed at main c9b983bfc5c663d404984139658b42e454a2f1c0 (PR #382): agent_checkpoint, permission_lease, agent_task_dag, autopilot_state and offline_independence_receipt now validate through the shared registry (contracts.contract_errors against the schemas shipped with the code) and belong to their contract families; release_scope checks registered ledger kinds with the registry's validator; offline independence receipts are validated before they are returned or written. Ratchets: every schemas/*.schema.json is registered or listed in DOMAIN_LOCAL_SCHEMAS with a reason (10 of those are documentation-only, loaded by no producer), and a registered schema is loaded only by the registry (the ratchet fails with the old agent_checkpoints module)."
     },
     {
       "requirement_id": "INV-006",
@@ -1318,24 +1323,34 @@
       "requirement_id": "TGT-016",
       "requirement_text": "Common execution contracts",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "PARTIAL",
+      "implementation_state": "IMPLEMENTED",
       "implementation_refs": [
         "backend/app/contracts.py",
-        "schemas/"
+        "schemas/",
+        "backend/app/agent_checkpoints.py",
+        "backend/app/permission_leases.py",
+        "backend/app/agent_task_dag.py",
+        "backend/app/autopilot.py",
+        "backend/app/offline_independence.py",
+        "backend/app/release_scope.py"
       ],
       "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
+      "positive_gate": "backend/tests/test_contract_registry.py::test_real_records_satisfy_the_shared_contracts_and_corruption_is_refused",
+      "negative_gate": "backend/tests/test_contracts.py::test_contract_violations_are_rejected",
       "benchmark": null,
       "evidence_refs": [
         "backend/tests/test_contracts.py::test_every_contract_family_has_present_valid_schemas",
         "backend/tests/test_contracts.py::test_real_producer_payloads_satisfy_contracts",
-        "backend/tests/test_contracts.py::test_contract_violations_are_rejected"
+        "backend/tests/test_contracts.py::test_contract_violations_are_rejected",
+        "backend/tests/test_contract_registry.py::test_every_schema_is_registered_or_declared_domain_local",
+        "backend/tests/test_contract_registry.py::test_registered_schemas_are_loaded_only_through_the_registry",
+        "backend/tests/test_contract_registry.py::test_real_records_satisfy_the_shared_contracts_and_corruption_is_refused",
+        "backend/tests/test_contract_registry.py::test_producers_use_the_shipped_schemas_even_when_the_root_points_at_a_data_folder"
       ],
-      "state": "PROVISIONAL",
+      "state": "PASS",
       "blocker_id": null,
       "dag_node": "N03",
-      "notes": "All nine families have schemas and a registry; runtime enforcement at source, provenance, grant, tool call/audit, citation/answer trace, memory, routing and receipt boundaries. Execution contract, run manifest and artifact identity producers now validate at runtime (PR #340). Residue: agent_checkpoint is validated by a module-local validator rather than the shared contract registry, and the newer permission_lease, agent_task_dag, autopilot_state and offline_independence schemas sit outside RECORD_SCHEMAS."
+      "notes": "PASS. All nine families have schemas and one registry; runtime enforcement at source, provenance, grant, permission decision and lease, tool call/audit, execution contract, run manifest, checkpoint, task DAG, autopilot state, artifact identity, citation/answer trace, memory, routing and receipt boundaries. Residue closed at main c9b983bfc5c663d404984139658b42e454a2f1c0 (PR #382): agent_checkpoint, permission_lease, agent_task_dag, autopilot_state and offline_independence_receipt now validate through the shared registry (contracts.contract_errors against the schemas shipped with the code) and belong to their contract families; release_scope checks registered ledger kinds with the registry's validator; offline independence receipts are validated before they are returned or written. Ratchets: every schemas/*.schema.json is registered or listed in DOMAIN_LOCAL_SCHEMAS with a reason (10 of those are documentation-only, loaded by no producer), and a registered schema is loaded only by the registry (the ratchet fails with the old agent_checkpoints module)."
     },
     {
       "requirement_id": "TGT-017",
@@ -1853,7 +1868,7 @@
       "requirement_id": "TGT-038",
       "requirement_text": "Coherent architecture",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "PARTIAL",
+      "implementation_state": "IMPLEMENTED",
       "implementation_refs": [
         "backend/app/tools.py",
         "backend/app/coherent_architecture.py",
@@ -1870,12 +1885,14 @@
         "backend/tests/test_coherent_architecture.py::test_declared_architecture_matches_the_running_code",
         "backend/tests/test_coherent_architecture.py::test_coding_bridges_include_execution_and_repository_mutation",
         "backend/tests/test_coherent_architecture.py::test_a_tool_outside_the_matrix_fails",
-        "backend/tests/test_coherent_architecture.py::test_a_drifted_matrix_fails"
+        "backend/tests/test_coherent_architecture.py::test_a_drifted_matrix_fails",
+        "_architecture/tool_governance_benchmark_v1.json",
+        "https://github.com/jotaele44/mucaro-ai/actions/runs/44041191535"
       ],
-      "state": "PROVISIONAL",
+      "state": "PASS",
       "blocker_id": null,
       "dag_node": "N03",
-      "notes": "PROVISIONAL at main 3503f5a84d548931b40dbf2fb97d52af886c7333 (PR #374). The architecture matrix is now executed on every CI run: all 12 categories once each, canonical surfaces resolve, refs exist, contract families are in CONTRACT_FAMILIES, bridges are in TOOL_REGISTRY, GIS and OCR have exactly one bridge each, and every registered tool belongs to a category (a tool outside the matrix fails CI). The CODE row now lists all 22 coding/github tools including coding.exec, coding.commit and coding.push. Residue: the matrix's limitation 3 also requires the stacked V06 permission-engine regressions, and flagpole V06 (permission_engine) is PARTIAL; the matrix proves source wiring, not executed benchmark quality."
+      "notes": "PASS at main c9b983bfc5c663d404984139658b42e454a2f1c0. The architecture matrix executes on every CI run (PR #374): all 12 categories once each, canonical surfaces resolve, refs exist, contract families are in CONTRACT_FAMILIES, bridges are in TOOL_REGISTRY, GIS and OCR have exactly one bridge each, and every registered tool belongs to a category. The matrix's own limitation 3 ('non-PASS until this matrix and the stacked V06/tool regressions execute on a real runner') is met: the matrix runs in the validate job on GitHub-hosted runners, and the V06 permission-taxonomy and tool regressions run as the frozen MATRIX-011 benchmark on a GitHub-hosted runner (run 44041191535, 23/23, PR #377). The shared contracts it relies on are complete (TGT-016/INV-005, PR #382). Limits: the matrix proves wiring; benchmark quality is carried by the MATRIX rows."
     },
     {
       "requirement_id": "MATRIX-001",
