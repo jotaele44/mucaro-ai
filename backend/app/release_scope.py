@@ -30,6 +30,8 @@ from typing import Any
 
 import jsonschema
 
+from .contracts import contract_validator, registered_kind_for_schema
+
 RELEASE_DIR = Path("_architecture") / "release"
 FROZEN_DIR = RELEASE_DIR / "frozen"
 SCHEMA_DIR = Path("schemas")
@@ -141,11 +143,20 @@ def load_release_scope(root: Path, release_dir: Path | None = None) -> tuple[dic
         if read_error:
             errors.append(_error("ERROR_SCOPE_JSON_INVALID", f"{kind}:{read_error}"))
             continue
-        schema, schema_error = _read_json(root / SCHEMA_DIR / schema_name)
-        if schema_error:
-            errors.append(_error("ERROR_SCOPE_SCHEMA_UNREADABLE", f"{schema_name}:{schema_error}"))
-            continue
-        validator = jsonschema.Draft202012Validator(schema)
+        registered = registered_kind_for_schema(schema_name)
+        if registered is not None:
+            # A record kind in the shared registry is checked by the registry's validator (TGT-016, INV-005).
+            try:
+                validator = contract_validator(registered, root=root)
+            except (OSError, ValueError) as exc:
+                errors.append(_error("ERROR_SCOPE_SCHEMA_UNREADABLE", f"{schema_name}:{exc}"))
+                continue
+        else:
+            schema, schema_error = _read_json(root / SCHEMA_DIR / schema_name)
+            if schema_error:
+                errors.append(_error("ERROR_SCOPE_SCHEMA_UNREADABLE", f"{schema_name}:{schema_error}"))
+                continue
+            validator = jsonschema.Draft202012Validator(schema)
         schema_errors = sorted(validator.iter_errors(payload), key=lambda item: list(item.absolute_path))
         if schema_errors:
             for item in schema_errors[:20]:

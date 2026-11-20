@@ -6,6 +6,8 @@ import re
 from pathlib import Path
 from typing import Any, Mapping
 
+from .contracts import APPLICATION_ROOT, contract_errors
+
 OFFLINE_INDEPENDENCE_RECEIPT_SCHEMA = "mucaro-offline-independence-receipt/1.0"
 STATUS_CERTIFIED = "OFFLINE_INDEPENDENT"
 STATUS_BLOCKED = "OFFLINE_INDEPENDENCE_BLOCKED"
@@ -234,10 +236,19 @@ def build_offline_independence_receipt(
     }
     unsigned = dict(receipt)
     receipt["receipt_sha256"] = _receipt_hash(unsigned)
-    return receipt
+    return _validated_receipt(receipt)
+
+
+def _validated_receipt(receipt: Mapping[str, Any]) -> dict[str, Any]:
+    """The receipt must satisfy the shared CERTIFICATION contract (TGT-016) before it is returned or written."""
+    errors = contract_errors("offline_independence_receipt", dict(receipt), root=APPLICATION_ROOT)
+    if errors:
+        raise OfflineIndependenceError("ERROR_OFFLINE_INDEPENDENCE_RECEIPT_SCHEMA", errors[0])
+    return dict(receipt)
 
 
 def write_offline_independence_receipt(receipt: Mapping[str, Any], path: str | Path) -> Path:
+    receipt = _validated_receipt(receipt)
     target = Path(path).expanduser().resolve()
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(json.dumps(dict(receipt), indent=2, sort_keys=True) + "\n", encoding="utf-8")
