@@ -130,7 +130,7 @@ async function send(page, text, { queued = false } = {}) {
 async function axe(page, viewport, name) {
   const result = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
   const serious = result.violations.filter((v) => ["serious", "critical"].includes(v.impact));
-  check(`axe ${name}: no serious/critical WCAG violations`, viewport, serious.length === 0, serious.map((v) => `${v.id}(${v.nodes.length})`).join(", ") || `${result.violations.length} minor`);
+  check(`axe ${name}: no serious/critical WCAG violations`, viewport, serious.length === 0, serious.map((v) => `${v.id}(${v.nodes.length}: ${v.nodes.map((n) => n.target.join(" ")).join(" | ")})`).join(", ") || `${result.violations.length} minor`);
   return { view: name, viewport, violations: result.violations.map((v) => ({ id: v.id, impact: v.impact, nodes: v.nodes.length })) };
 }
 
@@ -167,7 +167,7 @@ async function scenario(browser, base, viewport, contextOptions) {
   // Ask with citations (F02, TGT-002, TGT-031).
   await send(page, "How does source lineage work?");
   await waitRunState(page, "COMPLETED");
-  const citations = lastRun(page).getByRole("button", { name: /Open citation/ });
+  const citations = lastRun(page).getByRole("button", { name: /open citation from/i });
   check("answer completes with citations", viewport, (await citations.count()) > 0, `${await citations.count()} citations`);
   check("answer text rendered", viewport, (await lastRun(page).locator(".assistant-bubble").count()) === 1);
   await shot(page, viewport, "02-answer");
@@ -328,8 +328,8 @@ async function scenario(browser, base, viewport, contextOptions) {
   await shot(page, viewport, "03-evidence");
   await page.keyboard.press("Escape");
   await evidence.waitFor({ state: "detached" });
-  const focusedName = await page.evaluate(() => document.activeElement?.getAttribute("aria-label") || "");
-  check("Escape closes the sheet and returns focus", viewport, focusedName.startsWith("Open citation"), focusedName);
+  const focusedName = await page.evaluate(() => document.activeElement?.getAttribute("aria-label") || document.activeElement?.textContent?.trim() || "");
+  check("Escape closes the sheet and returns focus", viewport, /open citation from/i.test(focusedName), focusedName);
 
   // Approval-bound action (F07) and tool summary / drawer (F08, F09).
   await send(page, "/status");
