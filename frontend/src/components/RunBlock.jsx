@@ -245,9 +245,11 @@ function Citations({ citations, onOpenCitation }) {
           type="button"
           className="citation-chip"
           onClick={() => onOpenCitation(citation)}
-          aria-label={`Open citation ${citation.citation_order}: ${citation.source_url || citation.source_id}`}
         >
+          {/* The name comes from this content so it starts with the visible text (WCAG 2.5.3, label in name);
+              the full source is added for screen readers only. */}
           [{citation.citation_order}] {citation.source_url ? hostOf(citation.source_url) : citation.source_id.slice(0, 14)}
+          <span className="sr-only">, open citation from {citation.source_url || citation.source_id}</span>
           {citation.trust === "UNTRUSTED_CONTENT" && <span className="sr-only"> (untrusted content)</span>}
         </button>
       ))}
