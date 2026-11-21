@@ -1,6 +1,6 @@
 {
   "schema_version": "mucaro-release-dag/1.0",
-  "updated_utc": "2026-11-18T19:14:53Z",
+  "updated_utc": "2026-11-20T01:38:17Z",
   "nodes": [
     {
       "node_id": "N00",
@@ -91,7 +91,7 @@
       "dependencies": [
         "N01"
       ],
-      "state": "PROVISIONAL",
+      "state": "PASS",
       "risk": "MEDIUM",
       "user_value": "MEDIUM",
       "downstream_unlock_value": "HIGH",
@@ -100,7 +100,7 @@
         "schemas + runtime validate_contract at boundaries"
       ],
       "blocker": null,
-      "notes": "contracts.py registry + boundary enforcement; residue listed on TGT-016."
+      "notes": "PASS at main c9b983bfc5c663d404984139658b42e454a2f1c0: TGT-016, INV-005 and TGT-038 are all PASS (shared contract registry complete with ratchets, PR #382; architecture matrix executed in CI with its V06/tool regression limitation met by MATRIX-011 run 44041191535)."
     },
     {
       "node_id": "N04",
