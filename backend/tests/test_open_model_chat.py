@@ -383,7 +383,7 @@ def test_conversation_remembers_the_model_it_was_started_with(server, cfg):
         json={"title": "open", "model": {"model_provider": "openai_compatible_local", "model_name": "mistral:latest"}},
     )
     assert created.status_code == 200
-    expected = {"model_provider": "openai_compatible_local", "model_name": "mistral:latest", "allow_live": False}
+    expected = {"model_provider": "openai_compatible_local", "model_name": "mistral:latest", "allow_live": False, "agent": False}
     assert created.json()["model"] == expected
     conversation_id = created.json()["conversation_id"]
     assert get_conversation(conversation_id, cfg)["model"] == expected

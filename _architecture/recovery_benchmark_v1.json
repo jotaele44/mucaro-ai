@@ -1,0 +1,44 @@
+{
+  "schema_version": "mucaro-matrix016-recovery-benchmark/1.0",
+  "benchmark_id": "MATRIX-016-v1",
+  "requirement": "MATRIX-016 recovery benchmark: app restart; workflow restart; resume; cancel; crash/failure recovery where testable; partial tool failure; network interruption; offline transition. Verify state conservation and absence of unintended duplication.",
+  "required_categories": [
+    "app_restart",
+    "workflow_restart",
+    "resume",
+    "cancel",
+    "crash_recovery",
+    "partial_tool_failure",
+    "network_interruption",
+    "offline_transition"
+  ],
+  "cases": [
+    {"case_id": "APP_RESTART_RECONCILES", "category": "app_restart", "expected_outcome": "RUNNING_MARKED_INTERRUPTED_NOT_RERUN"},
+    {"case_id": "WORKFLOW_CHECKPOINT_SURVIVES_PROCESS", "category": "workflow_restart", "expected_outcome": "IDENTICAL_STATE_SEQUENCE_PLUS_ONE"},
+    {"case_id": "CORRUPT_CHECKPOINT_FAILS_CLOSED", "category": "workflow_restart", "expected_outcome": "CHECKPOINT_REJECTED"},
+    {"case_id": "RESUME_WAITING_AFTER_RESTART", "category": "resume", "expected_outcome": "COMPLETED_ONCE"},
+    {"case_id": "CANCEL_AWAITING_RUN", "category": "cancel", "expected_outcome": "INTERRUPTED_PENDING_CANCELLED"},
+    {"case_id": "CANCEL_QUEUED", "category": "cancel", "expected_outcome": "CANCELLED_BEFORE_START"},
+    {"case_id": "STEP_IDEMPOTENT_AFTER_CRASH", "category": "crash_recovery", "expected_outcome": "NO_DUPLICATE_STEP"},
+    {"case_id": "ACCEPTED_OP_NOT_REPLAYED", "category": "crash_recovery", "expected_outcome": "PROVIDER_EXECUTION_ALREADY_ACCEPTED"},
+    {"case_id": "PARTIAL_FAILURE_RETRY_ONLY_FAILED", "category": "partial_tool_failure", "expected_outcome": "COMPLETED_SUCCESSFUL_NOT_REPEATED"},
+    {"case_id": "NETWORK_DROP_PAUSES_CHECKPOINT", "category": "network_interruption", "expected_outcome": "PAUSED_PROVIDER_IDENTITY_PRESERVED"},
+    {"case_id": "INTERRUPTED_OP_RETRIED_ON_RESUME", "category": "network_interruption", "expected_outcome": "ACCEPTED_ONCE_AFTER_RESUME"},
+    {"case_id": "OFFLINE_ROUTE_BLOCKS_REMOTE", "category": "offline_transition", "expected_outcome": "REMOTE_INELIGIBLE_ONLY_WHILE_OFFLINE"},
+    {"case_id": "OFFLINE_MANIFEST_FLIPS", "category": "offline_transition", "expected_outcome": "WEB_FETCH_UNAVAILABLE_OFFLINE"}
+  ],
+  "required_case_count": 13,
+  "terminal_rule": {
+    "every_required_category_covered": true,
+    "all_cases_pass": true,
+    "case_identity_matches_manifest": true,
+    "zero_unexpected_outcomes": true
+  },
+  "limitations": [
+    "Cases run with the mock model and no network; the network case gets a real refused connection from a closed loopback port, not a dropped connection to a remote provider.",
+    "Network recovery covers model-provider calls; a failed web tool call is recovered through the partial-failure retry path, not a provider pause.",
+    "Offline transition is the routing and capability manifest under an explicit system_offline flag; the app does not detect losing connectivity on its own.",
+    "Restart cases restart the Python process on the same data directory; they do not reboot a machine or reinstall the app.",
+    "A change to the case list requires a new frozen MATRIX-016 denominator and receipt."
+  ]
+}

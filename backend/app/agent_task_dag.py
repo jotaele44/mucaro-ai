@@ -5,10 +5,9 @@ import json
 import re
 from copy import deepcopy
 from datetime import UTC, datetime
-from pathlib import Path
 from typing import Any
 
-import jsonschema
+from .contracts import APPLICATION_ROOT, contract_errors
 
 SCHEMA_VERSION = "mucaro-agent-task-dag/1.0"
 TASK_ID_PATTERN = re.compile(r"^[A-Za-z0-9_.:-]{1,128}$")
@@ -52,16 +51,16 @@ class TaskDagError(RuntimeError):
         self.detail = detail
 
 
+def _contract_errors(payload: Any) -> list[str]:
+    """Errors against the shared agent_task_dag contract (TGT-016), read from the schemas shipped with this code."""
+    try:
+        return contract_errors("agent_task_dag", payload, root=APPLICATION_ROOT)
+    except OSError as exc:
+        raise TaskDagError("ERROR_TASK_DAG_SCHEMA_UNAVAILABLE", str(exc)) from exc
+
+
 def _utc_now() -> str:
     return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
-
-
-def _schema() -> dict[str, Any]:
-    path = Path(__file__).resolve().parents[2] / "schemas" / "agent_task_dag.schema.json"
-    try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except OSError as exc:
-        raise TaskDagError("ERROR_TASK_DAG_SCHEMA_UNAVAILABLE", f"{path}: {exc}") from exc
 
 
 def _stable_hash(payload: Any) -> str:
@@ -236,10 +235,9 @@ def build_task_dag(
 def validate_task_dag(dag: dict[str, Any]) -> None:
     if not isinstance(dag, dict):
         raise TaskDagError("ERROR_TASK_DAG_SHAPE", "task DAG must be an object")
-    errors = sorted(jsonschema.Draft202012Validator(_schema()).iter_errors(dag), key=lambda error: list(error.absolute_path))
+    errors = _contract_errors(dag)
     if errors:
-        where = "/".join(str(part) for part in errors[0].absolute_path) or "<root>"
-        raise TaskDagError("ERROR_TASK_DAG_SCHEMA", f"{where}: {errors[0].message}")
+        raise TaskDagError("ERROR_TASK_DAG_SCHEMA", errors[0])
 
     tasks = dag["tasks"]
     definitions = _normalize_definitions([_definition(task) for task in tasks])

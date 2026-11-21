@@ -7,7 +7,7 @@
     "dev": "vite --host 127.0.0.1 --port 5173",
     "build": "npm run test:next-vectors && vite build",
     "preview": "vite preview --host 127.0.0.1 --port 4173",
-    "test:next-vectors": "node --test tests/nextVectorOptions.test.mjs"
+    "test:next-vectors": "node --test tests/nextVectorOptions.test.mjs tests/threadActivity.test.mjs"
   },
   "dependencies": {
     "@vitejs/plugin-react": "5.1.2",

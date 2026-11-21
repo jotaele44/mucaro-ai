@@ -14,6 +14,8 @@ The frozen `_architecture/mucaro_v1_denominator.json` remains historical baselin
 
 ## Overlay history
 
+> Historical overlay snapshots, last revised 2026-09-28; later events are not summarised here. The current strict score comes from applying every event: `python scripts/certify_mucaro_100.py --format text`.
+
 - Historical frozen baseline: `61.5% raw / 62.6% weighted`.
 - First common-substrate overlay: `64.5% raw / 66.2% weighted` from BC-07, BC-08, BC-09 and PR-10 events.
 - Coding read-only overlay: `66.0% raw / 67.7% weighted` after CODE-03 through CODE-05 became PROVISIONAL.

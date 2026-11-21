@@ -8,9 +8,11 @@ import { EvidencePanel } from "./EvidencePanel.jsx";
 import { ExecutionEntryCard } from "./ExecutionEntryCard.jsx";
 import { NextVectorPicker } from "./NextVectorPicker.jsx";
 import { EditableMessage } from "./MessageActions.jsx";
-import { ModelSetup, modelLabel } from "./ModelSetup.jsx";
+import { ModelSetup, modelLabel, modelOf } from "./ModelSetup.jsx";
+import { RepoSetup, repoLabel } from "./RepoSetup.jsx";
 import { RunBlock } from "./RunBlock.jsx";
 import { Sheet } from "./Sheet.jsx";
+import { isDeviceOnline } from "../online.js";
 
 // A stream route that keeps failing is retried with backoff, then paused until the user (or a reconnect) resumes it.
 const MAX_STREAM_RETRIES = 10;
@@ -86,17 +88,14 @@ function ConversationMenu({ conversation, onRename, onDelete, onOpenTasks, annou
   );
 }
 
-const modelOf = (options) => ({
-  model_provider: options?.model_provider || "mock",
-  model_name: options?.model_name || null,
-  allow_live: Boolean(options?.allow_live),
-});
-
-export function ChatView({ reconnect = 0, conversationId, onConversationCreated, onConversationsChanged, onOpenTasks, announce, modes, defaultOptions, onDefaultModelChange }) {
+export function ChatView({ reconnect = 0, conversationId, onConversationCreated, onConversationsChanged, onOpenTasks, announce, modes, defaultOptions, onDefaultModelChange, onOpenMemory }) {
   const [conversation, setConversation] = useState(null);
   // The model for a chat that has not started yet; it becomes the conversation's model on the first message.
   const [draftModel, setDraftModel] = useState(() => modelOf(defaultOptions));
   const [modelOpen, setModelOpen] = useState(false);
+  // The repository for a chat that has not started yet; it is bound when the first message creates the chat.
+  const [draftRepo, setDraftRepo] = useState(null);
+  const [repoOpen, setRepoOpen] = useState(false);
   const [runs, setRuns] = useState(new Map());
   const [summaries, setSummaries] = useState([]);
   const [mode, setMode] = useState("ask");
@@ -219,6 +218,7 @@ export function ChatView({ reconnect = 0, conversationId, onConversationCreated,
     setEntryContext(null);
     setError(null);
     setModelOpen(false);
+    setRepoOpen(false);
     if (!conversationId) return;
     setLoading(true);
     refresh()
@@ -286,9 +286,13 @@ export function ChatView({ reconnect = 0, conversationId, onConversationCreated,
       if (creating) {
         id = (await api.createConversation(prompt.slice(0, 60), draftModel)).conversation_id;
         onDefaultModelChange?.(draftModel); // the next new chat starts from this choice
+        if (draftRepo?.repo_root) {
+          await api.setConversationRepo(id, draftRepo); // a refused repository stops here, before anything is sent
+          setDraftRepo(null);
+        }
       }
       const key = suppliedIdempotencyKey || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-      const result = await api.sendMessage(id, { prompt, mode: modeOverride || mode, idempotency_key: key, options: { ...defaultOptions, ...chatModel } });
+      const result = await api.sendMessage(id, { prompt, mode: modeOverride || mode, idempotency_key: key, options: { ...defaultOptions, ...chatModel, system_offline: !isDeviceOnline() } });
       // Switch to a new conversation only after its first run exists, so the reload sees and follows it.
       if (creating) onConversationCreated(id);
       else {
@@ -299,6 +303,7 @@ export function ChatView({ reconnect = 0, conversationId, onConversationCreated,
         }
         const runList = await api.conversationRuns(id);
         setSummaries(runList.runs);
+        onConversationsChanged(); // the thread list shows this conversation as working at once
       }
       announce(result.run.state === "QUEUED" ? "Message queued." : "Message sent.");
     } catch (err) {
@@ -379,6 +384,17 @@ export function ChatView({ reconnect = 0, conversationId, onConversationCreated,
     }
   }
 
+  async function saveRepo(next) {
+    if (!conversationId) {
+      // Checked by the service when the chat is created; nothing exists to bind to yet.
+      setDraftRepo(next.repo_root ? next : null);
+      return;
+    }
+    const updated = await api.setConversationRepo(conversationId, next);
+    setConversation(updated);
+    announce(updated.repo ? `Repository set to ${repoLabel(updated.repo)}.` : "Repository removed from this chat.");
+  }
+
   const empty = !loading && !views.length && !legacyTurns.length && !entryContext?.entry;
   return (
     <section className="chat" aria-label="Conversation">
@@ -388,9 +404,14 @@ export function ChatView({ reconnect = 0, conversationId, onConversationCreated,
           <p className="muted small">Local workspace · answers cite your sources</p>
         </div>
         {conversationId && (
-          <button type="button" className="ghost-button model-button" aria-expanded={modelOpen} onClick={() => setModelOpen((open) => !open)}>
-            Model: {modelLabel(chatModel)}
-          </button>
+          <div className="chat-controls">
+            <button type="button" className="ghost-button model-button" aria-expanded={modelOpen} onClick={() => setModelOpen((open) => !open)}>
+              Model: {modelLabel(chatModel)}
+            </button>
+            <button type="button" className="ghost-button model-button" aria-expanded={repoOpen} onClick={() => setRepoOpen((open) => !open)}>
+              {conversation?.repo ? `Repository: ${repoLabel(conversation.repo)}` : "Repository"}
+            </button>
+          </div>
         )}
         {conversation && (
           <ConversationMenu
@@ -425,11 +446,18 @@ export function ChatView({ reconnect = 0, conversationId, onConversationCreated,
           />
         )}
         {conversationId && modelOpen && <ModelSetup value={chatModel} onChange={changeModel} announce={announce} />}
+        {conversationId && repoOpen && <RepoSetup value={conversation?.repo || null} onSave={saveRepo} />}
         {empty && (
           <div className="empty-state">
             <h2>What should Mucaro work on?</h2>
             <p className="muted">Ask about your sources, or use a command such as <code>/status</code> or <code>/fetch https://…</code>. Actions always ask before they run unless you choose Auto for local read-only tools.</p>
             {!conversationId && <ModelSetup value={draftModel} onChange={changeModel} announce={announce} />}
+            {!conversationId && (
+              <details className="repo-details">
+                <summary>Work on a code repository (optional){draftRepo?.repo_root ? ` · ${repoLabel(draftRepo)}` : ""}</summary>
+                <RepoSetup value={draftRepo} onSave={saveRepo} legend="Repository for this chat" />
+              </details>
+            )}
           </div>
         )}
         {legacyTurns.map((turn, index) => {
@@ -456,6 +484,7 @@ export function ChatView({ reconnect = 0, conversationId, onConversationCreated,
             view={view}
             onChanged={() => loadRun(view.runId).then(refresh)}
             onOpenCitation={setCitation}
+            onOpenMemory={onOpenMemory}
             announce={announce}
             messageEdits={messageEdits}
             onEditMessage={saveMessageEdit}
@@ -465,6 +494,9 @@ export function ChatView({ reconnect = 0, conversationId, onConversationCreated,
           <NextVectorPicker
             key={views[views.length - 1].runId}
             request={views[views.length - 1].prompt}
+            // The vector this run's answer closed with, if any: offered first, sent only by Start.
+            proposal={views[views.length - 1].nextVector}
+            announce={announce}
             // Follow-up selection is not tool approval. Use the canonical ask-first mode.
             onStart={(prompt, idempotencyKey) => send(prompt, "ask", idempotencyKey)}
           />

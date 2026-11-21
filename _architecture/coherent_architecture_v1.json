@@ -160,9 +160,26 @@
       "tool_registry_bridges": [
         "coding.repo_status",
         "coding.read_file",
+        "coding.list_files",
+        "coding.search",
         "coding.diff",
         "coding.patch_check",
-        "coding.patch_apply"
+        "coding.patch_apply",
+        "coding.exec",
+        "coding.branch_create",
+        "coding.commit",
+        "coding.push",
+        "repo.clone",
+        "coding.pr_request",
+        "github.pr_open_update",
+        "coding.regression_run",
+        "github.ci_status",
+        "github.issues_list",
+        "github.issue_view",
+        "github.prs_list",
+        "github.pr_view",
+        "github.gists_list",
+        "github.gist_view"
       ],
       "evidence_refs": [
         "backend/tests/test_tools.py",
@@ -185,7 +202,8 @@
         "EXECUTION"
       ],
       "tool_registry_bridges": [
-        "source_library.status"
+        "source_library.status",
+        "workspace_profiles.list"
       ],
       "evidence_refs": [
         "backend/tests/test_ingestion.py",
@@ -245,7 +263,9 @@
         "CERTIFICATION",
         "SOURCE"
       ],
-      "tool_registry_bridges": [],
+      "tool_registry_bridges": [
+        "product.audit"
+      ],
       "evidence_refs": [
         "backend/tests/test_capability_contracts.py",
         "backend/tests/test_contracts.py"
@@ -278,7 +298,8 @@
     "every implementation and evidence reference resolves inside the repository",
     "every declared shared contract family exists in the canonical contract registry",
     "every declared tool bridge exists in the single TOOL_REGISTRY",
-    "GIS and OCR each have exactly one canonical tool-registry bridge"
+    "GIS and OCR each have exactly one canonical tool-registry bridge",
+    "every registered tool appears in at least one category's bridges"
   ],
   "limitations": [
     "This matrix proves source architecture wiring, not executed benchmark quality.",

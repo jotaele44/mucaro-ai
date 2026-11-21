@@ -42,11 +42,11 @@ function ApprovalCard({ request, onDecided, announce }) {
 
   return (
     <section className="card approval-card" aria-label={`Permission request for ${request.tool_name}`}>
-      <p className="card-kicker">Permission needed</p>
+      <p className="card-kicker">{request.requested_by === "model" ? "The model wants to run an action" : "Permission needed"}</p>
       <h3 className="card-title">{request.tool_name}</h3>
       <details open>
         <summary>Arguments</summary>
-        <Json value={request.arguments} />
+        <Arguments value={request.arguments} />
         <p className="muted small">Argument digest {request.arguments_sha256?.slice(0, 12)}… — your decision applies to exactly these arguments, once.</p>
       </details>
       {error && <p className="error-text" role="alert">{error}</p>}
@@ -123,6 +123,48 @@ function QuestionCard({ question, onAnswered, announce }) {
   );
 }
 
+/** A unified diff with added and removed lines marked, so a proposed change can be read before it is allowed. */
+function DiffView({ patch }) {
+  const lines = String(patch).replace(/\n$/, "").split("\n");
+  const kind = (line) =>
+    line.startsWith("+++") || line.startsWith("---") || line.startsWith("diff ") || line.startsWith("index ")
+      ? "meta"
+      : line.startsWith("@@")
+        ? "hunk"
+        : line.startsWith("+")
+          ? "add"
+          : line.startsWith("-")
+            ? "del"
+            : "ctx";
+  const added = lines.filter((line) => kind(line) === "add").length;
+  const removed = lines.filter((line) => kind(line) === "del").length;
+  return (
+    <figure className="diff-view">
+      <figcaption className="muted small">Proposed change: {added} line{added === 1 ? "" : "s"} added, {removed} removed</figcaption>
+      <pre className="diff-block" tabIndex={0} aria-label="Proposed change as a diff">
+        {lines.map((line, index) => (
+          <span key={index} className={`diff-line diff-${kind(line)}`}>
+            {line || " "}
+            {"\n"}
+          </span>
+        ))}
+      </pre>
+    </figure>
+  );
+}
+
+/** Tool arguments, with a patch shown as a diff instead of an escaped string. */
+function Arguments({ value }) {
+  const { patch, ...rest } = value || {};
+  if (typeof patch !== "string") return <Json value={value} />;
+  return (
+    <>
+      <DiffView patch={patch} />
+      {Object.keys(rest).length > 0 && <Json value={rest} />}
+    </>
+  );
+}
+
 function ToolDrawer({ calls, onClose }) {
   return (
     <Sheet title="Tool activity" onClose={onClose}>
@@ -137,7 +179,7 @@ function ToolDrawer({ calls, onClose }) {
             </div>
             <details>
               <summary>Input</summary>
-              <Json value={call.arguments} />
+              <Arguments value={call.arguments} />
             </details>
             {call.error && (
               <p className="error-text">
@@ -165,6 +207,34 @@ function hostOf(url) {
   }
 }
 
+function plural(count, one, many) {
+  return `${count} ${count === 1 ? one : many}`;
+}
+
+// What an answer used besides sources: saved memory, kept across chats, and this chat's own earlier messages,
+// used only here. Counts only; the memories themselves are listed in the Memory workspace (INV-021).
+function AnswerContext({ context, onOpenMemory }) {
+  if (!context) return null;
+  const memories = Number(context.memory_context_count || 0);
+  const turns = Number(context.conversation_context_turn_count || 0);
+  if (!memories && !turns) return null;
+  return (
+    <p className="muted small answer-context" data-testid="answer-context">
+      Also used:{" "}
+      {memories > 0 &&
+        (onOpenMemory ? (
+          <button type="button" className="link-button" onClick={onOpenMemory}>
+            {plural(memories, "saved memory", "saved memories")}
+          </button>
+        ) : (
+          plural(memories, "saved memory", "saved memories")
+        ))}
+      {memories > 0 && turns > 0 && " · "}
+      {turns > 0 && `${plural(turns, "earlier message", "earlier messages")} from this chat`}
+    </p>
+  );
+}
+
 function Citations({ citations, onOpenCitation }) {
   if (!citations.length) return null;
   return (
@@ -175,9 +245,11 @@ function Citations({ citations, onOpenCitation }) {
           type="button"
           className="citation-chip"
           onClick={() => onOpenCitation(citation)}
-          aria-label={`Open citation ${citation.citation_order}: ${citation.source_url || citation.source_id}`}
         >
+          {/* The name comes from this content so it starts with the visible text (WCAG 2.5.3, label in name);
+              the full source is added for screen readers only. */}
           [{citation.citation_order}] {citation.source_url ? hostOf(citation.source_url) : citation.source_id.slice(0, 14)}
+          <span className="sr-only">, open citation from {citation.source_url || citation.source_id}</span>
           {citation.trust === "UNTRUSTED_CONTENT" && <span className="sr-only"> (untrusted content)</span>}
         </button>
       ))}
@@ -185,7 +257,7 @@ function Citations({ citations, onOpenCitation }) {
   );
 }
 
-export function RunBlock({ view, onChanged, onOpenCitation, announce, messageEdits = {}, onEditMessage }) {
+export function RunBlock({ view, onChanged, onOpenCitation, onOpenMemory, announce, messageEdits = {}, onEditMessage }) {
   const [toolsOpen, setToolsOpen] = useState(false);
   const toolLabel = toolSummaryLabel(view.calls);
   const planSteps = view.plan?.steps || [];
@@ -217,6 +289,9 @@ export function RunBlock({ view, onChanged, onOpenCitation, announce, messageEdi
         <div className="run-status">
           <span className={`status-chip status-${view.state.toLowerCase()}`}>{STATE_LABEL[view.state] || view.state}</span>
           {view.state === "RUNNING" && <span className="spinner" aria-hidden="true" />}
+          {view.agentStep && !view.final && (
+            <span className="muted small">Step {view.agentStep.step} of {view.agentStep.max_steps}</span>
+          )}
           {(planSteps.length > 0 || view.route) && (
             <details className="plan-details">
               <summary>Plan · {planSteps.length} step{planSteps.length === 1 ? "" : "s"}</summary>
@@ -277,13 +352,18 @@ export function RunBlock({ view, onChanged, onOpenCitation, announce, messageEdi
           </div>
         )}
         <Citations citations={view.citations} onOpenCitation={onOpenCitation} />
+        {view.answer && <AnswerContext context={view.context} onOpenMemory={onOpenMemory} />}
 
         {view.warnings.map((warning, index) => (
           <p key={index} className="notice" role="note">
             {warning.category === "UNTRUSTED_CONTENT"
               ? "Some sources contain instruction-like text. It was treated as data only and nothing was executed."
-              : warning.status === "WARN_NO_SOURCES_USED"
+              : warning.status === "NOTE_CHAT_BOUND_TO_CLONED_REPOSITORY"
+                ? `This chat now works on the cloned repository at ${warning.detail}.`
+                : warning.status === "WARN_NO_SOURCES_USED"
                 ? "No sources used: nothing in your local library matched this message, so this reply is the model's own and is not cited."
+                : warning.status === "WARN_NEXT_VECTOR_NOT_OFFERED"
+                ? `The next vector in this answer is not offered as a one-tap option (${warning.detail}). You can still read it above and choose another step.`
                 : `${warning.status}${warning.detail ? `: ${warning.detail}` : ""}`}
           </p>
         ))}
