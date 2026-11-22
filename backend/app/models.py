@@ -158,6 +158,8 @@ class RunOptions(BaseModel):
     allow_mock_fallback: bool = False
     allow_live: bool = False
     require_offline: bool = False
+    # The device reports it has no network: remote providers are refused up front instead of timing out (TGT-019).
+    system_offline: bool = False
     # Let the chat's model propose tool calls; every proposal still goes through the approval gate.
     agent: bool = False
 

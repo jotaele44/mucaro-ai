@@ -1,6 +1,6 @@
 {
   "schema_version": "mucaro-release-acceptance-ledger/1.0",
-  "updated_utc": "2026-11-15T01:30:13Z",
+  "updated_utc": "2026-11-20T01:38:17Z",
   "rows": [
     {
       "requirement_id": "GOAL-001",
@@ -548,21 +548,26 @@
       "requirement_id": "INV-005",
       "requirement_text": "Common contracts",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "PARTIAL",
+      "implementation_state": "IMPLEMENTED",
       "implementation_refs": [
-        "backend/app/contracts.py"
+        "backend/app/contracts.py",
+        "backend/tests/test_contract_registry.py"
       ],
       "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
+      "positive_gate": "backend/tests/test_contract_registry.py::test_every_schema_is_registered_or_declared_domain_local",
+      "negative_gate": "backend/tests/test_contract_registry.py::test_registered_schemas_are_loaded_only_through_the_registry",
       "benchmark": null,
       "evidence_refs": [
-        "backend/tests/test_contracts.py::test_export_refuses_a_trace_with_a_fabricated_citation"
+        "backend/tests/test_contracts.py::test_export_refuses_a_trace_with_a_fabricated_citation",
+        "backend/tests/test_contract_registry.py::test_every_schema_is_registered_or_declared_domain_local",
+        "backend/tests/test_contract_registry.py::test_registered_schemas_are_loaded_only_through_the_registry",
+        "backend/tests/test_contract_registry.py::test_real_records_satisfy_the_shared_contracts_and_corruption_is_refused",
+        "backend/tests/test_contract_registry.py::test_producers_use_the_shipped_schemas_even_when_the_root_points_at_a_data_folder"
       ],
-      "state": "PROVISIONAL",
+      "state": "PASS",
       "blocker_id": null,
       "dag_node": "N03",
-      "notes": "Same residue as TGT-016."
+      "notes": "PASS. Consequential subsystems operate under the shared SOURCE, PERMISSION, EXECUTION, PROVENANCE, ARTIFACT, CITATION, MEMORY, MODEL_ROUTING and CERTIFICATION contracts; a subsystem can extend a contract only by registering it, and the ratchets make a silent bypass fail CI. Residue closed at main c9b983bfc5c663d404984139658b42e454a2f1c0 (PR #382): agent_checkpoint, permission_lease, agent_task_dag, autopilot_state and offline_independence_receipt now validate through the shared registry (contracts.contract_errors against the schemas shipped with the code) and belong to their contract families; release_scope checks registered ledger kinds with the registry's validator; offline independence receipts are validated before they are returned or written. Ratchets: every schemas/*.schema.json is registered or listed in DOMAIN_LOCAL_SCHEMAS with a reason (10 of those are documentation-only, loaded by no producer), and a registered schema is loaded only by the registry (the ratchet fails with the old agent_checkpoints module)."
     },
     {
       "requirement_id": "INV-006",
@@ -575,16 +580,18 @@
       "dependencies": [],
       "positive_gate": "backend/tests/test_work_runs.py::test_ask_mode_waits_for_approval_then_resumes",
       "negative_gate": "backend/tests/test_work_runs.py::test_auto_mode_preapproves_only_local_read_only_tools",
-      "benchmark": null,
+      "benchmark": "_architecture/tool_governance_benchmark_v1.json",
       "evidence_refs": [
         "backend/tests/test_contracts.py::test_decision_against_stale_arguments_is_refused",
         "backend/tests/test_work_runs.py::test_retry_in_ask_mode_needs_a_fresh_approval",
-        "backend/tests/test_work_runs.py::test_plan_mode_executes_nothing"
+        "backend/tests/test_work_runs.py::test_plan_mode_executes_nothing",
+        "_architecture/tool_governance_benchmark_v1.json",
+        "https://github.com/jotaele44/mucaro-ai/actions/runs/44041191535"
       ],
       "state": "PASS",
       "blocker_id": null,
       "dag_node": "N05",
-      "notes": "All run actions use the approval-gated tool runtime; auto mode pre-approves only local, non-mutating tools; retries need fresh approval; approvals bind to immutable calls."
+      "notes": "All run actions use the approval-gated tool runtime; auto mode pre-approves only local, non-mutating tools; retries need fresh approval; approvals bind to immutable calls. The authority rules (planning never authorizes, no undeclared escalation, approval bound to the arguments, tamper-evident audit, memory and revoked leases cannot authorize) are cases in the frozen MATRIX-011 benchmark: Frozen tool-governance benchmark MATRIX-011-v1 certified on main 0da925cf2c1059060fbd5f69ab2358d08e6808aa (merge of PR #377): run 44041191535 SUCCESS, MATRIX011_TOOL_GOVERNANCE_CERT_OK, 23/23 cases over 21 categories (the nine action classes, the permission taxonomy, the authority rules), arithmetic closed, receipt SHA-256 aeb1c9f5535661c4b04848478b0891f326f95d9e3d98edf574b9bc7ef0f7d5d2; artifact 14309382150, 9,819 bytes, digest sha256:92c06be0c9c3078e1ccb89ebbb03166bf4ff35b951149a20a845b1c59192a188. A forced wrong outcome, a dropped case and a crashing case each fail the receipt."
     },
     {
       "requirement_id": "INV-007",
@@ -862,25 +869,33 @@
       "requirement_id": "INV-021",
       "requirement_text": "Memory authority",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "PARTIAL",
+      "implementation_state": "IMPLEMENTED",
       "implementation_refs": [
         "backend/app/memory.py",
-        "backend/app/memory_policy.py"
+        "backend/app/memory_policy.py",
+        "backend/app/work_runs.py",
+        "frontend/src/components/RunBlock.jsx",
+        "frontend/src/components/workspaces/MemoryWorkspace.jsx"
       ],
       "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
+      "positive_gate": "backend/tests/test_work_runs.py::test_answer_reports_saved_memory_and_chat_history_it_used_without_their_content",
+      "negative_gate": "backend/tests/test_prompt_injection.py::test_memory_instructions_cannot_authorize_tools",
       "benchmark": null,
       "evidence_refs": [
         "backend/tests/test_api.py::test_api_memory_controls_are_explicit_and_user_managed",
         "backend/tests/test_prompt_injection.py::test_memory_instructions_cannot_authorize_tools",
         "backend/tests/test_agent_loop.py::test_model_only_sees_enabled_memory_in_scope_and_cannot_list_the_rest",
-        "backend/tests/test_memory_scope.py::test_conversation_memory_is_never_selected_without_conversation_context"
+        "backend/tests/test_memory_scope.py::test_conversation_memory_is_never_selected_without_conversation_context",
+        "backend/tests/test_work_runs.py::test_answer_reports_saved_memory_and_chat_history_it_used_without_their_content",
+        "backend/tests/test_work_runs.py::test_disabled_memory_is_not_reported_as_used",
+        "qa/rendered/rendered_qa.mjs",
+        "https://github.com/jotaele44/mucaro-ai/actions/runs/43940319899",
+        "https://github.com/jotaele44/mucaro-ai/actions/runs/43941725229"
       ],
-      "state": "PROVISIONAL",
+      "state": "PASS",
       "blocker_id": null,
       "dag_node": "N14",
-      "notes": "Covered on main 6a2c396cb714fae9157fcf4a4bd920edfa98e68c: what is retained (list/export), provenance (source shown), scope (PR #143), mutation/disable/delete, and memory cannot authorize tools. Residue: the distinction between durable memory and current-conversation state is carried only by conversation-scoped durable rows and prompt wording; there is no explicit user-facing distinction, and no rendered check of it at the current head."
+      "notes": "PASS at main f67baceb067643b77fc94814319be05e0f556f41. Retained items (list/export), provenance, scope, mutation/disable/delete and memory-cannot-authorize-tools were already covered. The former residue is closed by PR #370: each answered run emits a context event with the count of saved memories and earlier chat messages used (ids and scope counts, never content); the answer shows 'Also used: N saved memory · N earlier messages from this chat' linking to Memory; the Memory workspace states that saved memory is kept across chats until turned off or deleted, while a chat's own earlier messages are used only in that chat and never saved; the conversation scope is bound to the current chat instead of a typed id. Rendered checks (memoryContextScenario, desktop and iPhone) passed in CI on chromium and webkit at PR #370 run 43940319899 and again at PR #371 run 43941725229, whose tree is the current main."
     },
     {
       "requirement_id": "INV-022",
@@ -1115,23 +1130,29 @@
       "requirement_id": "TGT-009",
       "requirement_text": "Permissioned remote AI",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "PARTIAL",
+      "implementation_state": "IMPLEMENTED",
       "implementation_refs": [
         "backend/app/model_router.py",
-        "backend/app/model_routing_policy.py"
+        "backend/app/model_routing_policy.py",
+        "backend/app/services.py",
+        "scripts/certify_tgt009_live.py"
       ],
       "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
+      "positive_gate": "_architecture/release/evidence/tgt009_live_9e8659bb22b3.json",
+      "negative_gate": "backend/tests/test_local_model.py::test_remote_forbidden_blocks_a_preferred_remote_provider",
       "benchmark": null,
       "evidence_refs": [
+        "_architecture/release/evidence/tgt009_live_9e8659bb22b3.json",
+        "scripts/certify_tgt009_live.py",
         "backend/tests/test_mock_model.py",
-        "backend/tests/test_local_model.py::test_remote_forbidden_blocks_a_preferred_remote_provider"
+        "backend/tests/test_local_model.py::test_remote_forbidden_blocks_a_preferred_remote_provider",
+        "backend/tests/test_local_model.py::test_system_offline_makes_remote_providers_ineligible",
+        "backend/tests/test_model_permission.py::test_anthropic_permission_denial_happens_before_sdk_transport"
       ],
-      "state": "BLOCKED",
-      "blocker_id": "BLK-LLM-001",
+      "state": "PASS",
+      "blocker_id": null,
       "dag_node": "N13",
-      "notes": "Credential-free work complete: remote use requires live mode + key + per-request allow_live, never implicit; the remote prompt uses the same fenced grounded prompt. Live remote evaluation needs an operator key."
+      "notes": "PASS: live remote evaluation with the operator's Anthropic key on 2026-11-17 at clean commit 9e8659bb22b35876e0fbb5e23b128d0f8b977fc6 (scripts/certify_tgt009_live.py; receipt _architecture/release/evidence/tgt009_live_9e8659bb22b3.json, TGT009_LIVE_CERT_OK, 5/5, receipt sha256 1537597542c11cc5c319e8a0d8f4239bb944616d47079995e7bc225ed4e40770). Through the app's own answer pipeline with every outbound request captured at the SDK client: (1) live mode off, (2) no per-request allow_live, (3) no API key and (4) an offline-only chat each refuse with ERROR_MODEL_ROUTE_BLOCKED and a plain reason, with zero requests sent; (5) with every permission given, claude-sonnet-5 answered in 1.5 s (251 input / 55 output tokens), CITATION_OK citing the one retrieved chunk, and exactly one request carried only that chunk: an unselected private document in the same workspace was never transmitted, and the key never appears in the request body or the receipt. Limits: one live request (path, not quality at scale); run from a cloud development container, not the packaged app; no CI run because the key is not a GitHub Actions secret."
     },
     {
       "requirement_id": "TGT-010",
@@ -1248,25 +1269,36 @@
       "requirement_id": "TGT-014",
       "requirement_text": "Governed tool execution",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "PARTIAL",
+      "implementation_state": "IMPLEMENTED",
       "implementation_refs": [
-        "backend/app/tools.py"
+        "backend/app/tools.py",
+        "backend/app/work_runs.py",
+        "backend/app/agent_loop.py",
+        "frontend/src/components/RunBlock.jsx",
+        "frontend/src/components/workspaces/ProvenanceWorkspace.jsx"
       ],
       "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
-      "benchmark": null,
+      "positive_gate": "backend/tests/test_agent_loop.py::test_model_proposal_waits_for_the_person_then_its_result_feeds_the_answer",
+      "negative_gate": "backend/tests/test_agent_loop.py::test_auto_mode_asks_per_call_when_the_model_is_remote",
+      "benchmark": "_architecture/tool_governance_benchmark_v1.json",
       "evidence_refs": [
         "backend/tests/test_contracts.py::test_api_cancel_and_summary_routes",
         "backend/tests/test_contracts.py::test_summary_counts_close_arithmetically",
         "backend/tests/test_agent_loop.py::test_model_proposal_waits_for_the_person_then_its_result_feeds_the_answer",
         "backend/tests/test_agent_loop.py::test_denied_proposal_is_reported_to_the_model_and_never_runs",
-        "backend/tests/test_agent_loop.py::test_proposals_outside_the_catalogue_or_with_extra_arguments_are_refused_before_any_request"
+        "backend/tests/test_agent_loop.py::test_proposals_outside_the_catalogue_or_with_extra_arguments_are_refused_before_any_request",
+        "backend/tests/test_agent_loop.py::test_auto_mode_asks_per_call_when_the_model_is_remote",
+        "_architecture/tool_governance_benchmark_v1.json",
+        "backend/tests/test_matrix011_tool_governance_benchmark.py::test_matrix011_full_benchmark_closes_its_frozen_denominator",
+        "qa/rendered/rendered_qa.mjs",
+        "https://github.com/jotaele44/mucaro-ai/actions/runs/44041191535",
+        "https://github.com/jotaele44/mucaro-ai/actions/runs/44041191535/artifacts/14309382150",
+        "https://github.com/jotaele44/mucaro-ai/actions/runs/44026675626"
       ],
-      "state": "PROVISIONAL",
+      "state": "PASS",
       "blocker_id": null,
       "dag_node": "N05",
-      "notes": "Permission-aware, audited (hash chain), attributable, cancellable before start, failure-aware. Model-initiated calls now go through the same gate as ordinary calls with requested_by=model (main 6a2c396cb714fae9157fcf4a4bd920edfa98e68c). Residue: in Auto mode a model proposal for a local read-only tool (for example coding.read_file) is pre-approved even when the chat's model is a remote provider, so local content can reach that provider without per-call approval; consent is per chat (allow_live), not per call. Whether that meets 'consequential actions require applicable approval' is an owner policy decision. No rendered check of model attribution at the current head."
+      "notes": "PASS at main 0da925cf2c1059060fbd5f69ab2358d08e6808aa. Permission-aware, audited (hash chain), attributable, cancellable before start, failure-aware; model-initiated calls go through the same gate with requested_by=model; in Auto mode a remote model's proposals ask per call (owner decision 2026-11-16). Both former residues are closed: (1) DAG N05's tool-governance benchmark: Frozen tool-governance benchmark MATRIX-011-v1 certified on main 0da925cf2c1059060fbd5f69ab2358d08e6808aa (merge of PR #377): run 44041191535 SUCCESS, MATRIX011_TOOL_GOVERNANCE_CERT_OK, 23/23 cases over 21 categories (the nine action classes, the permission taxonomy, the authority rules), arithmetic closed, receipt SHA-256 aeb1c9f5535661c4b04848478b0891f326f95d9e3d98edf574b9bc7ef0f7d5d2; artifact 14309382150, 9,819 bytes, digest sha256:92c06be0c9c3078e1ccb89ebbb03166bf4ff35b951149a20a845b1c59192a188. A forced wrong outcome, a dropped case and a crashing case each fail the receipt. (2) Rendered model attribution: rendered QA starts a scripted local model that proposes source_library.status; on desktop and iPhone the approval card reads 'The model wants to run an action', the Provenance record shows Requested by: model, and the call stays PENDING_APPROVAL; passed on chromium and webkit in PR #377 run 44026675626, whose tree is main's merge parent (rendered QA does not run on main pushes)."
     },
     {
       "requirement_id": "TGT-015",
@@ -1291,24 +1323,34 @@
       "requirement_id": "TGT-016",
       "requirement_text": "Common execution contracts",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "PARTIAL",
+      "implementation_state": "IMPLEMENTED",
       "implementation_refs": [
         "backend/app/contracts.py",
-        "schemas/"
+        "schemas/",
+        "backend/app/agent_checkpoints.py",
+        "backend/app/permission_leases.py",
+        "backend/app/agent_task_dag.py",
+        "backend/app/autopilot.py",
+        "backend/app/offline_independence.py",
+        "backend/app/release_scope.py"
       ],
       "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
+      "positive_gate": "backend/tests/test_contract_registry.py::test_real_records_satisfy_the_shared_contracts_and_corruption_is_refused",
+      "negative_gate": "backend/tests/test_contracts.py::test_contract_violations_are_rejected",
       "benchmark": null,
       "evidence_refs": [
         "backend/tests/test_contracts.py::test_every_contract_family_has_present_valid_schemas",
         "backend/tests/test_contracts.py::test_real_producer_payloads_satisfy_contracts",
-        "backend/tests/test_contracts.py::test_contract_violations_are_rejected"
+        "backend/tests/test_contracts.py::test_contract_violations_are_rejected",
+        "backend/tests/test_contract_registry.py::test_every_schema_is_registered_or_declared_domain_local",
+        "backend/tests/test_contract_registry.py::test_registered_schemas_are_loaded_only_through_the_registry",
+        "backend/tests/test_contract_registry.py::test_real_records_satisfy_the_shared_contracts_and_corruption_is_refused",
+        "backend/tests/test_contract_registry.py::test_producers_use_the_shipped_schemas_even_when_the_root_points_at_a_data_folder"
       ],
-      "state": "PROVISIONAL",
+      "state": "PASS",
       "blocker_id": null,
       "dag_node": "N03",
-      "notes": "All nine families have schemas and a registry; runtime enforcement at source, provenance, grant, tool call/audit, citation/answer trace, memory, routing and receipt boundaries. Execution contract, run manifest and artifact identity producers now validate at runtime (PR #340). Residue: agent_checkpoint is validated by a module-local validator rather than the shared contract registry, and the newer permission_lease, agent_task_dag, autopilot_state and offline_independence schemas sit outside RECORD_SCHEMAS."
+      "notes": "PASS. All nine families have schemas and one registry; runtime enforcement at source, provenance, grant, permission decision and lease, tool call/audit, execution contract, run manifest, checkpoint, task DAG, autopilot state, artifact identity, citation/answer trace, memory, routing and receipt boundaries. Residue closed at main c9b983bfc5c663d404984139658b42e454a2f1c0 (PR #382): agent_checkpoint, permission_lease, agent_task_dag, autopilot_state and offline_independence_receipt now validate through the shared registry (contracts.contract_errors against the schemas shipped with the code) and belong to their contract families; release_scope checks registered ledger kinds with the registry's validator; offline independence receipts are validated before they are returned or written. Ratchets: every schemas/*.schema.json is registered or listed in DOMAIN_LOCAL_SCHEMAS with a reason (10 of those are documentation-only, loaded by no producer), and a registered schema is loaded only by the registry (the ratchet fails with the old agent_checkpoints module)."
     },
     {
       "requirement_id": "TGT-017",
@@ -1362,23 +1404,36 @@
       "requirement_id": "TGT-019",
       "requirement_text": "Offline behavior",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "PARTIAL",
+      "implementation_state": "IMPLEMENTED",
       "implementation_refs": [
         "backend/app/offline.py",
-        "backend/app/model_routing_policy.py"
+        "backend/app/model_routing_policy.py",
+        "backend/app/services.py",
+        "backend/app/work_runs.py",
+        "backend/app/models.py",
+        "frontend/src/online.js",
+        "frontend/src/App.jsx",
+        "frontend/src/components/workspaces/SettingsWorkspace.jsx"
       ],
       "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
+      "positive_gate": "backend/tests/test_work_runs.py::test_offline_device_still_answers_with_a_local_model",
+      "negative_gate": "backend/tests/test_work_runs.py::test_offline_device_refuses_a_remote_model_at_once_and_says_why",
       "benchmark": null,
       "evidence_refs": [
         "backend/tests/test_local_model.py::test_offline_manifest_classifies_every_capability_and_closes",
-        "backend/tests/test_web_render.py::offline_dns"
+        "backend/tests/test_local_model.py::test_system_offline_makes_remote_providers_ineligible",
+        "backend/tests/test_web_render.py::offline_dns",
+        "backend/tests/test_work_runs.py::test_offline_device_refuses_a_remote_model_at_once_and_says_why",
+        "backend/tests/test_work_runs.py::test_offline_device_still_answers_with_a_local_model",
+        "qa/rendered/rendered_qa.mjs",
+        "_architecture/recovery_benchmark_v1.json",
+        "https://github.com/jotaele44/mucaro-ai/actions/runs/44344285395",
+        "https://github.com/jotaele44/mucaro-ai/actions/runs/44008775914"
       ],
-      "state": "PROVISIONAL",
+      "state": "PASS",
       "blocker_id": null,
       "dag_node": "N21",
-      "notes": "Every capability classified AVAILABLE_LOCALLY / UNAVAILABLE_OFFLINE / REQUIRES_REMOTE_SERVICE (plus LOCAL_DEPENDENCY_MISSING); remote providers ineligible when offline. OPEN: UI offline states and network-interruption tests (MATRIX-016)."
+      "notes": "PASS at main d12dfb1b57adcd276bb3a71f07c046d50ab07f1e (PR #380). Every capability is classified AVAILABLE_LOCALLY / UNAVAILABLE_OFFLINE / REQUIRES_REMOTE_SERVICE (plus LOCAL_DEPENDENCY_MISSING). The device's offline state now reaches the backend: each message carries system_offline, and routing refuses remote models at once with 'the network is unavailable' before any transport (test_offline_device_refuses_a_remote_model_at_once_and_says_why) while local models still answer. The UI shows an offline notice and Settings lists network-only capabilities as Unavailable offline (Needs network when back online); rendered checks pass on desktop and iPhone in chromium and webkit (PR #380 run 44344285395; rendered QA does not run on main pushes). Network interruption and offline transition are covered by the MATRIX-016 benchmark (run 44008775914). Limit: offline is what the device reports (navigator.onLine); a captive portal or an unreachable host still looks online and is handled by typed failures (e.g. DNS errors)."
     },
     {
       "requirement_id": "TGT-020",
@@ -1513,7 +1568,7 @@
       "dependencies": [],
       "positive_gate": "backend/tests/test_permissions.py::test_external_path_requires_then_accepts_directory_grant",
       "negative_gate": "backend/tests/test_tools.py::test_tool_runtime_requires_approval_before_execution",
-      "benchmark": null,
+      "benchmark": "_architecture/tool_governance_benchmark_v1.json",
       "evidence_refs": [
         "backend/tests/test_permissions.py::test_directory_grant_rejects_filesystem_root",
         "backend/tests/test_web_browsing.py::test_validate_web_fetch_url_blocks_private_dns_resolution",
@@ -1525,12 +1580,14 @@
         "backend/tests/test_tools.py::test_tool_runtime_web_search_stays_fail_closed_without_live_permission",
         "backend/tests/test_work_runs.py::test_retry_in_ask_mode_needs_a_fresh_approval",
         "backend/tests/test_prompt_injection.py::test_injected_document_cannot_create_tool_calls_or_approvals",
-        "backend/tests/test_api_auth_boundary.py::test_data_bearing_routes_reject_missing_token_when_configured"
+        "backend/tests/test_api_auth_boundary.py::test_data_bearing_routes_reject_missing_token_when_configured",
+        "_architecture/tool_governance_benchmark_v1.json",
+        "https://github.com/jotaele44/mucaro-ai/actions/runs/44041191535"
       ],
       "state": "PASS",
       "blocker_id": null,
       "dag_node": "N05",
-      "notes": "Permissions and their negative gates:\n- Filesystem: directory grants.\n- Network: remote tools need approval; SSRF/private-address blocking; the service listens on loopback only.\n- Models: loopback-only local provider; routing modes local-only, remote-forbidden and offline.\n- Tools: per-call approval bound to the argument digest; unknown tools are refused.\n- External services: web search stays fail-closed without live permission and a key.\n- Consequential actions: mutating tools need approval; a retry needs a fresh approval; untrusted content cannot create approvals.\n- API: token boundary.\nThe security gate permission_boundaries checks the registry on every run."
+      "notes": "Permissions and their negative gates:\n- Filesystem: directory grants.\n- Network: remote tools need approval; SSRF/private-address blocking; the service listens on loopback only.\n- Models: loopback-only local provider; routing modes local-only, remote-forbidden and offline.\n- Tools: per-call approval bound to the argument digest; unknown tools are refused.\n- External services: web search stays fail-closed without live permission and a key.\n- Consequential actions: mutating tools need approval; a retry needs a fresh approval; untrusted content cannot create approvals.\n- API: token boundary.\nThe security gate permission_boundaries checks the registry on every run. The permission taxonomy (filesystem grants and escapes, network gates, model denial before transport, side-effecting capabilities, distribution channel, unknown inputs) is part of the frozen MATRIX-011 benchmark: Frozen tool-governance benchmark MATRIX-011-v1 certified on main 0da925cf2c1059060fbd5f69ab2358d08e6808aa (merge of PR #377): run 44041191535 SUCCESS, MATRIX011_TOOL_GOVERNANCE_CERT_OK, 23/23 cases over 21 categories (the nine action classes, the permission taxonomy, the authority rules), arithmetic closed, receipt SHA-256 aeb1c9f5535661c4b04848478b0891f326f95d9e3d98edf574b9bc7ef0f7d5d2; artifact 14309382150, 9,819 bytes, digest sha256:92c06be0c9c3078e1ccb89ebbb03166bf4ff35b951149a20a845b1c59192a188. A forced wrong outcome, a dropped case and a crashing case each fail the receipt."
     },
     {
       "requirement_id": "TGT-026",
@@ -1811,19 +1868,31 @@
       "requirement_id": "TGT-038",
       "requirement_text": "Coherent architecture",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "PARTIAL",
+      "implementation_state": "IMPLEMENTED",
       "implementation_refs": [
-        "backend/app/tools.py"
+        "backend/app/tools.py",
+        "backend/app/coherent_architecture.py",
+        "_architecture/coherent_architecture_v1.json",
+        "backend/app/contracts.py"
       ],
       "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
+      "positive_gate": "backend/tests/test_coherent_architecture.py::test_declared_architecture_matches_the_running_code",
+      "negative_gate": "backend/tests/test_coherent_architecture.py::test_a_tool_outside_the_matrix_fails",
       "benchmark": null,
-      "evidence_refs": [],
-      "state": "OPEN",
+      "evidence_refs": [
+        "_architecture/coherent_architecture_v1.json",
+        "backend/app/coherent_architecture.py",
+        "backend/tests/test_coherent_architecture.py::test_declared_architecture_matches_the_running_code",
+        "backend/tests/test_coherent_architecture.py::test_coding_bridges_include_execution_and_repository_mutation",
+        "backend/tests/test_coherent_architecture.py::test_a_tool_outside_the_matrix_fails",
+        "backend/tests/test_coherent_architecture.py::test_a_drifted_matrix_fails",
+        "_architecture/tool_governance_benchmark_v1.json",
+        "https://github.com/jotaele44/mucaro-ai/actions/runs/44041191535"
+      ],
+      "state": "PASS",
       "blocker_id": null,
       "dag_node": "N03",
-      "notes": "GIS (gis.inspect) and OCR (ocr.analyze_image) are now registered governed tools (PR #344) and coding tools are in the registry. Residue: _architecture/coherent_architecture_v1.json is not loaded by any test or validator, its own limitation keeps TGT-038 non-PASS until the matrix executes on a real runner, and its coding bridge list omits exec, commit and push."
+      "notes": "PASS at main c9b983bfc5c663d404984139658b42e454a2f1c0. The architecture matrix executes on every CI run (PR #374): all 12 categories once each, canonical surfaces resolve, refs exist, contract families are in CONTRACT_FAMILIES, bridges are in TOOL_REGISTRY, GIS and OCR have exactly one bridge each, and every registered tool belongs to a category. The matrix's own limitation 3 ('non-PASS until this matrix and the stacked V06/tool regressions execute on a real runner') is met: the matrix runs in the validate job on GitHub-hosted runners, and the V06 permission-taxonomy and tool regressions run as the frozen MATRIX-011 benchmark on a GitHub-hosted runner (run 44041191535, 23/23, PR #377). The shared contracts it relies on are complete (TGT-016/INV-005, PR #382). Limits: the matrix proves wiring; benchmark quality is carried by the MATRIX rows."
     },
     {
       "requirement_id": "MATRIX-001",
@@ -2072,12 +2141,16 @@
       "implementation_refs": [
         "backend/app/tools.py",
         "backend/app/work_runs.py",
-        "backend/app/error_categories.py"
+        "backend/app/error_categories.py",
+        "backend/app/tool_governance_benchmark.py",
+        "_architecture/tool_governance_benchmark_v1.json",
+        "scripts/certify_matrix011_tool_governance.py",
+        ".github/workflows/matrix011-tool-governance-cert.yml"
       ],
       "dependencies": [],
       "positive_gate": "backend/tests/test_contracts.py::test_allowed_approved_action_executes_once_and_duplicate_invocation_is_refused",
       "negative_gate": "backend/tests/test_tools.py::test_a_hung_handler_times_out_and_is_never_recorded_as_executed",
-      "benchmark": null,
+      "benchmark": "_architecture/tool_governance_benchmark_v1.json",
       "evidence_refs": [
         "backend/tests/test_contracts.py::test_denied_and_cancelled_actions_never_execute",
         "backend/tests/test_tools.py::test_tool_runtime_requires_approval_before_execution",
@@ -2086,12 +2159,18 @@
         "backend/tests/test_work_runs.py::test_failed_action_asks_and_retry_repeats_only_the_failed_target",
         "backend/tests/test_contracts.py::test_restart_marks_running_calls_interrupted_without_retrying",
         "backend/tests/test_contracts.py::test_concurrent_runs_execute_the_handler_exactly_once",
-        "backend/tests/test_contracts.py::test_audit_chain_verifies_and_detects_tampering"
+        "backend/tests/test_contracts.py::test_audit_chain_verifies_and_detects_tampering",
+        "_architecture/tool_governance_benchmark_v1.json",
+        "backend/tests/test_matrix011_tool_governance_benchmark.py::test_matrix011_full_benchmark_closes_its_frozen_denominator",
+        "backend/tests/test_matrix011_tool_governance_benchmark.py::test_matrix011_a_case_with_the_wrong_outcome_fails_the_receipt",
+        "backend/tests/test_matrix011_tool_governance_benchmark.py::test_matrix011_a_dropped_case_fails_the_denominator",
+        "https://github.com/jotaele44/mucaro-ai/actions/runs/44041191535",
+        "https://github.com/jotaele44/mucaro-ai/actions/runs/44041191535/artifacts/14309382150"
       ],
       "state": "PASS",
       "blocker_id": null,
       "dag_node": "N05",
-      "notes": "All nine action classes are covered with audit and state truthfulness: allowed, denied, approval-required, cancelled, tool error/crash (FAILED, never left RUNNING), TIMEOUT, retry (failed target only, fresh approval), restart (RUNNING -> INTERRUPTED, no auto-retry) and duplicate invocation (atomic claim, handler runs exactly once). TIMEOUT: every handler runs under a per-tool wall-clock bound (default 120 s). On expiry the call is FAILED with ERROR_TOOL_TIMEOUT (category TOOL_FAILURE) and handler_abandoned=true. A mutating tool is marked side_effects=UNKNOWN because Python cannot kill the thread. A late return is discarded and never recorded as EXECUTED. The audit log is hash-chained and tamper-evident."
+      "notes": "All nine action classes are covered with audit and state truthfulness: allowed, denied, approval-required, cancelled, tool error/crash (FAILED, never left RUNNING), TIMEOUT, retry (failed target only, fresh approval), restart (RUNNING -> INTERRUPTED, no auto-retry) and duplicate invocation (atomic claim, handler runs exactly once). TIMEOUT: every handler runs under a per-tool wall-clock bound (default 120 s). On expiry the call is FAILED with ERROR_TOOL_TIMEOUT (category TOOL_FAILURE) and handler_abandoned=true. A mutating tool is marked side_effects=UNKNOWN because Python cannot kill the thread. A late return is discarded and never recorded as EXECUTED. The audit log is hash-chained and tamper-evident. Frozen tool-governance benchmark MATRIX-011-v1 certified on main 0da925cf2c1059060fbd5f69ab2358d08e6808aa (merge of PR #377): run 44041191535 SUCCESS, MATRIX011_TOOL_GOVERNANCE_CERT_OK, 23/23 cases over 21 categories (the nine action classes, the permission taxonomy, the authority rules), arithmetic closed, receipt SHA-256 aeb1c9f5535661c4b04848478b0891f326f95d9e3d98edf574b9bc7ef0f7d5d2; artifact 14309382150, 9,819 bytes, digest sha256:92c06be0c9c3078e1ccb89ebbb03166bf4ff35b951149a20a845b1c59192a188. A forced wrong outcome, a dropped case and a crashing case each fail the receipt."
     },
     {
       "requirement_id": "MATRIX-012",
@@ -2121,19 +2200,33 @@
       "requirement_id": "MATRIX-013",
       "requirement_text": "Memory benchmark",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "PARTIAL",
+      "implementation_state": "IMPLEMENTED",
       "implementation_refs": [
-        "backend/tests/test_memory_policy.py"
+        "backend/app/memory_benchmark.py",
+        "_architecture/memory_benchmark_v1.json",
+        "backend/tests/test_matrix013_memory_benchmark.py",
+        "scripts/certify_matrix013_memory.py",
+        ".github/workflows/matrix013-memory-cert.yml"
       ],
       "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
-      "benchmark": null,
-      "evidence_refs": [],
-      "state": "OPEN",
+      "positive_gate": ".github/workflows/matrix013-memory-cert.yml",
+      "negative_gate": "backend/tests/test_matrix013_memory_benchmark.py::test_matrix013_a_case_with_the_wrong_outcome_fails_the_receipt",
+      "benchmark": "_architecture/memory_benchmark_v1.json",
+      "evidence_refs": [
+        "_architecture/memory_benchmark_v1.json",
+        "backend/app/memory_benchmark.py",
+        "scripts/certify_matrix013_memory.py",
+        "backend/tests/test_matrix013_memory_benchmark.py::test_matrix013_frozen_manifest_matches_runtime_declaration",
+        "backend/tests/test_matrix013_memory_benchmark.py::test_matrix013_full_benchmark_closes_its_frozen_denominator",
+        "backend/tests/test_matrix013_memory_benchmark.py::test_matrix013_a_dropped_case_fails_the_denominator",
+        "backend/tests/test_matrix013_memory_benchmark.py::test_matrix013_a_crashing_case_is_recorded_as_a_failure",
+        "https://github.com/jotaele44/mucaro-ai/actions/runs/43943390101",
+        "https://github.com/jotaele44/mucaro-ai/actions/runs/43943390101/artifacts/14263257534"
+      ],
+      "state": "PASS",
       "blocker_id": null,
       "dag_node": "N14",
-      "notes": "Scope and conversation isolation, creation, disable, delete and auth are tested (test_memory_scope.py, test_api.py). Residue: no restart/persistence test and no single frozen memory-benchmark denominator (verification method is BENCHMARK)."
+      "notes": "PASS: exact-head MATRIX-013 certification at f67baceb067643b77fc94814319be05e0f556f41 (merge of PR #371) ran the frozen 13-case memory denominator covering all 10 contract categories (creation, retrieval, mutation, disablement, deletion, scope, conversation isolation, restart in a separate process, permission boundary, memory cannot authorize tools). Run 43943390101 completed SUCCESS and emitted MATRIX013_MEMORY_CERT_OK: 13/13 PASS, zero failures, arithmetic closed, failed_terminal_checks=[], receipt SHA-256 83155117eb65d18e4e0980698c071fcb29238e74726de1e0ede637936af778d1. Artifact 14263257534 is 5,344 bytes with GitHub artifact digest sha256:ca57a1b73d3e2ac9f1bf291223a156a664781d4c017e7e71d1fdef49d6019a88. Falsification: a forced wrong outcome, a dropped case and a crashing case each fail the receipt."
     },
     {
       "requirement_id": "MATRIX-014",
@@ -2184,19 +2277,34 @@
       "requirement_id": "MATRIX-016",
       "requirement_text": "Recovery benchmark",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "PARTIAL",
+      "implementation_state": "IMPLEMENTED",
       "implementation_refs": [
+        "backend/app/recovery_benchmark.py",
+        "_architecture/recovery_benchmark_v1.json",
+        "backend/tests/test_matrix016_recovery_benchmark.py",
+        "scripts/certify_matrix016_recovery.py",
+        ".github/workflows/matrix016-recovery-cert.yml",
         "backend/tests/test_agent_checkpoint_process_recovery.py"
       ],
       "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
-      "benchmark": null,
-      "evidence_refs": [],
-      "state": "OPEN",
+      "positive_gate": ".github/workflows/matrix016-recovery-cert.yml",
+      "negative_gate": "backend/tests/test_matrix016_recovery_benchmark.py::test_matrix016_a_case_with_the_wrong_outcome_fails_the_receipt",
+      "benchmark": "_architecture/recovery_benchmark_v1.json",
+      "evidence_refs": [
+        "_architecture/recovery_benchmark_v1.json",
+        "backend/app/recovery_benchmark.py",
+        "scripts/certify_matrix016_recovery.py",
+        "backend/tests/test_matrix016_recovery_benchmark.py::test_matrix016_frozen_manifest_matches_runtime_declaration",
+        "backend/tests/test_matrix016_recovery_benchmark.py::test_matrix016_full_benchmark_closes_its_frozen_denominator",
+        "backend/tests/test_matrix016_recovery_benchmark.py::test_matrix016_a_dropped_case_fails_the_denominator",
+        "backend/tests/test_matrix016_recovery_benchmark.py::test_matrix016_a_crashing_case_is_recorded_as_a_failure",
+        "https://github.com/jotaele44/mucaro-ai/actions/runs/44008775914",
+        "https://github.com/jotaele44/mucaro-ai/actions/runs/44008775914/artifacts/14295367984"
+      ],
+      "state": "PASS",
       "blocker_id": null,
       "dag_node": "N21",
-      "notes": ""
+      "notes": "PASS: exact-head MATRIX-016 certification at 8164989bbb09bd7be96f9b0348a8d98f0d2f3b41 (merge of PR #373) ran the frozen 13-case recovery denominator over all 8 contract categories: app restart (process killed mid tool call; fresh app marks the call and run INTERRUPTED once and refuses a rerun), workflow restart (checkpoint identity kept across processes, sequence +1, second resume refused; corrupt payloads refused), resume after restart (completes once), cancel (pending calls cancelled, queued run cancelled before start), crash recovery (in-flight step and accepted provider operation never repeated), partial tool failure (retry repeats only the failed call), network interruption (real refused connection pauses the checkpoint; accepted once after resume) and offline transition (remote providers ineligible only while offline; web.fetch unavailable offline). Run 44008775914 completed SUCCESS and emitted MATRIX016_RECOVERY_CERT_OK: 13/13 PASS, arithmetic closed, failed_terminal_checks=[], receipt SHA-256 3a098ccd44c53363a9af9753728c818f38c4ccfb4b3441f47665818d6598da9a. Artifact 14295367984 is 7,062 bytes with GitHub artifact digest sha256:1d6b3dbd85e1e5987ed1b6a88a4b3955f34cf046f00f541d3ecfc56dda2c30ca. Stated limits (in the frozen manifest): network recovery covers model-provider calls (web tool failures recover through the partial-failure path); offline is the explicit system_offline flag, not connectivity detection; restart is a new process on the same data directory."
     },
     {
       "requirement_id": "MATRIX-017",

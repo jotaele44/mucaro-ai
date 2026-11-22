@@ -1,12 +1,8 @@
 from __future__ import annotations
 
-import json
 from copy import deepcopy
 from datetime import UTC, datetime
-from pathlib import Path
 from typing import Any
-
-import jsonschema
 
 from .agent_checkpoints import (
     CheckpointError,
@@ -20,6 +16,7 @@ from .agent_checkpoints import (
 )
 from .agent_task_dag import TaskDagError, build_task_dag
 from .config import Settings, settings
+from .contracts import APPLICATION_ROOT, contract_errors
 from .permission_leases import PermissionLeaseError, authorize_tool_call_with_lease
 from .tool_execution_policy import READ_ONLY_LOCAL_INSPECTION_TOOLS, is_read_only_local_inspection_tool
 from .tools import (
@@ -68,19 +65,18 @@ class AutopilotError(RuntimeError):
         self.detail = detail
 
 
-def _schema() -> dict[str, Any]:
-    path = Path(__file__).resolve().parents[2] / "schemas" / "autopilot_state.schema.json"
+def _contract_errors(payload: Any) -> list[str]:
+    """Errors against the shared autopilot_state contract (TGT-016), read from the schemas shipped with this code."""
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
+        return contract_errors("autopilot_state", payload, root=APPLICATION_ROOT)
     except OSError as exc:
-        raise AutopilotError("ERROR_AUTOPILOT_SCHEMA_UNAVAILABLE", f"{path}: {exc}") from exc
+        raise AutopilotError("ERROR_AUTOPILOT_SCHEMA_UNAVAILABLE", str(exc)) from exc
 
 
 def _validate_state(state: dict[str, Any]) -> dict[str, Any]:
-    errors = sorted(jsonschema.Draft202012Validator(_schema()).iter_errors(state), key=lambda error: list(error.absolute_path))
+    errors = _contract_errors(state)
     if errors:
-        where = "/".join(str(part) for part in errors[0].absolute_path) or "<root>"
-        raise AutopilotError("ERROR_AUTOPILOT_SCHEMA", f"{where}: {errors[0].message}")
+        raise AutopilotError("ERROR_AUTOPILOT_SCHEMA", errors[0])
     return state
 
 

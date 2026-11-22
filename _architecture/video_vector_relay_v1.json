@@ -1,0 +1,159 @@
+{
+  "schema": "mucaro-video-vector-relay-denominator/1.0",
+  "denominator_id": "VIDEO_VECTOR_RELAY_V1",
+  "frozen_date": "2026-11-16",
+  "baseline_main_sha": "301297065526047fde7ae2b9858e687631a3f8f2",
+  "source_manifest": {
+    "kind": "USER_SUPPLIED_VIDEO",
+    "filename": "ScreenRecording_11-16-2026_09-03-33_1.mov",
+    "sha256": "0e47d28633b8615b8b1bba657ac4004f8e308488ea03a4e72b761197f6036058",
+    "duration_seconds": 26.775,
+    "video_codec": "hevc",
+    "width": 1170,
+    "height": 2390,
+    "frame_rate": "4120/51"
+  },
+  "scope": "Capabilities observably demonstrated in the frozen 26.775-second phone recording of a relay across five conversations in another product. The recording has no audible narration. This denominator does not claim parity with undisclosed behavior of that product, and it records no conversation titles or investigation content from the recording.",
+  "closure_rule": "Every required capability must be IMPLEMENTED and certification PASS for one exact Mucaro source SHA, with positive and negative execution evidence, at least one live model, and zero unresolved residue inside this denominator.",
+  "capabilities": [
+    {
+      "id": "VRL-001",
+      "capability": "concurrent_conversation_runs",
+      "required": true,
+      "flagpole_domains": [
+        "V02",
+        "V07",
+        "V12"
+      ],
+      "observed_behavior": "Several conversations each hold a running or finished run at the same time, and a run keeps working after the operator leaves its conversation."
+    },
+    {
+      "id": "VRL-002",
+      "capability": "answer_closes_with_vector_block",
+      "required": true,
+      "flagpole_domains": [
+        "V04",
+        "V07"
+      ],
+      "observed_behavior": "Each finished answer closes with one fenced plain-text block in a fixed grammar: NEXT VECTOR with an anchor line and arrow steps, CROSS ALL T'S, MAXIMIZE YIELD, and in some answers FINAL GATE or FINAL RELEASE rows."
+    },
+    {
+      "id": "VRL-003",
+      "capability": "vector_block_copy_control",
+      "required": true,
+      "flagpole_domains": [
+        "V21"
+      ],
+      "observed_behavior": "The block is shown as a unit apart from the prose with its own copy control, and copying yields exactly the block text."
+    },
+    {
+      "id": "VRL-004",
+      "capability": "vector_relayed_as_next_message",
+      "required": true,
+      "flagpole_domains": [
+        "V02",
+        "V21"
+      ],
+      "observed_behavior": "The copied block is sent as the next message of the same conversation and a new run starts at once."
+    },
+    {
+      "id": "VRL-005",
+      "capability": "relay_is_an_operator_action",
+      "required": true,
+      "flagpole_domains": [
+        "V06",
+        "V07"
+      ],
+      "observed_behavior": "Every relay in the recording is an explicit operator action. No vector starts by itself."
+    },
+    {
+      "id": "VRL-006",
+      "capability": "round_robin_across_conversations",
+      "required": true,
+      "flagpole_domains": [
+        "V12",
+        "V21"
+      ],
+      "observed_behavior": "The operator advances five conversations in one pass, moving to the next while the previous one works."
+    },
+    {
+      "id": "VRL-007",
+      "capability": "unseen_result_marker",
+      "required": true,
+      "flagpole_domains": [
+        "V02",
+        "V21"
+      ],
+      "observed_behavior": "Conversations whose newest result has not been opened carry a marker in the list, and the control that opens the list carries one while the list is hidden."
+    },
+    {
+      "id": "VRL-008",
+      "capability": "run_progress_stop_and_follow_up",
+      "required": true,
+      "flagpole_domains": [
+        "V07",
+        "V21"
+      ],
+      "observed_behavior": "An active run shows that it is working, and the composer offers stop and takes a follow-up message for later."
+    },
+    {
+      "id": "VRL-009",
+      "capability": "pinned_conversation_group",
+      "required": true,
+      "flagpole_domains": [
+        "V21"
+      ],
+      "observed_behavior": "Chosen conversations are grouped under a pinned heading at the top of the list."
+    },
+    {
+      "id": "VRL-010",
+      "capability": "long_unattended_research_run",
+      "required": true,
+      "flagpole_domains": [
+        "V06",
+        "V08",
+        "V14"
+      ],
+      "observed_behavior": "A relayed vector runs for an extended period, searching and reading the web without the operator approving each action, and returns with sources."
+    },
+    {
+      "id": "VRL-011",
+      "capability": "answer_carries_sources",
+      "required": true,
+      "flagpole_domains": [
+        "V15",
+        "V18"
+      ],
+      "observed_behavior": "Each answer carries the sources it used."
+    },
+    {
+      "id": "VRL-012",
+      "capability": "gate_ledger_in_the_vector",
+      "required": true,
+      "flagpole_domains": [
+        "V19",
+        "V20"
+      ],
+      "observed_behavior": "The block carries gate rows with explicit states, keeps unverified gates open or unresolved, and holds production and promotion gates as withheld."
+    },
+    {
+      "id": "VRL-013",
+      "capability": "baseline_lineage_across_vectors",
+      "required": true,
+      "flagpole_domains": [
+        "V03",
+        "V18"
+      ],
+      "observed_behavior": "Successive vectors name frozen baselines by version and exact hash and direct that frozen evidence be reused instead of acquired again."
+    },
+    {
+      "id": "VRL-014",
+      "capability": "operable_on_a_phone",
+      "required": true,
+      "flagpole_domains": [
+        "V21"
+      ],
+      "observed_behavior": "The whole loop is carried out on a phone by touch."
+    }
+  ]
+}

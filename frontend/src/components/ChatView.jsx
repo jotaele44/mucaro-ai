@@ -12,6 +12,7 @@ import { ModelSetup, modelLabel, modelOf } from "./ModelSetup.jsx";
 import { RepoSetup, repoLabel } from "./RepoSetup.jsx";
 import { RunBlock } from "./RunBlock.jsx";
 import { Sheet } from "./Sheet.jsx";
+import { isDeviceOnline } from "../online.js";
 
 // A stream route that keeps failing is retried with backoff, then paused until the user (or a reconnect) resumes it.
 const MAX_STREAM_RETRIES = 10;
@@ -87,7 +88,7 @@ function ConversationMenu({ conversation, onRename, onDelete, onOpenTasks, annou
   );
 }
 
-export function ChatView({ reconnect = 0, conversationId, onConversationCreated, onConversationsChanged, onOpenTasks, announce, modes, defaultOptions, onDefaultModelChange }) {
+export function ChatView({ reconnect = 0, conversationId, onConversationCreated, onConversationsChanged, onOpenTasks, announce, modes, defaultOptions, onDefaultModelChange, onOpenMemory }) {
   const [conversation, setConversation] = useState(null);
   // The model for a chat that has not started yet; it becomes the conversation's model on the first message.
   const [draftModel, setDraftModel] = useState(() => modelOf(defaultOptions));
@@ -291,7 +292,7 @@ export function ChatView({ reconnect = 0, conversationId, onConversationCreated,
         }
       }
       const key = suppliedIdempotencyKey || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-      const result = await api.sendMessage(id, { prompt, mode: modeOverride || mode, idempotency_key: key, options: { ...defaultOptions, ...chatModel } });
+      const result = await api.sendMessage(id, { prompt, mode: modeOverride || mode, idempotency_key: key, options: { ...defaultOptions, ...chatModel, system_offline: !isDeviceOnline() } });
       // Switch to a new conversation only after its first run exists, so the reload sees and follows it.
       if (creating) onConversationCreated(id);
       else {
@@ -302,6 +303,7 @@ export function ChatView({ reconnect = 0, conversationId, onConversationCreated,
         }
         const runList = await api.conversationRuns(id);
         setSummaries(runList.runs);
+        onConversationsChanged(); // the thread list shows this conversation as working at once
       }
       announce(result.run.state === "QUEUED" ? "Message queued." : "Message sent.");
     } catch (err) {
@@ -482,6 +484,7 @@ export function ChatView({ reconnect = 0, conversationId, onConversationCreated,
             view={view}
             onChanged={() => loadRun(view.runId).then(refresh)}
             onOpenCitation={setCitation}
+            onOpenMemory={onOpenMemory}
             announce={announce}
             messageEdits={messageEdits}
             onEditMessage={saveMessageEdit}
@@ -491,6 +494,9 @@ export function ChatView({ reconnect = 0, conversationId, onConversationCreated,
           <NextVectorPicker
             key={views[views.length - 1].runId}
             request={views[views.length - 1].prompt}
+            // The vector this run's answer closed with, if any: offered first, sent only by Start.
+            proposal={views[views.length - 1].nextVector}
+            announce={announce}
             // Follow-up selection is not tool approval. Use the canonical ask-first mode.
             onStart={(prompt, idempotencyKey) => send(prompt, "ask", idempotencyKey)}
           />

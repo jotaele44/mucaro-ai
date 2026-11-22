@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { api } from "../../api.js";
 import { CleartextNotice } from "../CleartextNotice.jsx";
 import { ModelSetup, modelOf } from "../ModelSetup.jsx";
+import { useOnline } from "../../online.js";
 
 // One settings home (TGT-033): model, retrieval, access token and offline capability view.
 export function SettingsWorkspace({ options, onOptionsChange, announce }) {
@@ -9,15 +10,16 @@ export function SettingsWorkspace({ options, onOptionsChange, announce }) {
   const [config, setConfig] = useState(null);
   const [token, setToken] = useState(api.getOperatorToken());
   const [error, setError] = useState(null);
+  const online = useOnline();
 
   useEffect(() => {
-    Promise.all([api.offlineManifest(), api.config()])
+    Promise.all([api.offlineManifest(!online), api.config()])
       .then(([o, c]) => {
         setManifest(o);
         setConfig(c);
       })
       .catch(setError);
-  }, []);
+  }, [online]);
 
   const byState = (state) => (manifest?.capabilities || []).filter((row) => row.state_now === state);
   return (
@@ -74,9 +76,15 @@ export function SettingsWorkspace({ options, onOptionsChange, announce }) {
       {manifest && (
         <details className="panel" open>
           <summary>What works offline</summary>
+          <p className="muted small" data-testid="offline-status">
+            {online
+              ? "This device is online. Items marked Needs network stop working when it goes offline."
+              : "This device is offline. Local items keep working; items marked Unavailable offline return when it reconnects."}
+          </p>
           <ul className="offline-list">
             {byState("AVAILABLE_LOCALLY").map((row) => <li key={row.capability}><span className="status-chip status-completed">Local</span> {row.description}</li>)}
             {byState("REQUIRES_REMOTE_SERVICE").map((row) => <li key={row.capability}><span className="status-chip status-queued">Needs network</span> {row.description}</li>)}
+            {byState("UNAVAILABLE_OFFLINE").map((row) => <li key={row.capability} data-state="UNAVAILABLE_OFFLINE"><span className="status-chip status-failed">Unavailable offline</span> {row.description}</li>)}
             {byState("LOCAL_DEPENDENCY_MISSING").map((row) => <li key={row.capability}><span className="status-chip status-failed">Unavailable</span> {row.description} — missing {row.local_dependency}</li>)}
           </ul>
         </details>

@@ -1,0 +1,159 @@
+{
+  "schema_version": "mucaro-matrix011-tool-governance-benchmark/1.0",
+  "benchmark_id": "MATRIX-011-v1",
+  "requirement": "MATRIX-011 action-class benchmark (allowed, denied, approval-required, cancelled, tool error, timeout, retry, restart, duplicate invocation) plus the TGT-025 permission taxonomy (filesystem, network, models, tools and other side-effecting capabilities, distribution) and the INV-006 / TGT-014 authority rules (planning never authorizes, no undeclared escalation, approval bound to the action executed, tamper-evident audit, memory and leases cannot widen authority). Evidence for DAG N05 and flagpole V06.",
+  "required_categories": [
+    "allowed",
+    "denied",
+    "approval_required",
+    "cancelled",
+    "tool_error",
+    "timeout",
+    "retry",
+    "restart",
+    "duplicate_invocation",
+    "filesystem",
+    "network",
+    "model",
+    "side_effecting_capability",
+    "distribution",
+    "unknown_input",
+    "planning_authority",
+    "escalation",
+    "argument_binding",
+    "audit_integrity",
+    "memory_authority",
+    "lease"
+  ],
+  "cases": [
+    {
+      "case_id": "ALLOWED_EXECUTES_AND_AUDITS",
+      "category": "allowed",
+      "expected_outcome": "EXECUTED_AND_AUDITED"
+    },
+    {
+      "case_id": "UNKNOWN_TOOL_REFUSED",
+      "category": "denied",
+      "expected_outcome": "ERROR_TOOL_NOT_ALLOWED"
+    },
+    {
+      "case_id": "DENIED_NEVER_EXECUTES",
+      "category": "denied",
+      "expected_outcome": "DENIED_NEVER_EXECUTED"
+    },
+    {
+      "case_id": "APPROVAL_REQUIRED_BEFORE_RUN",
+      "category": "approval_required",
+      "expected_outcome": "ERROR_TOOL_APPROVAL_REQUIRED"
+    },
+    {
+      "case_id": "CANCELLED_NEVER_EXECUTES",
+      "category": "cancelled",
+      "expected_outcome": "CANCELLED_NEVER_EXECUTED"
+    },
+    {
+      "case_id": "TOOL_ERROR_RECORDED",
+      "category": "tool_error",
+      "expected_outcome": "FAILED_WITH_TYPED_STATUS"
+    },
+    {
+      "case_id": "TIMEOUT_NEVER_EXECUTED",
+      "category": "timeout",
+      "expected_outcome": "TIMEOUT_SIDE_EFFECTS_UNKNOWN"
+    },
+    {
+      "case_id": "RETRY_NEEDS_FRESH_APPROVAL",
+      "category": "retry",
+      "expected_outcome": "RETRY_PENDING_APPROVAL"
+    },
+    {
+      "case_id": "RESTART_INTERRUPTED_NOT_RERUN",
+      "category": "restart",
+      "expected_outcome": "RUNNING_MARKED_INTERRUPTED_NOT_RERUN"
+    },
+    {
+      "case_id": "DUPLICATE_INVOCATION_REFUSED",
+      "category": "duplicate_invocation",
+      "expected_outcome": "SECOND_RUN_REFUSED"
+    },
+    {
+      "case_id": "FILESYSTEM_GRANT_ENFORCED",
+      "category": "filesystem",
+      "expected_outcome": "GRANT_ENFORCED_NO_ESCAPE"
+    },
+    {
+      "case_id": "TOO_BROAD_GRANT_REFUSED",
+      "category": "filesystem",
+      "expected_outcome": "ERROR_DIRECTORY_PERMISSION_TOO_BROAD"
+    },
+    {
+      "case_id": "NETWORK_PRIVATE_AND_LIVE_GATES",
+      "category": "network",
+      "expected_outcome": "NETWORK_FAILS_CLOSED"
+    },
+    {
+      "case_id": "MODEL_DENIED_BEFORE_TRANSPORT",
+      "category": "model",
+      "expected_outcome": "ERROR_PERMISSION_DENIED"
+    },
+    {
+      "case_id": "SIDE_EFFECTS_ASK_FOR_AGENT",
+      "category": "side_effecting_capability",
+      "expected_outcome": "AGENT_SIDE_EFFECTS_ASK"
+    },
+    {
+      "case_id": "DISTRIBUTION_CHANNEL_ENFORCED",
+      "category": "distribution",
+      "expected_outcome": "CHANNEL_RESTRICTIONS_DENY"
+    },
+    {
+      "case_id": "UNKNOWN_INPUTS_DENIED",
+      "category": "unknown_input",
+      "expected_outcome": "FAIL_CLOSED_ON_UNKNOWN"
+    },
+    {
+      "case_id": "PLANNING_NEVER_AUTHORIZES",
+      "category": "planning_authority",
+      "expected_outcome": "PLANNING_STILL_ASKS"
+    },
+    {
+      "case_id": "UNDECLARED_ESCALATION_DENIED",
+      "category": "escalation",
+      "expected_outcome": "DENY"
+    },
+    {
+      "case_id": "ARGUMENTS_BOUND_TO_APPROVAL",
+      "category": "argument_binding",
+      "expected_outcome": "ERROR_TOOL_BINDING_MISMATCH"
+    },
+    {
+      "case_id": "AUDIT_TAMPER_BLOCKS_APPROVAL",
+      "category": "audit_integrity",
+      "expected_outcome": "ERROR_TOOL_AUDIT_CHAIN_BROKEN"
+    },
+    {
+      "case_id": "MEMORY_CANNOT_AUTHORIZE",
+      "category": "memory_authority",
+      "expected_outcome": "APPROVAL_STILL_REQUIRED"
+    },
+    {
+      "case_id": "LEASE_REVOCATION_ENFORCED",
+      "category": "lease",
+      "expected_outcome": "REVOKED_LEASE_GRANTS_NOTHING"
+    }
+  ],
+  "required_case_count": 23,
+  "terminal_rule": {
+    "every_required_category_covered": true,
+    "all_cases_pass": true,
+    "case_identity_matches_manifest": true,
+    "zero_unexpected_outcomes": true
+  },
+  "limitations": [
+    "Cases run with the mock model and no network: network gates are shown failing closed (private address, live search off), not a successful live request.",
+    "Remote-model Auto-mode per-call approval is covered by backend/tests/test_agent_loop.py::test_auto_mode_asks_per_call_when_the_model_is_remote, which needs a scripted local HTTP server, not by a case here.",
+    "Engine-level cases exercise permission_engine.evaluate directly; tool-runtime cases exercise the full request, approval, execution and audit path.",
+    "The restart case reuses the MATRIX-016 process-kill case: a process dies mid tool call and a fresh app reconciles it.",
+    "A change to the case list requires a new frozen MATRIX-011 denominator and receipt."
+  ]
+}
