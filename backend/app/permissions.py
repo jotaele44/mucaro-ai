@@ -5,6 +5,7 @@ from typing import Any
 
 from .config import Settings, settings
 from .contracts import validate_contract
+from .governance_audit import record_governance_event
 from .utils import read_json, update_json, utc_now
 
 DIRECTORY_PERMISSIONS_NAME = "directory_permissions.json"
@@ -147,6 +148,12 @@ def grant_directory(path: str | Path, cfg: Settings = settings, *, granted_by: s
         grants[:] = kept
 
     update_json(permission_ledger_path(cfg), [], mutate)
+    record_governance_event(
+        "DIRECTORY_GRANTED",
+        granted_by,
+        {"canonical_root": canonical_root, "reason_given": bool(reason)},
+        cfg,
+    )
     return grant
 
 
@@ -160,6 +167,8 @@ def revoke_directory(path: str | Path, cfg: Settings = settings) -> dict[str, An
         return removed_count
 
     removed = update_json(permission_ledger_path(cfg), [], mutate)
+    if removed:
+        record_governance_event("DIRECTORY_REVOKED", "user", {"canonical_root": str(root), "removed": removed}, cfg)
     return {
         "status": "DIRECTORY_PERMISSION_REVOKED" if removed else "DIRECTORY_PERMISSION_NOT_FOUND",
         "canonical_root": str(root),

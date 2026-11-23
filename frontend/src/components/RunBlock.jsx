@@ -320,6 +320,8 @@ export function RunBlock({ view, onChanged, onOpenCitation, onOpenMemory, announ
                 ? `This chat now works on the cloned repository at ${warning.detail}.`
                 : warning.status === "WARN_NO_SOURCES_USED"
                 ? "No sources used: nothing in your local library matched this message, so this reply is the model's own and is not cited."
+                : warning.status === "WARN_NARRATION_CONTRADICTS_RECORDS"
+                ? `Check the actions above: this answer describes ${(warning.conflicts || []).map((item) => String(item.claim || "").toLowerCase().replace(/_/g, " ")).join(", ") || "actions"} that the records do not show as done. The action records are what happened.`
                 : warning.status === "WARN_NEXT_VECTOR_NOT_OFFERED"
                 ? `The next vector in this answer is not offered as a one-tap option (${warning.detail}). You can still read it above and choose another step.`
                 : `${warning.status}${warning.detail ? `: ${warning.detail}` : ""}`}
