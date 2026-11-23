@@ -98,6 +98,8 @@ from .models import (
 )
 from .model_router import ModelProviderError, list_model_providers, model_provider_names, probe_model_server
 from .github_pull_requests import REPO_PATTERN as GITHUB_REPO_PATTERN
+from .governance_audit import list_governance_events
+from .permission_leases import verify_permission_lease_audit_chain
 from .model_settings import ModelSettingsError, public_model_settings, save_model_settings
 from .multimodal import MULTIMODAL_SUFFIXES
 from .offline import build_offline_manifest
@@ -1227,6 +1229,17 @@ def create_app(cfg: Settings = settings) -> FastAPI:
     @app.get("/tools/audit")
     def tool_audit() -> dict:
         return list_tool_audit_events(cfg)
+
+    @app.get("/audit")
+    def governance_audit(event: str | None = None, limit: int = 200) -> dict:
+        """Source acquisition and permission changes (TGT-035), with every chained log's verification."""
+        payload = list_governance_events(cfg, event=event, limit=max(0, min(limit, 1000)))
+        payload["chains"] = {
+            "governance": payload["chain"],
+            "tools": verify_tool_audit_chain(cfg),
+            "permission_leases": verify_permission_lease_audit_chain(cfg),
+        }
+        return payload
 
     @app.get("/workspaces")
     def workspaces() -> dict:

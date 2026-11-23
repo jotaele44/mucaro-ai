@@ -23,6 +23,7 @@ ERROR_CATEGORIES = (
 
 # Ordered (substring, category) rules; the first match wins.
 _RULES: tuple[tuple[str, str], ...] = (
+    ("NARRATION_CONTRADICTS", "TOOL_FAILURE"),  # the answer claims an action the call records do not show
     ("UNTRUSTED", "UNTRUSTED_CONTENT"),
     ("CONTAINS_INSTRUCTIONS", "UNTRUSTED_CONTENT"),
     ("OFFLINE", "OFFLINE"),

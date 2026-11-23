@@ -31,6 +31,7 @@ RECORD_SCHEMAS: dict[str, str] = {
     "permission_decision": "permission_decision.schema.json",
     "tool_call": "tool_call.schema.json",
     "tool_audit_event": "tool_audit_event.schema.json",
+    "governance_audit_event": "governance_audit_event.schema.json",
     "execution_contract": "execution_contract.schema.json",
     "run_manifest": "run_manifest.schema.json",
     "agent_checkpoint": "agent_checkpoint.schema.json",
@@ -61,7 +62,7 @@ CONTRACT_FAMILIES: dict[str, tuple[str, ...]] = {
     "EXECUTION": (
         "execution_contract", "run_manifest", "agent_checkpoint", "agent_task_dag", "autopilot_state", "tool_call",
     ),
-    "PROVENANCE": ("provenance_record", "runtime_identity"),
+    "PROVENANCE": ("provenance_record", "runtime_identity", "governance_audit_event"),
     "ARTIFACT": ("artifact_identity",),
     "CITATION": ("citation_record", "answer_trace"),
     "MEMORY": ("memory_item", "memory_selection"),
