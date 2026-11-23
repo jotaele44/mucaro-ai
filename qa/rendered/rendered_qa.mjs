@@ -994,6 +994,105 @@ async function deviceOfflineScenario(browser, base, viewport, profile) {
   });
 }
 
+// TGT-003 / TGT-002: the GIS, OCR / page review, Code and Artifacts workspaces. Each request goes through the tool
+// gate in the UI (Allow binds to the argument digest, then an explicit Run) and the result is drawn as a purpose-built
+// view, not raw JSON. Inputs are local: a USGS GeoJSON fixture, a generated PNG and a throwaway git repository.
+const ONE_PIXEL_PNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+
+async function specializedWorkspacesScenario(browser, base, viewport, profile, axeSink) {
+  await guarded("specialized workspaces (TGT-003)", viewport, async () => {
+    const fixtureDir = path.join(ROOT, "backend", "tests", "fixtures", "gis_corpus");
+    const scratch = mkdtempSync(path.join(tmpdir(), "mucaro-qa-ws-"));
+    const repo = path.join(scratch, "repo");
+    mkdirSync(repo);
+    execFileSync("git", ["init", "-q", "-b", "main", repo]);
+    writeFileSync(path.join(repo, "README.md"), "workspace check\n");
+    execFileSync("git", ["-C", repo, "-c", "user.email=qa@example.invalid", "-c", "user.name=QA", "add", "README.md"]);
+    execFileSync("git", ["-C", repo, "-c", "user.email=qa@example.invalid", "-c", "user.name=QA", "-c", "commit.gpgsign=false", "commit", "-q", "-m", "init"]);
+    writeFileSync(path.join(repo, "notes.txt"), "uncommitted\n");
+    const page_png = path.join(scratch, "page.png");
+    writeFileSync(page_png, Buffer.from(ONE_PIXEL_PNG, "base64"));
+    for (const dir of [fixtureDir, scratch]) {
+      const granted = await fetch(`${base}/permissions/directories/grant`, jsonPost({ path: dir, reason: "rendered QA" }));
+      if (!granted.ok) throw new Error(`grant ${dir}: HTTP ${granted.status} ${await granted.text()}`);
+    }
+    const context = await browser.newContext({ ...profile, baseURL: base });
+    const page = await context.newPage();
+    const open = async (label) => {
+      if (viewport.includes("iphone")) await page.getByRole("button", { name: "Open navigation" }).click();
+      await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: label, exact: true }).click();
+    };
+    // Request, allow (bound to the digest shown) and run one call from a workspace; returns the call row.
+    const requestAllowRun = async (workspaceId, fieldLabel, value, button) => {
+      const ws = page.locator(`[data-testid="${workspaceId}-workspace"][data-loaded="true"]`);
+      await ws.waitFor();
+      const before = await ws.getByTestId("workspace-call").count();
+      await ws.getByLabel(fieldLabel).fill(value);
+      await ws.getByRole("button", { name: button }).click();
+      // New calls are listed first; wait until the list has grown so the row below is this request, not an older one.
+      await page.waitForFunction(
+        ([id, count]) => document.querySelectorAll(`[data-testid="${id}-workspace"] [data-testid="workspace-call"]`).length > count,
+        [workspaceId, before],
+        { timeout: 10000 },
+      );
+      const row = ws.getByTestId("workspace-call").first();
+      const pending = (await row.locator(".status-chip").innerText()).trim();
+      await row.getByRole("button", { name: "Allow" }).click();
+      await row.getByRole("button", { name: "Run" }).click();
+      await row.locator(".status-chip").filter({ hasText: /EXECUTED|FAILED/ }).waitFor({ timeout: 20000 });
+      return { row, pending, final: (await row.locator(".status-chip").innerText()).trim() };
+    };
+    try {
+      await page.goto("/");
+      await page.locator("#composer-input").waitFor();
+
+      await open("GIS");
+      const gis = await requestAllowRun("gis", "GeoJSON file", path.join(fixtureDir, "usgs_pr_earthquakes_2020-01-06_2020-01-08.geojson"), "Inspect layer");
+      const gisTable = gis.row.getByTestId("gis-features");
+      const gisRows = await gisTable.locator("tbody tr").count().catch(() => 0);
+      check("a GIS request waits for approval, then runs only on Run (TGT-003)", viewport, gis.pending === "PENDING_APPROVAL" && gis.final === "EXECUTED", `${gis.pending} -> ${gis.final}`);
+      check("the GIS workspace draws the layer: CRS, features table and bounding-box preview (TGT-003)", viewport,
+        gisRows === 30 && (await gis.row.getByTestId("gis-bbox-preview").count()) === 1 && /EPSG:4326/.test(await gis.row.getByTestId("gis-result").innerText()),
+        `rows=${gisRows}`);
+      await shot(page, viewport, "ws-gis");
+      if (axeSink && !viewport.includes("iphone")) axeSink.push(await axe(page, viewport, "gis"));
+
+      await open("OCR");
+      const ocr = await requestAllowRun("ocr", "Image file", page_png, "Read page");
+      const ocrText = (await ocr.row.innerText()).replace(/\s+/g, " ");
+      check("the OCR workspace shows the page result or the engine's error, never a silent result (TGT-003)", viewport,
+        ocr.pending === "PENDING_APPROVAL" && ((ocr.final === "EXECUTED" && (await ocr.row.getByTestId("ocr-result").count()) + (await ocr.row.getByText(/Raw result|Output/).count()) > 0) || (ocr.final === "FAILED" && /ERROR_OCR_/.test(ocrText))),
+        `${ocr.final}: ${ocrText.slice(0, 160)}`);
+      await shot(page, viewport, "ws-ocr");
+
+      await open("Code");
+      const code = await requestAllowRun("code", "Repository folder", repo, "Check repository");
+      const codeText = (await code.row.getByTestId("code-repo-result").innerText().catch(() => "")).replace(/\s+/g, " ");
+      check("the Code workspace shows branch, HEAD and untracked files for a repository (TGT-003)", viewport,
+        code.final === "EXECUTED" && /Branch main/.test(codeText) && /notes\.txt/.test(codeText), codeText.slice(0, 200));
+      check("the Code workspace offers no repository-changing action (TGT-003)", viewport,
+        (await page.getByTestId("code-workspace").getByRole("button", { name: /commit|push|apply|exec/i }).count()) === 0);
+      await shot(page, viewport, "ws-code");
+
+      await open("Artifacts");
+      const artifacts = page.getByTestId("artifacts-workspace");
+      await artifacts.getByTestId("artifact-report").first().waitFor({ timeout: 10000 });
+      await artifacts.getByTestId("artifact-answer").first().waitFor({ timeout: 10000 }).catch(() => {});
+      const reports = await artifacts.getByTestId("artifact-report").count();
+      const answers = await artifacts.getByTestId("artifact-answer").count();
+      check("the Artifacts workspace lists saved answers and inspection reports with their hashes (TGT-003)", viewport,
+        reports >= 1 && answers >= 1 && /[0-9a-f]{64}/.test(await artifacts.getByTestId("artifact-report").first().innerText()),
+        `reports=${reports}, answers=${answers}`);
+      await shot(page, viewport, "ws-artifacts");
+    } finally {
+      await context.close();
+      // Leave the grant list as other scenarios expect it.
+      for (const dir of [fixtureDir, scratch]) await fetch(`${base}/permissions/directories/revoke`, jsonPost({ path: dir }));
+      rmSync(scratch, { recursive: true, force: true });
+    }
+  });
+}
+
 // The focused element as a short string; runs inside the page.
 const describeActive = () => {
   const el = document.activeElement;
@@ -1960,6 +2059,8 @@ try {
     await memoryContextScenario(browser, base, "memory-desktop", desktopProfile());
     await memoryContextScenario(browser, base, "memory-iphone", iphoneProfile());
     await modelAttributionScenario(browser);
+    await specializedWorkspacesScenario(browser, base, "workspaces-desktop", desktopProfile(), axeResults);
+    await specializedWorkspacesScenario(browser, base, "workspaces-iphone", iphoneProfile());
     await deviceOfflineScenario(browser, base, "offline-desktop", desktopProfile());
     await deviceOfflineScenario(browser, base, "offline-iphone", iphoneProfile());
     const headers = (await fetch(`${base}/`)).headers;

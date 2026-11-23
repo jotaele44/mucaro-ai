@@ -4,6 +4,7 @@ import { STATE_LABEL, TERMINAL_STATES, toolSummaryLabel } from "../feed.js";
 import { answerRecords } from "../files.js";
 import { EditableMessage } from "./MessageActions.jsx";
 import { Sheet } from "./Sheet.jsx";
+import { DiffView, Json, ToolResult } from "./results/ToolResult.jsx";
 
 const OUTCOME_TEXT = {
   ACTIONS_COMPLETED: "Actions finished. Open the tool summary for each result.",
@@ -12,14 +13,6 @@ const OUTCOME_TEXT = {
   QUESTION_DISMISSED: "The question was dismissed, so no further actions ran.",
   CANCELLED_BEFORE_START: "Cancelled before it started.",
 };
-
-function Json({ value }) {
-  return (
-    <pre className="json-block">
-      <code>{JSON.stringify(value ?? {}, null, 2)}</code>
-    </pre>
-  );
-}
 
 function ApprovalCard({ request, onDecided, announce }) {
   const [busy, setBusy] = useState(false);
@@ -123,36 +116,6 @@ function QuestionCard({ question, onAnswered, announce }) {
   );
 }
 
-/** A unified diff with added and removed lines marked, so a proposed change can be read before it is allowed. */
-function DiffView({ patch }) {
-  const lines = String(patch).replace(/\n$/, "").split("\n");
-  const kind = (line) =>
-    line.startsWith("+++") || line.startsWith("---") || line.startsWith("diff ") || line.startsWith("index ")
-      ? "meta"
-      : line.startsWith("@@")
-        ? "hunk"
-        : line.startsWith("+")
-          ? "add"
-          : line.startsWith("-")
-            ? "del"
-            : "ctx";
-  const added = lines.filter((line) => kind(line) === "add").length;
-  const removed = lines.filter((line) => kind(line) === "del").length;
-  return (
-    <figure className="diff-view">
-      <figcaption className="muted small">Proposed change: {added} line{added === 1 ? "" : "s"} added, {removed} removed</figcaption>
-      <pre className="diff-block" tabIndex={0} aria-label="Proposed change as a diff">
-        {lines.map((line, index) => (
-          <span key={index} className={`diff-line diff-${kind(line)}`}>
-            {line || " "}
-            {"\n"}
-          </span>
-        ))}
-      </pre>
-    </figure>
-  );
-}
-
 /** Tool arguments, with a patch shown as a diff instead of an escaped string. */
 function Arguments({ value }) {
   const { patch, ...rest } = value || {};
@@ -186,12 +149,7 @@ function ToolDrawer({ calls, onClose }) {
                 {call.error.category}: {call.error.status} {call.error.detail || ""}
               </p>
             )}
-            {call.result && (
-              <details>
-                <summary>Output ({call.result_status})</summary>
-                <Json value={call.result} />
-              </details>
-            )}
+            {call.result && <ToolResult toolName={call.tool_name} result={call.result} status={call.result_status} />}
           </li>
         ))}
       </ul>
