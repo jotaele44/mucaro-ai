@@ -286,6 +286,9 @@ export const api = {
   denyTool: (callId, argumentsSha256) => request(`/tools/requests/${callId}/deny`, json("POST", { arguments_sha256: argumentsSha256 })),
   toolSummary: () => request("/tools/summary"),
   toolCalls: () => request("/tools/requests"),
+  // Workspaces ask for a governed call; it is created PENDING_APPROVAL and never runs until approved, then run explicitly.
+  requestTool: (toolName, args, reason) => request("/tools/requests", json("POST", { tool_name: toolName, arguments: args, reason })),
+  runTool: (callId) => request(`/tools/requests/${encodeURIComponent(callId)}/run`, { method: "POST" }),
   resolveInteraction: (id, payload) => request(`/interactions/${id}/resolve`, json("POST", payload)),
 
   sources: () => request("/sources"),
