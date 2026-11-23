@@ -1,6 +1,6 @@
 {
   "schema_version": "mucaro-release-dag/1.0",
-  "updated_utc": "2026-11-20T01:38:17Z",
+  "updated_utc": "2026-11-23T15:34:32Z",
   "nodes": [
     {
       "node_id": "N00",
@@ -386,7 +386,7 @@
         "N06",
         "N13"
       ],
-      "state": "PROVISIONAL",
+      "state": "PASS",
       "risk": "HIGH",
       "user_value": "HIGH",
       "downstream_unlock_value": "HIGH",
@@ -395,7 +395,7 @@
         "run ledger + SSE + cancel + queue regressions"
       ],
       "blocker": null,
-      "notes": "Run bus implemented with 29 regressions; UI integration (N17) and model-proposed tool calls remain."
+      "notes": "PASS at main b07f888fee4502eb90e68ed446fc5567e4adc5c5: every requirement is PASS (TGT-002 and MOB-F19 result views in PR #386; TGT-035 governance audit stream, MOB-F15 narration check and the MOB-F19 live read in PR #387) and the run ledger, SSE, cancel and queue regressions stand. Its dependency N13 is not yet PASS, so the validator warns WARN_DAG_PASS_ON_UNPASSED_DEPENDENCY N15:N13; N15's own evidence does not depend on N13's open rows."
     },
     {
       "node_id": "N16",
