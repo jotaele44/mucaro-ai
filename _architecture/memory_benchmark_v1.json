@@ -1,0 +1,39 @@
+{
+  "schema_version": "mucaro-matrix013-memory-benchmark/1.0",
+  "benchmark_id": "MATRIX-013-v1",
+  "requirement": "MATRIX-013 memory benchmark: creation; retrieval; mutation; disablement; deletion semantics; scope; conversation isolation; restart; permission boundaries; memory content cannot silently authorize consequential actions.",
+  "required_categories": [
+    "creation",
+    "retrieval",
+    "mutation",
+    "disablement",
+    "deletion",
+    "scope",
+    "conversation_isolation",
+    "restart",
+    "permission_boundary",
+    "authorization"
+  ],
+  "cases": [
+    {"case_id": "CREATE_GLOBAL", "category": "creation", "expected_outcome": "MEMORY_SAVED_AND_LISTED"},
+    {"case_id": "CREATE_EMPTY_REFUSED", "category": "creation", "expected_outcome": "ERROR_MEMORY_CONTENT_REQUIRED"},
+    {"case_id": "RETRIEVAL_ENABLED_SELECTED", "category": "retrieval", "expected_outcome": "SELECTED"},
+    {"case_id": "MUTATION_TOGGLE_ROUNDTRIP", "category": "mutation", "expected_outcome": "ENABLED_AFTER_TOGGLE"},
+    {"case_id": "DISABLED_EXCLUDED", "category": "disablement", "expected_outcome": "EXCLUDED_DISABLED"},
+    {"case_id": "DELETE_REMOVES_ONLY_TARGET", "category": "deletion", "expected_outcome": "ONLY_TARGET_REMOVED"},
+    {"case_id": "DELETE_UNKNOWN_NO_CHANGE", "category": "deletion", "expected_outcome": "ERROR_MEMORY_NOT_FOUND"},
+    {"case_id": "SCOPE_WORKSPACE_MISMATCH_EXCLUDED", "category": "scope", "expected_outcome": "EXCLUDED_SCOPE_MISMATCH"},
+    {"case_id": "CONVERSATION_ISOLATION", "category": "conversation_isolation", "expected_outcome": "ISOLATED"},
+    {"case_id": "CONVERSATION_WITHOUT_CONTEXT_EXCLUDED", "category": "conversation_isolation", "expected_outcome": "EXCLUDED_SCOPE_CONTEXT_MISSING"},
+    {"case_id": "RESTART_PERSISTS", "category": "restart", "expected_outcome": "PERSISTED_ACROSS_RESTART"},
+    {"case_id": "PERMISSION_TOKEN_REQUIRED", "category": "permission_boundary", "expected_outcome": "ERROR_OPERATOR_AUTH_REQUIRED"},
+    {"case_id": "MEMORY_CANNOT_AUTHORIZE", "category": "authorization", "expected_outcome": "APPROVAL_STILL_REQUIRED"}
+  ],
+  "required_case_count": 13,
+  "terminal_rule": {
+    "every_required_category_covered": true,
+    "all_cases_pass": true,
+    "case_identity_matches_manifest": true,
+    "zero_unexpected_outcomes": true
+  }
+}

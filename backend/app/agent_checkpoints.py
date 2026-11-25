@@ -1,13 +1,17 @@
 from __future__ import annotations
 
 import json
-from functools import lru_cache
-from pathlib import Path
 from typing import Any, Callable
 
-import jsonschema
-
+from .agent_task_dag import (
+    TaskDagError,
+    reconstruct_task_dag,
+    split_task_dag,
+    transition_task_dag,
+    validate_task_dag,
+)
 from .config import Settings, settings
+from .contracts import APPLICATION_ROOT, contract_errors
 from .db import get_connection, init_db, upsert_payload
 from .utils import stable_id, utc_now
 
@@ -50,6 +54,14 @@ class CheckpointError(RuntimeError):
         super().__init__(detail)
         self.status = status
         self.detail = detail
+
+
+def _contract_errors(payload: Any) -> list[str]:
+    """Errors against the shared agent_checkpoint contract (TGT-016), read from the schemas shipped with this code."""
+    try:
+        return contract_errors("agent_checkpoint", payload, root=APPLICATION_ROOT)
+    except OSError as exc:
+        raise CheckpointError("ERROR_CHECKPOINT_SCHEMA_UNAVAILABLE", str(exc)) from exc
 
 
 def create_checkpoint(
@@ -102,21 +114,10 @@ def create_checkpoint(
     return checkpoint
 
 
-@lru_cache(maxsize=1)
-def _schema() -> dict[str, Any]:
-    # Application code, not project data: resolve relative to this module, never cfg.project_root.
-    path = Path(__file__).resolve().parents[2] / "schemas" / "agent_checkpoint.schema.json"
-    try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except OSError as exc:
-        raise CheckpointError("ERROR_CHECKPOINT_SCHEMA_UNAVAILABLE", f"{path}: {exc}") from exc
-
-
 def _validate_payload(checkpoint: dict[str, Any], cfg: Settings) -> None:
-    errors = sorted(jsonschema.Draft202012Validator(_schema()).iter_errors(checkpoint), key=lambda e: list(e.absolute_path))
+    errors = _contract_errors(checkpoint)
     if errors:
-        where = "/".join(str(part) for part in errors[0].absolute_path) or "<root>"
-        raise CheckpointError("ERROR_CHECKPOINT_SCHEMA", f"{where}: {errors[0].message}")
+        raise CheckpointError("ERROR_CHECKPOINT_SCHEMA", errors[0])
 
 
 def _decode(raw: str, cfg: Settings) -> dict[str, Any]:
@@ -143,6 +144,35 @@ def list_checkpoints(cfg: Settings = settings) -> list[dict[str, Any]]:
         rows = conn.execute("SELECT payload_json FROM agent_checkpoints ORDER BY rowid ASC").fetchall()
     # Same fail-closed decode as get_checkpoint: a corrupt or schema-invalid row is a CheckpointError.
     return [_decode(row["payload_json"], cfg) for row in rows]
+
+
+def set_checkpoint_metadata_namespace(
+    checkpoint_id: str,
+    *,
+    namespace: str,
+    value: dict[str, Any],
+    expected_sequence: int,
+    cfg: Settings = settings,
+) -> dict[str, Any]:
+    """Replace one non-task-DAG metadata namespace under optimistic concurrency.
+
+    task_dag is reserved for the canonical DAG helpers so generic metadata writes cannot
+    bypass DAG validation or rewrite its identity.
+    """
+    if not isinstance(namespace, str) or not namespace.strip() or namespace == "task_dag":
+        raise CheckpointError("ERROR_CHECKPOINT_METADATA_NAMESPACE", "metadata namespace is invalid or reserved")
+    if not isinstance(value, dict):
+        raise CheckpointError("ERROR_CHECKPOINT_METADATA_VALUE", "metadata namespace value must be an object")
+
+    def change(current: dict[str, Any]) -> dict[str, Any]:
+        if current["state"] in TERMINAL_STATES:
+            raise CheckpointError("ERROR_CHECKPOINT_TERMINAL", "terminal checkpoint metadata cannot change")
+        metadata = dict(current.get("metadata") or {})
+        metadata[namespace] = dict(value)
+        current["metadata"] = metadata
+        return current
+
+    return _mutate(checkpoint_id, change, cfg, expected_sequence=expected_sequence)
 
 
 def _mutate(checkpoint_id: str, change: Callable[[dict[str, Any]], dict[str, Any] | None], cfg: Settings, *, expected_sequence: int | None = None) -> dict[str, Any]:
@@ -241,12 +271,33 @@ def transition_checkpoint(
             raise CheckpointError("ERROR_CHECKPOINT_TRANSITION", f"illegal transition {current['state']} -> {state}")
         if contradictions is not None:
             current["contradictions"] = _merged_contradictions(current["contradictions"], contradictions)
+        task_dag_metadata = (current.get("metadata") or {}).get("task_dag")
+        if task_dag_metadata and (completed_steps is not None or pending_steps is not None):
+            raise CheckpointError(
+                "ERROR_CHECKPOINT_TASK_DAG_DIRECT_REWRITE",
+                "task-DAG progress must change through transition_task_dag_state",
+            )
         if state == "COMPLETED":
             if current.get("in_flight_step"):
                 raise CheckpointError("ERROR_CHECKPOINT_STEP_IN_FLIGHT", "cannot complete while a step is in flight")
             open_ids = sorted(str(c.get("id")) for c in current["contradictions"] if not _adjudicated(c))
             if open_ids:
                 raise CheckpointError("ERROR_CHECKPOINT_OPEN_CONTRADICTIONS", f"unadjudicated contradictions: {open_ids}")
+            if task_dag_metadata:
+                try:
+                    dag = reconstruct_task_dag(
+                        metadata=task_dag_metadata,
+                        pending_tasks=current["pending_steps"],
+                        completed_tasks=current["completed_steps"],
+                    )
+                except TaskDagError as exc:
+                    raise CheckpointError(exc.status, exc.detail) from exc
+                incomplete = sorted(task["id"] for task in dag["tasks"] if task["state"] != "PASSED")
+                if incomplete:
+                    raise CheckpointError(
+                        "ERROR_CHECKPOINT_TASK_DAG_INCOMPLETE",
+                        f"checkpoint cannot complete until every canonical task PASSES: {','.join(incomplete)}",
+                    )
         current["state"] = state
         current["pause_reason"] = pause_reason.strip() if pause_reason else None
         if completed_steps is not None:
@@ -257,6 +308,151 @@ def transition_checkpoint(
             current["provider"] = provider
         if model is not _UNSET:
             current["model"] = model
+        return current
+
+    return _mutate(checkpoint_id, change, cfg, expected_sequence=expected_sequence)
+
+
+def install_pending_task_dag_state(
+    checkpoint_id: str,
+    *,
+    tasks: list[dict[str, Any]],
+    dag_metadata: dict[str, Any],
+    expected_sequence: int,
+    cfg: Settings = settings,
+) -> dict[str, Any]:
+    """Atomically install a validated canonical task DAG into checkpoint-owned progress arrays."""
+    try:
+        dag = {**dict(dag_metadata), "tasks": [dict(task) for task in tasks]}
+        validate_task_dag(dag)
+        pending, completed, canonical_metadata = split_task_dag(dag)
+    except TaskDagError as exc:
+        raise CheckpointError(exc.status, exc.detail) from exc
+    if completed:
+        raise CheckpointError("ERROR_CHECKPOINT_TASK_DAG_INITIAL_TERMINAL", "initial task DAG cannot contain terminal tasks")
+    non_initial = sorted(
+        task["id"]
+        for task in pending
+        if task.get("state") not in {"PENDING", "READY"}
+        or task.get("attempt_count") != 0
+        or task.get("started_at") is not None
+        or task.get("completed_at") is not None
+        or task.get("evidence")
+        or task.get("artifacts")
+    )
+    if non_initial:
+        raise CheckpointError(
+            "ERROR_CHECKPOINT_TASK_DAG_NOT_INITIAL",
+            f"initial task DAG contains progressed state: {','.join(non_initial)}",
+        )
+
+    def change(current: dict[str, Any]) -> dict[str, Any]:
+        if current["state"] in TERMINAL_STATES:
+            raise CheckpointError("ERROR_CHECKPOINT_TERMINAL", "terminal checkpoint cannot install a task DAG")
+        if current["state"] != "PLANNING":
+            raise CheckpointError("ERROR_CHECKPOINT_TASK_DAG_STATE", f"task DAG installs only in PLANNING, not {current['state']}")
+        if current.get("in_flight_step"):
+            raise CheckpointError("ERROR_CHECKPOINT_STEP_IN_FLIGHT", "cannot install a task DAG while a step is in flight")
+        if current.get("pending_steps") or current.get("completed_steps"):
+            raise CheckpointError("ERROR_CHECKPOINT_TASK_DAG_PROGRESS_EXISTS", "existing pending/completed progress cannot be overwritten")
+        metadata = dict(current.get("metadata") or {})
+        if metadata.get("task_dag"):
+            raise CheckpointError("ERROR_CHECKPOINT_TASK_DAG_EXISTS", "task DAG is already installed")
+        current["pending_steps"] = pending
+        current["completed_steps"] = []
+        metadata["task_dag"] = canonical_metadata
+        current["metadata"] = metadata
+        return current
+
+    return _mutate(checkpoint_id, change, cfg, expected_sequence=expected_sequence)
+
+
+def install_task_dag_state(
+    checkpoint_id: str,
+    *,
+    dag: dict[str, Any],
+    expected_sequence: int,
+    cfg: Settings = settings,
+) -> dict[str, Any]:
+    """Preferred task-DAG installation boundary for a fully validated DAG report."""
+    try:
+        validate_task_dag(dag)
+        pending, completed, metadata = split_task_dag(dag)
+    except TaskDagError as exc:
+        raise CheckpointError(exc.status, exc.detail) from exc
+    if completed:
+        raise CheckpointError("ERROR_CHECKPOINT_TASK_DAG_INITIAL_TERMINAL", "initial task DAG cannot contain terminal tasks")
+    return install_pending_task_dag_state(
+        checkpoint_id,
+        tasks=pending,
+        dag_metadata=metadata,
+        expected_sequence=expected_sequence,
+        cfg=cfg,
+    )
+
+
+def get_task_dag_state(checkpoint_id: str, cfg: Settings = settings) -> dict[str, Any]:
+    checkpoint = get_checkpoint(checkpoint_id, cfg)
+    if checkpoint is None:
+        raise CheckpointError("ERROR_CHECKPOINT_NOT_FOUND", checkpoint_id)
+    metadata = (checkpoint.get("metadata") or {}).get("task_dag")
+    if not metadata:
+        raise CheckpointError("ERROR_CHECKPOINT_TASK_DAG_MISSING", checkpoint_id)
+    try:
+        return reconstruct_task_dag(
+            metadata=metadata,
+            pending_tasks=checkpoint["pending_steps"],
+            completed_tasks=checkpoint["completed_steps"],
+        )
+    except TaskDagError as exc:
+        raise CheckpointError(exc.status, exc.detail) from exc
+
+
+def transition_task_dag_state(
+    checkpoint_id: str,
+    *,
+    task_id: str,
+    state: str,
+    expected_sequence: int,
+    evidence: list[dict[str, Any]] | None = None,
+    artifacts: list[dict[str, Any]] | None = None,
+    blocked_reason: str | None = None,
+    cfg: Settings = settings,
+) -> dict[str, Any]:
+    """Atomically transition one canonical DAG task and recompute dependency-derived states."""
+    def change(current: dict[str, Any]) -> dict[str, Any]:
+        if current["state"] in TERMINAL_STATES:
+            raise CheckpointError("ERROR_CHECKPOINT_TERMINAL", "terminal checkpoint cannot transition task state")
+        if current["state"] != "EXECUTING":
+            raise CheckpointError(
+                "ERROR_CHECKPOINT_TASK_DAG_NOT_EXECUTING",
+                f"task transitions require EXECUTING checkpoint state, not {current['state']}",
+            )
+        metadata = (current.get("metadata") or {}).get("task_dag")
+        if not metadata:
+            raise CheckpointError("ERROR_CHECKPOINT_TASK_DAG_MISSING", checkpoint_id)
+        try:
+            dag = reconstruct_task_dag(
+                metadata=metadata,
+                pending_tasks=current["pending_steps"],
+                completed_tasks=current["completed_steps"],
+            )
+            updated = transition_task_dag(
+                dag,
+                task_id=task_id,
+                state=state,
+                evidence=evidence,
+                artifacts=artifacts,
+                blocked_reason=blocked_reason,
+            )
+            pending, completed, new_metadata = split_task_dag(updated)
+        except TaskDagError as exc:
+            raise CheckpointError(exc.status, exc.detail) from exc
+        current["pending_steps"] = pending
+        current["completed_steps"] = completed
+        all_metadata = dict(current.get("metadata") or {})
+        all_metadata["task_dag"] = new_metadata
+        current["metadata"] = all_metadata
         return current
 
     return _mutate(checkpoint_id, change, cfg, expected_sequence=expected_sequence)
@@ -278,6 +474,11 @@ def begin_step(checkpoint_id: str, *, step_id: str, idempotency_key: str, cfg: S
         raise CheckpointError("ERROR_CHECKPOINT_STEP", "step_id and idempotency_key are required")
 
     def change(current: dict[str, Any]) -> dict[str, Any]:
+        if (current.get("metadata") or {}).get("task_dag"):
+            raise CheckpointError(
+                "ERROR_CHECKPOINT_TASK_DAG_LEGACY_STEP_API",
+                "canonical task DAG checkpoints must use transition_task_dag_state",
+            )
         if current["state"] != "EXECUTING":
             raise CheckpointError("ERROR_CHECKPOINT_STEP_STATE", f"steps run only in EXECUTING, not {current['state']}")
         if current.get("in_flight_step"):
@@ -293,6 +494,11 @@ def begin_step(checkpoint_id: str, *, step_id: str, idempotency_key: str, cfg: S
 def complete_step(checkpoint_id: str, *, idempotency_key: str, result: dict[str, Any] | None = None, cfg: Settings = settings) -> dict[str, Any]:
     """Finish the in-flight step. Completing the same idempotency key twice is a no-op, not a duplicate."""
     def change(current: dict[str, Any]) -> dict[str, Any] | None:
+        if (current.get("metadata") or {}).get("task_dag"):
+            raise CheckpointError(
+                "ERROR_CHECKPOINT_TASK_DAG_LEGACY_STEP_API",
+                "canonical task DAG checkpoints must use transition_task_dag_state",
+            )
         if any(done.get("idempotency_key") == idempotency_key for done in current["completed_steps"]):
             return None
         flight = current.get("in_flight_step")
@@ -316,7 +522,6 @@ def record_contradiction(checkpoint_id: str, *, contradiction_id: str, claims: l
         return current
 
     return _mutate(checkpoint_id, change, cfg)
-
 
 
 PROVIDER_ATTEMPT_STARTED = "STARTED"

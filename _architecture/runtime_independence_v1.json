@@ -101,5 +101,33 @@
     "This contract does not claim feature parity across desktop and mobile.",
     "This contract does not classify explicitly authorized API or fetch traffic as an independence defect.",
     "Bundled-only resolution does not mean Git, OCR engines, or a container engine are already present in every release artifact."
-  ]
+  ],
+  "certification_profile": {
+    "required_offline_capabilities": [
+      "ingest.files",
+      "retrieve.local",
+      "answer.cited",
+      "gis.vector_raster",
+      "memory",
+      "exports"
+    ],
+    "optional_capability_rule": "OUT_OF_SCOPE_UNLESS_ADOPTED_BY_PLATFORM_RELEASE",
+    "required_external_evidence_gates": [
+      "artifact_verified",
+      "install_completed_without_public_network",
+      "first_launch_completed_without_public_network",
+      "representative_offline_workflow_passed",
+      "local_state_persisted_after_restart",
+      "reinstall_preserved_local_state",
+      "mandatory_runtime_dependencies_self_contained",
+      "host_developer_tools_absent_or_unneeded",
+      "public_network_isolation_proven",
+      "unexpected_egress_absent",
+      "remote_model_negative_control_failed_closed",
+      "web_network_negative_control_failed_closed",
+      "loopback_only_local_service",
+      "source_identity_bound",
+      "post_launch_bundle_immutable"
+    ]
+  }
 }

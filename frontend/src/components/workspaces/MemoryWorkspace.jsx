@@ -3,12 +3,11 @@ import { api } from "../../api.js";
 import { ConfirmSheet } from "../ConfirmSheet.jsx";
 
 // Explicit memory (TGT-013, INV-021): what is retained, where it came from, and on/off/delete controls.
-export function MemoryWorkspace({ announce }) {
+export function MemoryWorkspace({ announce, currentConversationId = null }) {
   const [rows, setRows] = useState([]);
   const [content, setContent] = useState("");
   const [kind, setKind] = useState("preference");
   const [scope, setScope] = useState("global");
-  const [scopeId, setScopeId] = useState("");
   const [error, setError] = useState(null);
   const [pendingDelete, setPendingDelete] = useState(null);
 
@@ -28,9 +27,8 @@ export function MemoryWorkspace({ announce }) {
     event.preventDefault();
     if (!content.trim()) return;
     try {
-      await api.remember(content.trim(), kind, scope, scope === "conversation" ? scopeId.trim() || null : null);
+      await api.remember(content.trim(), kind, scope, scope === "conversation" ? currentConversationId : null);
       setContent("");
-      if (scope === "conversation") setScopeId("");
       await load();
       announce("Saved to memory.");
     } catch (err) {
@@ -42,7 +40,11 @@ export function MemoryWorkspace({ announce }) {
     <section className="workspace" aria-labelledby="memory-title">
       <header className="workspace-header">
         <h1 id="memory-title">Memory</h1>
-        <p className="muted small">Memory is context about you, used only when enabled. It never approves actions and is never cited as evidence.</p>
+        <p className="muted small" data-testid="memory-durable-note">
+          Saved memory is kept across chats until you turn it off or delete it. A chat's own earlier messages are used
+          only in that chat and are never saved here.
+        </p>
+        <p className="muted small">Memory is used only when enabled. It never approves actions and is never cited as evidence.</p>
       </header>
       {error && <p className="error-card" role="alert">{error.status}: {error.message}</p>}
       <form className="inline-form" onSubmit={add}>
@@ -61,28 +63,18 @@ export function MemoryWorkspace({ announce }) {
         </label>
         <label className="field">
           <span>Scope</span>
-          <select value={scope} onChange={(event) => { setScope(event.target.value); setScopeId(""); }}>
-            <option value="global">Global</option>
-            <option value="workspace">Current workspace</option>
-            <option value="conversation">Conversation</option>
+          <select value={scope} onChange={(event) => setScope(event.target.value)}>
+            <option value="global">All chats</option>
+            <option value="workspace">This workspace</option>
+            <option value="conversation" disabled={!currentConversationId}>
+              {currentConversationId ? "Only the current chat" : "Only the current chat (open a chat first)"}
+            </option>
           </select>
         </label>
-        {scope === "conversation" && (
-          <label className="field">
-            <span>Conversation ID</span>
-            <input
-              value={scopeId}
-              onChange={(event) => setScopeId(event.target.value)}
-              placeholder="conv_…"
-              maxLength={160}
-              required
-            />
-          </label>
-        )}
         <button
           type="submit"
           className="primary-button"
-          disabled={!content.trim() || (scope === "conversation" && !scopeId.trim())}
+          disabled={!content.trim() || (scope === "conversation" && !currentConversationId)}
         >
           Save
         </button>

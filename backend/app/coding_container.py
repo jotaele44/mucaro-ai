@@ -4,7 +4,9 @@ import hashlib
 import json
 import re
 import subprocess
+import threading
 import time
+import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -28,6 +30,10 @@ DEFAULT_WORKSPACE_MB = 1024
 MAX_COMMAND_PARTS = 64
 MAX_COMMAND_PART_BYTES = 4096
 CONTAINER_UID_GID = "65532:65532"
+OUTPUT_READ_CHUNK_BYTES = 64 * 1024
+OUTPUT_TRUNCATION_MARKER = "\n[mucaro: container output truncated at {max_bytes} bytes]\n"
+CONTAINER_CLEANUP_TIMEOUT_SECONDS = 10
+_PROCESS_POLL_SECONDS = 0.05
 
 
 class CodingContainerError(RuntimeError):
@@ -293,7 +299,170 @@ def _output_receipt(raw: bytes, *, max_bytes: int) -> dict[str, Any]:
         "byte_size": len(raw),
         "sha256": hashlib.sha256(raw).hexdigest(),
         "text": raw.decode("utf-8", errors="replace"),
+        "truncated": False,
     }
+
+
+def _truncated_output_receipt(raw: bytes, *, max_bytes: int, observed_bytes: int) -> dict[str, Any]:
+    retained = raw[:max_bytes]
+    text = retained.decode("utf-8", errors="replace")
+    truncated = observed_bytes > max_bytes
+    if truncated:
+        text += OUTPUT_TRUNCATION_MARKER.format(max_bytes=max_bytes)
+    return {
+        "byte_size": len(retained),
+        "observed_byte_size_at_stop": observed_bytes,
+        "sha256": hashlib.sha256(retained).hexdigest(),
+        "text": text,
+        "truncated": truncated,
+    }
+
+
+class _BoundedStream:
+    """Drain one pipe in fixed chunks while retaining at most ``max_bytes + 1`` bytes."""
+
+    def __init__(self, pipe: Any, *, max_bytes: int, overflow: threading.Event) -> None:
+        self._pipe = pipe
+        self._max_bytes = max_bytes
+        self._overflow = overflow
+        self._buffer = bytearray()
+        self.observed_bytes = 0
+        self.thread = threading.Thread(target=self._drain, daemon=True)
+
+    def _drain(self) -> None:
+        try:
+            while True:
+                chunk = self._pipe.read1(OUTPUT_READ_CHUNK_BYTES)
+                if not chunk:
+                    return
+                self.observed_bytes += len(chunk)
+                room = self._max_bytes + 1 - len(self._buffer)
+                if room > 0:
+                    self._buffer += chunk[:room]
+                if self.observed_bytes > self._max_bytes:
+                    # Stop reading: the supervisor kills the process, and nothing past the cap is retained.
+                    self._overflow.set()
+                    return
+        except (OSError, ValueError):
+            return
+
+    def close(self) -> None:
+        try:
+            self._pipe.close()
+        except (OSError, ValueError):
+            pass
+
+    @property
+    def data(self) -> bytes:
+        return bytes(self._buffer)
+
+
+def _stop_container(engine: str, container_name: str, proc: subprocess.Popen[bytes]) -> None:
+    """Kill the engine client and force-remove the named container; both are best effort."""
+
+    try:
+        proc.kill()
+    except OSError:
+        pass
+    try:
+        subprocess.run(
+            [engine, "rm", "--force", container_name],
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=CONTAINER_CLEANUP_TIMEOUT_SECONDS,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        pass
+    try:
+        proc.wait(timeout=CONTAINER_CLEANUP_TIMEOUT_SECONDS)
+    except (OSError, subprocess.SubprocessError):
+        pass
+
+
+def _run_container_bounded(
+    argv: list[str],
+    *,
+    cwd: Path,
+    timeout_seconds: int,
+    max_output_bytes: int,
+    container_name: str,
+) -> tuple[int, bytes, bytes]:
+    """Run the container with a hard in-memory cap per output stream.
+
+    Output is drained incrementally, so memory use is bounded by ``max_output_bytes + 1`` per stream plus one read
+    chunk regardless of how much the command writes. Crossing the cap, or the wall-clock timeout, stops the process and
+    force-removes the named container instead of waiting for the command to exit.
+    """
+
+    try:
+        proc = subprocess.Popen(
+            argv,
+            cwd=cwd,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+    except OSError as exc:
+        raise CodingContainerError("ERROR_CODING_CONTAINER_START", str(exc)) from exc
+
+    overflow = threading.Event()
+    streams = (
+        _BoundedStream(proc.stdout, max_bytes=max_output_bytes, overflow=overflow),
+        _BoundedStream(proc.stderr, max_bytes=max_output_bytes, overflow=overflow),
+    )
+    for stream in streams:
+        stream.thread.start()
+
+    deadline = time.monotonic() + timeout_seconds
+    failure: str | None = None
+    while True:
+        if overflow.is_set():
+            failure = "ERROR_CODING_CONTAINER_OUTPUT_TOO_LARGE"
+            break
+        if proc.poll() is not None and not any(stream.thread.is_alive() for stream in streams):
+            break
+        if time.monotonic() >= deadline:
+            failure = "ERROR_CODING_CONTAINER_TIMEOUT"
+            break
+        overflow.wait(_PROCESS_POLL_SECONDS)
+
+    if failure is None and overflow.is_set():
+        failure = "ERROR_CODING_CONTAINER_OUTPUT_TOO_LARGE"
+    if failure is not None:
+        _stop_container(argv[0], container_name, proc)
+        for stream in streams:
+            stream.thread.join(timeout=1)
+            # A reader still blocked on a pipe inherited by an orphan keeps its (daemon) thread; closing under it
+            # would block, so only finished readers release their pipe here.
+            if not stream.thread.is_alive():
+                stream.close()
+        partial = {
+            "status": "CODING_CONTAINER_STOPPED",
+            "execution_status": "INVALIDATED",
+            "stop_reason": failure,
+            "container_name": container_name,
+            "max_output_bytes": max_output_bytes,
+            "stdout": _truncated_output_receipt(
+                streams[0].data, max_bytes=max_output_bytes, observed_bytes=streams[0].observed_bytes
+            ),
+            "stderr": _truncated_output_receipt(
+                streams[1].data, max_bytes=max_output_bytes, observed_bytes=streams[1].observed_bytes
+            ),
+        }
+        if failure == "ERROR_CODING_CONTAINER_TIMEOUT":
+            raise CodingContainerError(failure, str(timeout_seconds), receipt=partial)
+        raise CodingContainerError(
+            failure,
+            f"container output exceeded {max_output_bytes} bytes; the container was stopped",
+            receipt=partial,
+        )
+
+    for stream in streams:
+        stream.thread.join()
+        stream.close()
+    return int(proc.returncode), streams[0].data, streams[1].data
 
 
 def run_coding_container_plan(plan: CodingContainerPlan, *, cfg: Settings = settings) -> dict[str, Any]:
@@ -314,29 +483,26 @@ def run_coding_container_plan(plan: CodingContainerPlan, *, cfg: Settings = sett
         )
     except PermissionEngineError as exc:
         raise CodingContainerError(exc.status, exc.detail) from exc
+    # The run-scoped name is the only token added to the validated argv; it lets a runaway container be removed.
+    container_name = f"mucaro-coding-{uuid.uuid4().hex}"
+    run_argv = [*argv[:2], f"--name={container_name}", *argv[2:]]
     started = time.monotonic()
-    try:
-        proc = subprocess.run(
-            argv,
-            cwd=plan.repo_root,
-            stdin=subprocess.DEVNULL,
-            capture_output=True,
-            timeout=plan.timeout_seconds,
-            check=False,
-        )
-    except subprocess.TimeoutExpired as exc:
-        raise CodingContainerError("ERROR_CODING_CONTAINER_TIMEOUT", str(plan.timeout_seconds)) from exc
-    except OSError as exc:
-        raise CodingContainerError("ERROR_CODING_CONTAINER_START", str(exc)) from exc
+    returncode, raw_stdout, raw_stderr = _run_container_bounded(
+        run_argv,
+        cwd=plan.repo_root,
+        timeout_seconds=plan.timeout_seconds,
+        max_output_bytes=plan.max_output_bytes,
+        container_name=container_name,
+    )
     duration_ms = max(0, int((time.monotonic() - started) * 1000))
 
-    stdout = _output_receipt(proc.stdout, max_bytes=plan.max_output_bytes)
-    stderr = _output_receipt(proc.stderr, max_bytes=plan.max_output_bytes)
+    stdout = _output_receipt(raw_stdout, max_bytes=plan.max_output_bytes)
+    stderr = _output_receipt(raw_stderr, max_bytes=plan.max_output_bytes)
     after = validate_coding_container_plan(plan, cfg=cfg)
     receipt: dict[str, Any] = {
         "schema_version": CODING_CONTAINER_SCHEMA_VERSION,
-        "status": "CODING_CONTAINER_EXECUTED_PASS" if proc.returncode == 0 else "CODING_CONTAINER_EXECUTED_FAIL",
-        "execution_status": "PASS" if proc.returncode == 0 else "FAIL",
+        "status": "CODING_CONTAINER_EXECUTED_PASS" if returncode == 0 else "CODING_CONTAINER_EXECUTED_FAIL",
+        "execution_status": "PASS" if returncode == 0 else "FAIL",
         "plan_sha256": plan.plan_sha256,
         "head_sha": plan.head_sha,
         "dirty_status": plan.dirty_status,
@@ -347,7 +513,8 @@ def run_coding_container_plan(plan: CodingContainerPlan, *, cfg: Settings = sett
         "engine": plan.engine,
         "command_argv": list(plan.command),
         "container_argv_sha256": hashlib.sha256(json.dumps(argv, separators=(",", ":")).encode("utf-8")).hexdigest(),
-        "exit_code": proc.returncode,
+        "exit_code": returncode,
+        "container_name": container_name,
         "duration_ms": duration_ms,
         "stdout": stdout,
         "stderr": stderr,

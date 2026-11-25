@@ -1,5 +1,9 @@
 name: ARM64 Portable Runtime Source Certification
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 on:
   workflow_dispatch:
   pull_request:
@@ -26,6 +30,8 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
+          cache: pip
+          cache-dependency-path: pyproject.toml
 
       - name: Install Mucaro and pinned uv resolver
         run: |
@@ -71,7 +77,7 @@ jobs:
           MACOSX_DEPLOYMENT_TARGET: "14.0"
         run: |
           set -euo pipefail
-          uv pip compile pyproject.toml             --upgrade-package certifi==2026.10.19             --python-version 3.13             --python-platform aarch64-apple-darwin             --generate-hashes             --only-binary :all:             --output-file "$OUT/requirements-macos-arm64.lock"
+          uv pip compile pyproject.toml             --upgrade-package certifi==2026.10.19             --python-version 3.13             --python-platform aarch64-apple-darwin             --generate-hashes             --only-binary :all:             --exclude-newer 2026-11-14T00:00:00Z             --output-file "$OUT/requirements-macos-arm64.lock"
           test -s "$OUT/requirements-macos-arm64.lock"
           sha256sum "$OUT/requirements-macos-arm64.lock"
           cat "$OUT/requirements-macos-arm64.lock"

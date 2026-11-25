@@ -10,6 +10,7 @@ from .config import Settings, settings
 from .contracts import validate_contract
 from .db import delete_chunks_for_source, delete_payload, init_db, upsert_payload
 from .format_registry import SUPPORTED_INGEST_SUFFIXES
+from .governance_audit import record_governance_event
 from .injection_guard import scan_text
 from .parser import ParseError, detect_mime, parse_file
 from .provenance import build_provenance_record
@@ -50,6 +51,24 @@ def _store_source_payload(source_payload: dict[str, Any], chunks: list[dict[str,
         "semantic_store_version": semantic_payload["version"],
         "semantic_store_indexed_chunk_count": semantic_payload["indexed_chunk_count"],
     }
+
+
+def _record_source_ingested(source: dict[str, Any], source_kind: str, cfg: Settings, *, snapshot_id: str | None = None) -> None:
+    """Governance audit (TGT-035): identity, hash and counts of what entered the library, never its text."""
+    details: dict[str, Any] = {
+        "source_id": source["source_id"],
+        "source_kind": source_kind,
+        "source_sha256": source.get("source_sha256"),
+        "bytes": source.get("bytes"),
+        "mime_type": source.get("mime_type"),
+        "parser": source.get("parser"),
+        "chunk_count": source.get("chunk_count"),
+        "lineage_status": source.get("lineage_status"),
+        "warning_count": len(source.get("warnings") or []),
+    }
+    if snapshot_id:
+        details["snapshot_id"] = snapshot_id
+    record_governance_event("SOURCE_INGESTED", "ingestion", details, cfg)
 
 
 def ingest_file(path: Path, cfg: Settings = settings, *, source_kind: str = "LOCAL_FILE") -> dict[str, Any]:
@@ -109,6 +128,7 @@ def ingest_file(path: Path, cfg: Settings = settings, *, source_kind: str = "LOC
         chunk.setdefault("trust", "UNTRUSTED_CONTENT")
     validate_contract("source_manifest", source_payload)
     store = _store_source_payload(source_payload, chunks, cfg)
+    _record_source_ingested(source_payload, source_kind, cfg)
     return {
         "status": "INGEST_OK",
         "source": source_payload,
@@ -218,6 +238,7 @@ def ingest_web_snapshot(snapshot_path: Path, cfg: Settings = settings) -> dict[s
     }
     validate_contract("source_manifest", source_payload)
     store = _store_source_payload(source_payload, chunks, cfg)
+    _record_source_ingested(source_payload, "WEB_SNAPSHOT", cfg, snapshot_id=snapshot_id)
     return {
         "status": "WEB_SNAPSHOT_INGEST_OK",
         "source": source_payload,
@@ -370,6 +391,17 @@ def delete_source(source_id: str, cfg: Settings = settings) -> dict[str, Any]:
     delete_chunks_for_source(source_id, cfg.sqlite_path)
     index_payload = build_persistent_index(kept_chunks, cfg)
     semantic_payload = build_semantic_store(kept_chunks, cfg)
+    record_governance_event(
+        "SOURCE_DELETED",
+        "ingestion",
+        {
+            "source_id": source_id,
+            "source_sha256": source.get("source_sha256"),
+            "removed_chunks": removed_chunks,
+            "managed_file_removed": managed_file_removed,
+        },
+        cfg,
+    )
     return {
         "status": "SOURCE_DELETE_OK",
         "source_id": source_id,

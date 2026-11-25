@@ -8,6 +8,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from backend.app import work_runs
+from backend.app.contracts import validate_contract
 from backend.app.conversations import create_conversation, get_conversation
 from backend.app.ingestion import ingest_file
 from backend.app.main import create_app
@@ -110,6 +111,43 @@ def test_answer_run_streams_an_ordered_feed_and_persists_turns(cfg, conversation
     assert context_usage["metrics"]["raw_context_chars"]["classification"] == "COMPUTED"
     final = next(event for event in events if event["type"] == "final")
     assert final["data"]["context_usage"] == context_usage
+
+
+def test_real_work_run_persists_validated_terminal_manifest(cfg, conversation):
+    run = _submit(conversation, "How does source lineage work?", cfg)
+    final = get_run(run["run_id"], cfg)
+    manifest = final["run_manifest"]
+    validate_contract("run_manifest", manifest)
+    assert manifest["run_id"] == final["run_id"]
+    assert manifest["task_id"] == conversation
+    assert manifest["state"] == "COMPLETE"
+    assert manifest["completed_at"] == final["finished_at"]
+
+
+def test_work_run_manifest_drift_fails_closed(cfg, conversation):
+    run = _submit(conversation, "How does source lineage work?", cfg)
+    final = get_run(run["run_id"], cfg)
+    with sqlite3.connect(cfg.sqlite_path) as conn:
+        row = conn.execute("SELECT payload_json FROM work_runs WHERE run_id = ?", (final["run_id"],)).fetchone()
+        payload = __import__("json").loads(row[0])
+        payload["run_manifest"]["task_id"] = "conv_someone_else"
+        conn.execute(
+            "UPDATE work_runs SET payload_json = ? WHERE run_id = ?",
+            (__import__("json").dumps(payload, sort_keys=True), final["run_id"]),
+        )
+    with pytest.raises(RunError) as exc:
+        get_run(final["run_id"], cfg)
+    assert exc.value.status == "ERROR_RUN_MANIFEST_DRIFT"
+
+
+def test_work_run_manifest_state_follows_the_authoritative_state_column(cfg, conversation):
+    run = _submit(conversation, "/memory", cfg)
+    assert get_run(run["run_id"], cfg)["run_manifest"]["state"] == "READY_FOR_APPROVAL"
+    with sqlite3.connect(cfg.sqlite_path) as conn:
+        conn.execute("UPDATE work_runs SET state = 'RUNNING' WHERE run_id = ?", (run["run_id"],))
+    observed = get_run(run["run_id"], cfg)
+    validate_contract("run_manifest", observed["run_manifest"])
+    assert observed["run_manifest"]["state"] == "EXECUTING"
 
 
 def test_idempotent_resubmission_returns_the_original_run(cfg, conversation):
@@ -532,3 +570,73 @@ def test_event_stream_keeps_events_of_a_run_that_finishes_between_its_reads(cfg,
     assert "event: interrupted" in delivered
     assert blocks[-1].startswith("event: end")
 
+
+
+# --- INV-021: what an answer used besides sources ---------------------------------------
+
+
+def test_answer_reports_saved_memory_and_chat_history_it_used_without_their_content(cfg, conversation):
+    from backend.app.memory import remember_memory_item
+
+    saved = remember_memory_item("Prefer short answers", cfg)["memory"]
+    first = _submit(conversation, "How does source lineage work?", cfg)
+    second = _submit(conversation, "And chunk ids?", cfg)
+
+    def context_of(run):
+        events = [event for event in list_run_events(run["run_id"], cfg=cfg) if event["type"] == "context"]
+        assert len(events) == 1
+        return events[0]["data"]
+
+    opening = context_of(first)
+    assert opening["memory_context_count"] == 1
+    assert opening["memory_ids"] == [saved["memory_id"]]
+    assert opening["memory_scope_counts"] == {"global": 1, "workspace": 0, "conversation": 0}
+    assert opening["conversation_context_turn_count"] == 0
+    follow_up = context_of(second)
+    assert follow_up["conversation_context_turn_count"] > 0
+    from backend.app.db import list_payloads
+
+    answer_run_id = get_run(second["run_id"], cfg)["answer_run_id"]
+    trace = next(row for row in list_payloads("runs", cfg.sqlite_path) if row["run_id"] == answer_run_id)
+    assert follow_up["conversation_context_turn_count"] == trace["conversation_context_turn_count"]
+    assert follow_up["memory_ids"] == trace["memory_ids"]
+    # Identifiers and counts only: the memory text itself is never copied into the work feed.
+    assert "Prefer short answers" not in repr(follow_up)
+
+
+def test_disabled_memory_is_not_reported_as_used(cfg, conversation):
+    from backend.app.memory import remember_memory_item, set_memory_enabled
+
+    saved = remember_memory_item("Prefer short answers", cfg)["memory"]
+    set_memory_enabled(saved["memory_id"], False, cfg)
+    run = _submit(conversation, "How does source lineage work?", cfg)
+    context = next(event["data"] for event in list_run_events(run["run_id"], cfg=cfg) if event["type"] == "context")
+    assert context["memory_context_count"] == 0
+    assert context["memory_ids"] == []
+
+
+# --- TGT-019: an offline device is told so, at once -------------------------------------------
+
+
+def test_offline_device_refuses_a_remote_model_at_once_and_says_why(cfg, conversation, monkeypatch):
+    from backend.app import model_router
+
+    monkeypatch.setenv("MUCARO_AI_LIVE_MODE", "1")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-placeholder")
+    reached = []
+    monkeypatch.setattr(model_router, "_anthropic_answer", lambda *a, **k: reached.append(1) or {})
+    options = {"model_provider": "anthropic", "allow_live": True, "system_offline": True}
+    run = get_run(_submit(conversation, "How does source lineage work?", cfg, options=options)["run_id"], cfg)
+    assert run["state"] == "FAILED"
+    assert run["error"]["status"] == "ERROR_MODEL_ROUTE_BLOCKED"
+    assert "the network is unavailable" in run["error"]["detail"]
+    assert reached == []
+    route = next(event for event in list_run_events(run["run_id"], cfg=cfg) if event["type"] == "route")["data"]
+    assert route["selected_provider"] != "anthropic"
+
+
+def test_offline_device_still_answers_with_a_local_model(cfg, conversation):
+    options = {"model_provider": "mock", "system_offline": True}
+    run = get_run(_submit(conversation, "How does source lineage work?", cfg, options=options)["run_id"], cfg)
+    assert run["state"] == "COMPLETED"
+    assert run["outcome"] == "ANSWERED"

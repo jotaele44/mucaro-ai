@@ -1,0 +1,81 @@
+{
+  "schema_version": "mucaro-offline-independence-external-evidence/1.0",
+  "note": "Template only. Every gate begins UNPROVEN and must be replaced by observed clean-machine evidence.",
+  "evidence": {
+    "artifact_verified": {
+      "passed": false,
+      "state": "UNPROVEN",
+      "required_observation": "Prepared artifact hash/signature/manifest verification passes before install."
+    },
+    "install_completed_without_public_network": {
+      "passed": false,
+      "state": "UNPROVEN",
+      "required_observation": "Install succeeds while public networking is externally disabled."
+    },
+    "first_launch_completed_without_public_network": {
+      "passed": false,
+      "state": "UNPROVEN",
+      "required_observation": "First launch succeeds before networking is restored."
+    },
+    "representative_offline_workflow_passed": {
+      "passed": false,
+      "state": "UNPROVEN",
+      "required_observation": "Declared offline core workflow passes in the isolated environment."
+    },
+    "local_state_persisted_after_restart": {
+      "passed": false,
+      "state": "UNPROVEN",
+      "required_observation": "Local conversation/source/memory state survives process restart."
+    },
+    "reinstall_preserved_local_state": {
+      "passed": false,
+      "state": "UNPROVEN",
+      "required_observation": "Reinstall preserves user data according to the release contract."
+    },
+    "mandatory_runtime_dependencies_self_contained": {
+      "passed": false,
+      "state": "UNPROVEN",
+      "required_observation": "No mandatory runtime file/library/helper is acquired externally."
+    },
+    "host_developer_tools_absent_or_unneeded": {
+      "passed": false,
+      "state": "UNPROVEN",
+      "required_observation": "Run succeeds without host Python, Node, Git, package managers, compilers, or container runtime for the declared core."
+    },
+    "public_network_isolation_proven": {
+      "passed": false,
+      "state": "UNPROVEN",
+      "required_observation": "External harness proves public networking was unavailable during install/launch/workflow."
+    },
+    "unexpected_egress_absent": {
+      "passed": false,
+      "state": "UNPROVEN",
+      "required_observation": "Observed network activity contains no unexplained non-loopback connection attempts."
+    },
+    "remote_model_negative_control_failed_closed": {
+      "passed": false,
+      "state": "UNPROVEN",
+      "required_observation": "A remote-model request attempted while offline fails explicitly without mock/local success substitution."
+    },
+    "web_network_negative_control_failed_closed": {
+      "passed": false,
+      "state": "UNPROVEN",
+      "required_observation": "Governed web fetch/search/render attempted while offline fails explicitly."
+    },
+    "loopback_only_local_service": {
+      "passed": false,
+      "state": "UNPROVEN",
+      "required_observation": "Mucaro local service listens only on loopback interfaces."
+    },
+    "source_identity_bound": {
+      "passed": false,
+      "state": "UNPROVEN",
+      "required_observation": "Runtime/artifact source identity matches the exact candidate HEAD."
+    },
+    "post_launch_bundle_immutable": {
+      "passed": false,
+      "state": "UNPROVEN",
+      "required_observation": "Post-launch member/hash manifest equals the pre-launch prepared artifact."
+    }
+  }
+}
