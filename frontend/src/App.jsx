@@ -9,14 +9,20 @@ import { ProvenanceWorkspace } from "./components/workspaces/ProvenanceWorkspace
 import { SettingsWorkspace } from "./components/workspaces/SettingsWorkspace.jsx";
 import { SourcesWorkspace } from "./components/workspaces/SourcesWorkspace.jsx";
 import { WorkbenchWorkspace } from "./components/workspaces/WorkbenchWorkspace.jsx";
+import { ArtifactsWorkspace } from "./components/workspaces/ArtifactsWorkspace.jsx";
+import { CodeWorkspace, GisWorkspace, OcrWorkspace } from "./components/workspaces/SpecializedWorkspaces.jsx";
 import { useOnline } from "./online.js";
 
 const WORKSPACES = [
   { id: "chat", label: "Chat" },
   { id: "workbench", label: "Workbench" },
   { id: "sources", label: "Sources" },
+  { id: "gis", label: "GIS" },
+  { id: "ocr", label: "OCR" },
+  { id: "code", label: "Code" },
   { id: "memory", label: "Memory" },
   { id: "provenance", label: "Provenance" },
+  { id: "artifacts", label: "Artifacts" },
   { id: "settings", label: "Settings" },
 ];
 const DEFAULT_OPTIONS = { model_provider: "mock", retrieval_strategy: "hybrid", allow_live: false, top_k: 5 };
@@ -346,6 +352,10 @@ export function App() {
         {health.state === "ok" && view === "sources" && <SourcesWorkspace announce={announce} />}
         {health.state === "ok" && view === "memory" && <MemoryWorkspace announce={announce} currentConversationId={activeId} />}
         {health.state === "ok" && view === "provenance" && <ProvenanceWorkspace />}
+        {health.state === "ok" && view === "gis" && <GisWorkspace announce={announce} />}
+        {health.state === "ok" && view === "ocr" && <OcrWorkspace announce={announce} />}
+        {health.state === "ok" && view === "code" && <CodeWorkspace announce={announce} />}
+        {health.state === "ok" && view === "artifacts" && <ArtifactsWorkspace announce={announce} />}
         {health.state === "ok" && view === "settings" && <SettingsWorkspace options={options} onOptionsChange={setOptions} announce={announce} />}
       </main>
       {tasksOpen && <TasksDrawer onClose={() => setTasksOpen(false)} />}

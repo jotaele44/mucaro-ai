@@ -47,6 +47,7 @@ from .db import ensure_db, get_connection
 from .error_categories import classify_error
 from .execution_records import build_run_manifest
 from . import agent_loop
+from .narration_check import NARRATION_WARNING, narration_conflicts
 from .model_router import MODEL_PROVIDER_SPECS, ModelProviderError, generate_turn, supports_tool_calls
 from .model_routing_policy import ModelRoutingError, plan_model_route
 from .next_vector import STATUS_ABSENT as NEXT_VECTOR_ABSENT
@@ -1286,6 +1287,16 @@ def _phase_answer(run: dict[str, Any], cfg: Settings) -> None:
     for flag in trace.get("validation_flags", []):
         if str(flag).startswith("ERROR_") or str(flag).startswith("WARN"):
             events.append(("warning", {"status": flag, "category": classify_error(flag)}))
+    conflicts = narration_conflicts(answer, calls)
+    if conflicts:
+        # MOB-F15: the answer claims an action the call records do not show as executed; the records win.
+        events.append(("warning", {
+            "status": NARRATION_WARNING,
+            "category": classify_error(NARRATION_WARNING),
+            "detail": "The answer describes actions that the call records do not show as done: "
+                      + ", ".join(sorted({item["claim"].lower().replace("_", " ") for item in conflicts})) + ".",
+            "conflicts": conflicts,
+        }))
     events.extend(_next_vector_events(run_id, answer, trace, calls, prompt=run["prompt"]))
     with _Tx(cfg) as conn:
         for event_type, data in events:

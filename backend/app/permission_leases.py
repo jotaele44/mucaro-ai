@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from .config import Settings, settings
+from .governance_audit import record_governance_event
 from .contracts import APPLICATION_ROOT, contract_errors
 from .tool_execution_policy import is_read_only_local_inspection_tool
 from .tools import (
@@ -346,6 +347,12 @@ def grant_permission_lease(
             ]
         update_json(_leases_path(cfg), [], rollback)
         raise
+    record_governance_event(
+        "LEASE_GRANTED",
+        lease["granted_by"],
+        {"lease_id": lease_id, "run_id": lease["run_id"], "grant_sha256": lease["grant_sha256"]},
+        cfg,
+    )
     return {"status": "PERMISSION_LEASE_GRANTED", "lease": lease}
 
 
@@ -414,6 +421,12 @@ def revoke_permission_lease(
                 "grant_sha256": updated["grant_sha256"],
                 "revoked_by": revoked_by.strip(),
             },
+            cfg,
+        )
+        record_governance_event(
+            "LEASE_REVOKED",
+            revoked_by.strip(),
+            {"lease_id": lease_id, "run_id": updated["run_id"], "grant_sha256": updated["grant_sha256"]},
             cfg,
         )
     return {"status": "PERMISSION_LEASE_REVOKED", "lease": updated, "changed": outcome["changed"]}
