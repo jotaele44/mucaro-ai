@@ -90,15 +90,25 @@ def enqueue(
 def claim(
     db_path: str | Path, *, worker_id: str, lease_seconds: float = 30,
     now: float | None = None,
+    kind: str | None = None,
+    read_only_only: bool = False,
 ) -> dict[str, Any] | None:
-    """Atomically claim one queued task. This DOES NOT authorize execution."""
+    """Atomically claim an optionally filtered task. Claiming never grants authorization."""
     if not worker_id or not (0 < lease_seconds <= 3600):
         raise SupervisorQueueError("invalid worker or lease")
     timestamp = time.time() if now is None else now
     with _connect(db_path) as db:
         db.execute("BEGIN IMMEDIATE")
+        predicates = ["state='QUEUED'"]
+        params: list[Any] = []
+        if read_only_only:
+            predicates.append("mutates_state=0")
+        if kind is not None:
+            predicates.append("json_extract(payload_json, '$.kind') = ?")
+            params.append(kind)
         row = db.execute(
-            "SELECT * FROM supervisor_tasks WHERE state='QUEUED' ORDER BY created_at,task_id LIMIT 1"
+            "SELECT * FROM supervisor_tasks WHERE " + " AND ".join(predicates)
+            + " ORDER BY created_at,task_id LIMIT 1", params,
         ).fetchone()
         if row is None:
             return None
