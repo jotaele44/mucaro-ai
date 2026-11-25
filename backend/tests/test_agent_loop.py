@@ -192,6 +192,19 @@ def test_auto_mode_pre_approves_only_local_read_only_tools(server, cfg):
     assert [data["tool_name"] for data in _events(cfg, run["run_id"], "approval_request")] == ["web.fetch"]
 
 
+def test_auto_mode_asks_per_call_when_the_model_is_remote(server, cfg):
+    """A remote model would receive the tool's result, so Auto mode never pre-approves its proposals."""
+    model_settings.save_model_settings({"remote": {"base_url": server, "model": MODEL}}, cfg)
+    _Scripted.script = [_call("source_library.status", {}), _text("unused")]
+    remote = {"model_provider": "openai_compatible_remote", "agent": True, "allow_live": True}
+    run = _submit(cfg, "check my library", mode="auto", options=remote)
+    assert run["state"] == "AWAITING_APPROVAL"
+    calls = [call for call in list_tool_calls(cfg)["tool_calls"] if call.get("run_id") == run["run_id"]]
+    assert [(call["tool_name"], call["status"]) for call in calls] == [("source_library.status", "PENDING_APPROVAL")]
+    assert calls[0].get("approved_by") in (None, "")
+    assert [data["tool_name"] for data in _events(cfg, run["run_id"], "approval_request")] == ["source_library.status"]
+
+
 def test_answer_without_tools_is_cited_like_any_other(server, cfg):
     _Scripted.script = [_text("placeholder")]
     run = _submit(cfg, "How does source lineage work?")

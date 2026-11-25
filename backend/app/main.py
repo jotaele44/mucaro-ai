@@ -98,6 +98,8 @@ from .models import (
 )
 from .model_router import ModelProviderError, list_model_providers, model_provider_names, probe_model_server
 from .github_pull_requests import REPO_PATTERN as GITHUB_REPO_PATTERN
+from .governance_audit import list_governance_events
+from .permission_leases import verify_permission_lease_audit_chain
 from .model_settings import ModelSettingsError, public_model_settings, save_model_settings
 from .multimodal import MULTIMODAL_SUFFIXES
 from .offline import build_offline_manifest
@@ -146,8 +148,10 @@ from .validation import validate_project_json
 from .work_runs import (
     RunError,
     available_modes,
+    conversation_activity,
     edit_queued_run,
     get_run,
+    idle_activity,
     list_run_events,
     list_runs,
     reconcile_runs_on_startup,
@@ -736,7 +740,19 @@ def create_app(cfg: Settings = settings) -> FastAPI:
 
     @app.get("/conversations")
     def conversations() -> dict:
-        return {"conversations": list_conversations(cfg)}
+        # Each row carries its thread status so the list can show what is working, waiting or newly finished.
+        activity = conversation_activity(cfg)
+        return {
+            "conversations": [
+                {**row, "activity": activity.get(row["conversation_id"]) or idle_activity()} for row in list_conversations(cfg)
+            ]
+        }
+
+    @app.get("/conversations/activity")
+    def conversations_activity() -> dict:
+        # The light read the thread list polls while a run is active: run state only, no transcripts.
+        # Declared before /conversations/{conversation_id} so "activity" is never taken for an id.
+        return {"status": "CONVERSATION_ACTIVITY_OK", "activity": conversation_activity(cfg)}
 
     @app.post("/conversations")
     def create_chat(req: ConversationCreateRequest, _auth: dict = Depends(require_auth)) -> dict:
@@ -1213,6 +1229,17 @@ def create_app(cfg: Settings = settings) -> FastAPI:
     @app.get("/tools/audit")
     def tool_audit() -> dict:
         return list_tool_audit_events(cfg)
+
+    @app.get("/audit")
+    def governance_audit(event: str | None = None, limit: int = 200) -> dict:
+        """Source acquisition and permission changes (TGT-035), with every chained log's verification."""
+        payload = list_governance_events(cfg, event=event, limit=max(0, min(limit, 1000)))
+        payload["chains"] = {
+            "governance": payload["chain"],
+            "tools": verify_tool_audit_chain(cfg),
+            "permission_leases": verify_permission_lease_audit_chain(cfg),
+        }
+        return payload
 
     @app.get("/workspaces")
     def workspaces() -> dict:

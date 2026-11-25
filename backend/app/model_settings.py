@@ -15,6 +15,7 @@ from typing import Any
 from urllib.parse import urlparse
 
 from .config import Settings, settings
+from .governance_audit import record_governance_event
 
 DEFAULT_LOCAL_MODEL_URL = "http://127.0.0.1:11434/v1"
 DEFAULT_LOCAL_MODEL = "llama3.1:8b"
@@ -115,6 +116,7 @@ def save_model_settings(update: dict[str, Any], cfg: Settings = settings) -> dic
     """
     with _LOCK:
         current = _read(cfg)
+        before = {section: dict(current.get(section) or {}) for section in ("local", "remote")}
         for section in ("local", "remote"):
             incoming = update.get(section)
             if not isinstance(incoming, dict):
@@ -139,4 +141,23 @@ def save_model_settings(update: dict[str, Any], cfg: Settings = settings) -> dic
             json.dump(current, handle, sort_keys=True)
         os.chmod(tmp, 0o600)
         os.replace(tmp, path)
+        changes = _settings_changes(before, current)
+        if changes:
+            record_governance_event("MODEL_SETTINGS_CHANGED", "user", {"changes": changes}, cfg)
     return public_model_settings(cfg)
+
+
+def _settings_changes(before: dict[str, dict[str, Any]], after: dict[str, Any]) -> list[dict[str, Any]]:
+    """Which settings changed, for the governance audit (TGT-035). The API key is reported only as set, replaced or
+    cleared; its value never leaves the settings file. Base URLs and model names are configuration, not secrets."""
+    changes: list[dict[str, Any]] = []
+    for section in ("local", "remote"):
+        old = before.get(section) or {}
+        new = after.get(section) or {}
+        for field in ("base_url", "model"):
+            if old.get(field) != new.get(field):
+                changes.append({"section": section, "field": field, "from": old.get(field) or None, "to": new.get(field) or None})
+        if section == "remote" and old.get("api_key") != new.get("api_key"):
+            change = "SET" if not old.get("api_key") else "CLEARED" if not new.get("api_key") else "REPLACED"
+            changes.append({"section": section, "field": "credential", "change": change})
+    return changes

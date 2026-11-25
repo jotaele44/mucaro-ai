@@ -250,11 +250,12 @@ export const api = {
   models: () => request("/models"),
   saveModelSettings: (payload) => request("/models/settings", json("PUT", payload)),
   probeModels: (baseUrl, apiKey) => request("/models/probe", json("POST", apiKey ? { base_url: baseUrl, api_key: apiKey } : { base_url: baseUrl })),
-  offlineManifest: () => request("/offline-manifest"),
+  offlineManifest: (offline = false) => request(`/offline-manifest?offline=${offline ? "true" : "false"}`),
   modes: () => request("/work-runs/modes"),
   workbenchPlan: (payload) => request("/workbench/plan", json("POST", payload)),
 
   conversations: () => request("/conversations"),
+  conversationActivity: () => request("/conversations/activity"),
   createConversation: (title, model) => request("/conversations", json("POST", model ? { title, model } : { title })),
   setConversationModel: (id, model) => request(`/conversations/${id}/model`, json("PUT", model)),
   setConversationRepo: (id, repo) => request(`/conversations/${id}/repo`, json("PUT", repo)),
@@ -285,6 +286,9 @@ export const api = {
   denyTool: (callId, argumentsSha256) => request(`/tools/requests/${callId}/deny`, json("POST", { arguments_sha256: argumentsSha256 })),
   toolSummary: () => request("/tools/summary"),
   toolCalls: () => request("/tools/requests"),
+  // Workspaces ask for a governed call; it is created PENDING_APPROVAL and never runs until approved, then run explicitly.
+  requestTool: (toolName, args, reason) => request("/tools/requests", json("POST", { tool_name: toolName, arguments: args, reason })),
+  runTool: (callId) => request(`/tools/requests/${encodeURIComponent(callId)}/run`, { method: "POST" }),
   resolveInteraction: (id, payload) => request(`/interactions/${id}/resolve`, json("POST", payload)),
 
   sources: () => request("/sources"),

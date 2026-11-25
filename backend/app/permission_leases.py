@@ -1,14 +1,13 @@
 from __future__ import annotations
 
-import json
 import re
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-import jsonschema
-
 from .config import Settings, settings
+from .governance_audit import record_governance_event
+from .contracts import APPLICATION_ROOT, contract_errors
 from .tool_execution_policy import is_read_only_local_inspection_tool
 from .tools import (
     TOOL_REGISTRY,
@@ -35,12 +34,12 @@ class PermissionLeaseError(RuntimeError):
         self.detail = detail
 
 
-def _schema() -> dict[str, Any]:
-    path = Path(__file__).resolve().parents[2] / "schemas" / "permission_lease.schema.json"
+def _contract_errors(payload: Any) -> list[str]:
+    """Errors against the shared permission_lease contract (TGT-016), read from the schemas shipped with this code."""
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
+        return contract_errors("permission_lease", payload, root=APPLICATION_ROOT)
     except OSError as exc:
-        raise PermissionLeaseError("ERROR_PERMISSION_LEASE_SCHEMA_UNAVAILABLE", f"{path}: {exc}") from exc
+        raise PermissionLeaseError("ERROR_PERMISSION_LEASE_SCHEMA_UNAVAILABLE", str(exc)) from exc
 
 
 def _leases_path(cfg: Settings) -> Path:
@@ -81,10 +80,9 @@ def _grant_payload(lease: dict[str, Any]) -> dict[str, Any]:
 
 
 def _validate_schema(lease: dict[str, Any]) -> None:
-    errors = sorted(jsonschema.Draft202012Validator(_schema()).iter_errors(lease), key=lambda e: list(e.absolute_path))
+    errors = _contract_errors(lease)
     if errors:
-        where = "/".join(str(part) for part in errors[0].absolute_path) or "<root>"
-        raise PermissionLeaseError("ERROR_PERMISSION_LEASE_SCHEMA", f"{where}: {errors[0].message}")
+        raise PermissionLeaseError("ERROR_PERMISSION_LEASE_SCHEMA", errors[0])
 
 
 def _append_audit(event: dict[str, Any], cfg: Settings) -> dict[str, Any]:
@@ -349,6 +347,12 @@ def grant_permission_lease(
             ]
         update_json(_leases_path(cfg), [], rollback)
         raise
+    record_governance_event(
+        "LEASE_GRANTED",
+        lease["granted_by"],
+        {"lease_id": lease_id, "run_id": lease["run_id"], "grant_sha256": lease["grant_sha256"]},
+        cfg,
+    )
     return {"status": "PERMISSION_LEASE_GRANTED", "lease": lease}
 
 
@@ -417,6 +421,12 @@ def revoke_permission_lease(
                 "grant_sha256": updated["grant_sha256"],
                 "revoked_by": revoked_by.strip(),
             },
+            cfg,
+        )
+        record_governance_event(
+            "LEASE_REVOKED",
+            revoked_by.strip(),
+            {"lease_id": lease_id, "run_id": updated["run_id"], "grant_sha256": updated["grant_sha256"]},
             cfg,
         )
     return {"status": "PERMISSION_LEASE_REVOKED", "lease": updated, "changed": outcome["changed"]}

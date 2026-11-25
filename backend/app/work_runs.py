@@ -27,6 +27,9 @@ Guarantees (MOB F02-F04, F07-F09, F13-F16, F18; TGT-014, TGT-018):
 - Stop halts before the next step and records INTERRUPTED, listing any
   call that was in flight. A process restart marks RUNNING runs
   INTERRUPTED; runs waiting on approval or input resume after restart.
+- An answer that closes with a NEXT VECTOR block yields a ``next_vector``
+  event: a proposal the user may start as the next message. It is data.
+  Nothing here submits it, and it approves nothing (see ``next_vector``).
 """
 
 from __future__ import annotations
@@ -44,8 +47,12 @@ from .db import ensure_db, get_connection
 from .error_categories import classify_error
 from .execution_records import build_run_manifest
 from . import agent_loop
-from .model_router import ModelProviderError, generate_turn, supports_tool_calls
+from .narration_check import NARRATION_WARNING, narration_conflicts
+from .model_router import MODEL_PROVIDER_SPECS, ModelProviderError, generate_turn, supports_tool_calls
 from .model_routing_policy import ModelRoutingError, plan_model_route
+from .next_vector import STATUS_ABSENT as NEXT_VECTOR_ABSENT
+from .next_vector import STATUS_ECHO as NEXT_VECTOR_ECHO
+from .next_vector import propose_next_vector
 from .response_flow import (
     InteractionError,
     build_response_envelope,
@@ -84,7 +91,8 @@ MODES = {
 EVENT_TYPES = {
     "queued", "run_started", "route", "plan", "tool_call", "approval_request", "tool_started", "tool_result",
     "tool_summary", "question", "question_resolved", "retry_requested", "user_note", "retrieval", "text_delta",
-    "citation", "artifact", "warning", "error", "interrupted", "cancelled", "final", "agent_step",
+    "citation", "artifact", "warning", "error", "interrupted", "cancelled", "final", "agent_step", "context",
+    "next_vector",
 }
 MAX_PROMPT_CHARS = 20_000
 TEXT_DELTA_CHARS = 160
@@ -355,6 +363,59 @@ def list_runs(
         "runs": [summarize_run(run, cfg) for run in runs],
         "next_before_seq": runs[-1]["queue_seq"] if len(rows) > limit else None,
     }
+
+
+_IDLE_ACTIVITY: dict[str, Any] = {
+    "state": "IDLE", "queued": 0, "last_finished_run_id": None, "last_finished_state": None,
+    "last_finished_at": None, "next_vector_ready": False,
+}
+
+
+def idle_activity() -> dict[str, Any]:
+    return dict(_IDLE_ACTIVITY)
+
+
+def conversation_activity(cfg: Settings = settings) -> dict[str, dict[str, Any]]:
+    """Thread-list status for every existing conversation that has runs.
+
+    Read from the indexed state columns; only each conversation's newest finished run is decoded.
+    Runs outlive a deleted conversation as receipts, so they are filtered out here.
+    ``next_vector_ready`` means that run completed with a proposal and nothing is active or queued,
+    so the thread is waiting on the user's next relay. It reports state; it starts nothing.
+    """
+    ensure_db(cfg.sqlite_path)
+    activity: dict[str, dict[str, Any]] = {}
+    with get_connection(cfg.sqlite_path) as conn:
+        counts = conn.execute(
+            "SELECT conversation_id, state, COUNT(*) AS n FROM work_runs "
+            "WHERE state IN ('QUEUED','RUNNING','AWAITING_APPROVAL','AWAITING_INPUT') "
+            "AND conversation_id IN (SELECT conversation_id FROM conversations) GROUP BY conversation_id, state"
+        ).fetchall()
+        finished = conn.execute(
+            "SELECT w.conversation_id, w.run_id, w.state, w.payload_json, "
+            "EXISTS(SELECT 1 FROM run_events e WHERE e.run_id = w.run_id AND e.event_type = 'next_vector') AS has_vector "
+            "FROM work_runs w JOIN ("
+            "  SELECT conversation_id, MAX(queue_seq) AS queue_seq FROM work_runs "
+            "  WHERE state IN ('COMPLETED','FAILED','INTERRUPTED') "
+            "  AND conversation_id IN (SELECT conversation_id FROM conversations) GROUP BY conversation_id"
+            ") newest ON newest.conversation_id = w.conversation_id AND newest.queue_seq = w.queue_seq"
+        ).fetchall()
+    for row in counts:
+        item = activity.setdefault(row["conversation_id"], idle_activity())
+        if row["state"] == "QUEUED":
+            item["queued"] = int(row["n"])
+        else:
+            item["state"] = row["state"]
+    for item in activity.values():
+        if item["state"] == "IDLE" and item["queued"]:
+            item["state"] = "QUEUED"
+    for row in finished:
+        item = activity.setdefault(row["conversation_id"], idle_activity())
+        item["last_finished_run_id"] = row["run_id"]
+        item["last_finished_state"] = row["state"]
+        item["last_finished_at"] = json.loads(row["payload_json"]).get("finished_at")
+        item["next_vector_ready"] = bool(row["has_vector"]) and row["state"] == "COMPLETED" and item["state"] == "IDLE"
+    return activity
 
 
 # --- submission, queue and dispatch -----------------------------------------------
@@ -745,6 +806,7 @@ def _phase_start(run: dict[str, Any], cfg: Settings) -> None:
             preferred_model=options.get("model_name"),
             allow_live=bool(options.get("allow_live")),
             require_offline=bool(options.get("require_offline")),
+            system_offline=bool(options.get("system_offline")),
             cfg=cfg,
         )
         route_event = {
@@ -1028,6 +1090,7 @@ def _phase_agent(run: dict[str, Any], cfg: Settings) -> bool:
             preferred_model=options.get("model_name"),
             allow_live=bool(options.get("allow_live")),
             require_offline=bool(options.get("require_offline")),
+            system_offline=bool(options.get("system_offline")),
             cfg=cfg,
         )
     except (ModelRoutingError, ModelProviderError) as exc:
@@ -1035,6 +1098,8 @@ def _phase_agent(run: dict[str, Any], cfg: Settings) -> bool:
     # The same consent and readiness rules as any answer: a remote model without allow_live never gets here.
     if route["status"] != "MODEL_ROUTE_READY" or not supports_tool_calls(route["selected_provider"]):
         return leave(route.get("selection_reason"))
+    selected_spec = MODEL_PROVIDER_SPECS.get(route["selected_provider"])
+    model_is_local = selected_spec is not None and selected_spec.locality == "local"
     conversation = get_conversation(run["conversation_id"], cfg) or {"turns": []}
     # The repository this chat is bound to; a model can use coding tools on it and on nothing else.
     repo = conversation.get("repo") or None
@@ -1111,7 +1176,9 @@ def _phase_agent(run: dict[str, Any], cfg: Settings) -> bool:
                                        "detail": f"{str(proposal['name'])[:80]}: {refusal}"}))
             continue
         always_ask = bool(agent_loop.AGENT_TOOLS[record["tool_name"]].get("always_ask"))
-        if run["mode"] == "auto" and _auto_approvable(record["tool_name"]) and not always_ask:
+        # Auto mode pre-approves local read-only tools only when the model itself runs on this machine. A remote
+        # model would receive the tool's result, so local content reaching it needs the person's approval per call.
+        if run["mode"] == "auto" and _auto_approvable(record["tool_name"]) and not always_ask and model_is_local:
             record = approve_tool_call(record["tool_call_id"], cfg=cfg, approved_by="policy:auto-local-read-only",
                                        expected_arguments_sha256=record["arguments_sha256"])["tool_call"]
         new_pending.append({"id": proposal["id"], "tool_call_id": record["tool_call_id"]})
@@ -1164,6 +1231,7 @@ def _phase_answer(run: dict[str, Any], cfg: Settings) -> None:
             allow_mock_fallback=bool(options.get("allow_mock_fallback")),
             allow_live=bool(options.get("allow_live")),
             require_offline=bool(options.get("require_offline")),
+            system_offline=bool(options.get("system_offline")),
             conversation_context=build_conversation_context(conversation),
             conversation_scope_id=run["conversation_id"],
             cfg=cfg,
@@ -1195,6 +1263,15 @@ def _phase_answer(run: dict[str, Any], cfg: Settings) -> None:
     events: list[tuple[str, dict[str, Any]]] = [
         ("retrieval", {"strategy": trace.get("retrieval_strategy"), "retrieved_chunk_ids": trace.get("retrieved_chunk_ids", []),
                        "source_ids": trace.get("source_ids", []), "grounding": trace.get("grounding") or "SOURCES"}),
+        # What this answer used besides sources: saved memory (kept across chats until the person turns it off or
+        # deletes it) and earlier messages of this chat (used only here, never saved as memory). Identifiers and
+        # counts only; memory content stays in the Memory workspace.
+        ("context", {
+            "conversation_context_turn_count": int(trace.get("conversation_context_turn_count") or 0),
+            "memory_context_count": int(trace.get("memory_context_count") or 0),
+            "memory_scope_counts": dict(trace.get("memory_scope_counts") or {}),
+            "memory_ids": [str(item) for item in trace.get("memory_ids") or []],
+        }),
     ]
     answer = str(trace["answer"])
     if not trace.get("answer_streamed"):
@@ -1210,10 +1287,50 @@ def _phase_answer(run: dict[str, Any], cfg: Settings) -> None:
     for flag in trace.get("validation_flags", []):
         if str(flag).startswith("ERROR_") or str(flag).startswith("WARN"):
             events.append(("warning", {"status": flag, "category": classify_error(flag)}))
+    conflicts = narration_conflicts(answer, calls)
+    if conflicts:
+        # MOB-F15: the answer claims an action the call records do not show as executed; the records win.
+        events.append(("warning", {
+            "status": NARRATION_WARNING,
+            "category": classify_error(NARRATION_WARNING),
+            "detail": "The answer describes actions that the call records do not show as done: "
+                      + ", ".join(sorted({item["claim"].lower().replace("_", " ") for item in conflicts})) + ".",
+            "conflicts": conflicts,
+        }))
+    events.extend(_next_vector_events(run_id, answer, trace, calls, prompt=run["prompt"]))
     with _Tx(cfg) as conn:
         for event_type, data in events:
             _emit(conn, run_id, event_type, data)
     _complete(run_id, cfg, outcome="ANSWERED", answer_trace=trace, action_ledger=ledger)
+
+
+def _next_vector_events(
+    run_id: str, answer: str, trace: dict[str, Any], calls: list[dict[str, Any]], *, prompt: str | None = None
+) -> list[tuple[str, dict[str, Any]]]:
+    """A proposal when the answer closes with a valid NEXT VECTOR block; a warning when it closes with a bad one."""
+    network_tools = [
+        call["tool_name"] for call in calls
+        if call["status"] == "EXECUTED" and getattr(TOOL_REGISTRY.get(call["tool_name"]), "network", "none") != "none"
+    ]
+    try:
+        proposal, status = propose_next_vector(
+            answer,
+            work_run_id=run_id,
+            answer_run_id=trace.get("run_id"),
+            model_provider=trace.get("model_provider"),
+            model_name=trace.get("model_name"),
+            validation_flags=[str(flag) for flag in trace.get("validation_flags", [])],
+            network_tools=network_tools,
+            prompt=prompt,
+        )
+    except Exception:  # noqa: BLE001 - the answer is finished; an optional proposal must never fail its run
+        proposal, status = None, "NEXT_VECTOR_REJECTED_INTERNAL_ERROR"
+    if proposal is not None:
+        return [("next_vector", proposal)]
+    if status in {NEXT_VECTOR_ABSENT, NEXT_VECTOR_ECHO}:
+        return []
+    blocked = status.endswith(("SLASH_COMMAND", "CONTROL_CHARACTERS"))
+    return [("warning", {"status": "WARN_NEXT_VECTOR_NOT_OFFERED", "category": "BLOCKED_ACTION" if blocked else "INPUT_INVALID", "detail": status})]
 
 
 def _complete(
