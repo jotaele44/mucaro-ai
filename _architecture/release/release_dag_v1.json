@@ -1,6 +1,6 @@
 {
   "schema_version": "mucaro-release-dag/1.0",
-  "updated_utc": "2026-10-16T18:28:27Z",
+  "updated_utc": "2026-11-23T15:34:32Z",
   "nodes": [
     {
       "node_id": "N00",
@@ -91,7 +91,7 @@
       "dependencies": [
         "N01"
       ],
-      "state": "PROVISIONAL",
+      "state": "PASS",
       "risk": "MEDIUM",
       "user_value": "MEDIUM",
       "downstream_unlock_value": "HIGH",
@@ -100,7 +100,7 @@
         "schemas + runtime validate_contract at boundaries"
       ],
       "blocker": null,
-      "notes": "contracts.py registry + boundary enforcement; residue listed on TGT-016."
+      "notes": "PASS at main c9b983bfc5c663d404984139658b42e454a2f1c0: TGT-016, INV-005 and TGT-038 are all PASS (shared contract registry complete with ratchets, PR #382; architecture matrix executed in CI with its V06/tool regression limitation met by MATRIX-011 run 44041191535)."
     },
     {
       "node_id": "N04",
@@ -138,7 +138,7 @@
         "N02",
         "N03"
       ],
-      "state": "OPEN",
+      "state": "PASS",
       "risk": "HIGH",
       "user_value": "HIGH",
       "downstream_unlock_value": "HIGH",
@@ -147,7 +147,7 @@
         "tool-governance benchmark"
       ],
       "blocker": null,
-      "notes": ""
+      "notes": "PASS at main 0da925cf2c1059060fbd5f69ab2358d08e6808aa: TGT-014, TGT-025, INV-006 and MATRIX-011 are all PASS, and the required tool-governance benchmark is met by MATRIX-011 run 44041191535 (23/23, receipt aeb1c9f5535661c4b04848478b0891f326f95d9e3d98edf574b9bc7ef0f7d5d2). Dependency N03 is still PROVISIONAL (TGT-016, INV-005, TGT-038), so this node's PASS stands on its own rows, not on N03."
     },
     {
       "node_id": "N06",
@@ -333,7 +333,7 @@
         "model-routing benchmark"
       ],
       "blocker": null,
-      "notes": "Routing and MATRIX-012 PASS; local provider verified against a protocol-faithful fake server; real-model evaluation and live remote evaluation remain."
+      "notes": "Routing, MATRIX-012 and TGT-009 PASS (live remote evaluation 2026-11-17, receipt _architecture/release/evidence/tgt009_live_9e8659bb22b3.json); local provider verified against a protocol-faithful fake server. Remaining: real local-model evaluation (TGT-008) and INV-004 residue."
     },
     {
       "node_id": "N14",
@@ -346,7 +346,7 @@
       "dependencies": [
         "N03"
       ],
-      "state": "OPEN",
+      "state": "PASS",
       "risk": "MEDIUM",
       "user_value": "MEDIUM",
       "downstream_unlock_value": "LOW",
@@ -355,7 +355,7 @@
         "memory benchmark"
       ],
       "blocker": null,
-      "notes": ""
+      "notes": "PASS at main f67baceb067643b77fc94814319be05e0f556f41: TGT-013, INV-021 and MATRIX-013 are all PASS; the required memory benchmark is met by MATRIX-013 run 43943390101 (13/13, receipt 83155117eb65d18e4e0980698c071fcb29238e74726de1e0ede637936af778d1)."
     },
     {
       "node_id": "N15",
@@ -386,7 +386,7 @@
         "N06",
         "N13"
       ],
-      "state": "PROVISIONAL",
+      "state": "PASS",
       "risk": "HIGH",
       "user_value": "HIGH",
       "downstream_unlock_value": "HIGH",
@@ -395,7 +395,7 @@
         "run ledger + SSE + cancel + queue regressions"
       ],
       "blocker": null,
-      "notes": "Run bus implemented with 29 regressions; UI integration (N17) and model-proposed tool calls remain."
+      "notes": "PASS at main b07f888fee4502eb90e68ed446fc5567e4adc5c5: every requirement is PASS (TGT-002 and MOB-F19 result views in PR #386; TGT-035 governance audit stream, MOB-F15 narration check and the MOB-F19 live read in PR #387) and the run ledger, SSE, cancel and queue regressions stand. Its dependency N13 is not yet PASS, so the validator warns WARN_DAG_PASS_ON_UNPASSED_DEPENDENCY N15:N13; N15's own evidence does not depend on N13's open rows."
     },
     {
       "node_id": "N16",
@@ -533,7 +533,7 @@
         "N15",
         "N19"
       ],
-      "state": "OPEN",
+      "state": "PASS",
       "risk": "MEDIUM",
       "user_value": "MEDIUM",
       "downstream_unlock_value": "LOW",
@@ -542,7 +542,7 @@
         "frozen thresholds + recovery benchmark"
       ],
       "blocker": null,
-      "notes": "MATRIX-017 PASS: frozen Apple-Silicon work-run performance benchmark run 38972805642 completed 20/20 with zero errors, p95 first-word 37.5 ms and p95 total 44.6 ms under pre-execution ceilings; RT-10 independently covers retrieval-scale performance. TGT-020 and MATRIX-017 are PASS. TGT-019 and MATRIX-016 recovery/offline-transition evidence remain open."
+      "notes": "PASS at main d12dfb1b57adcd276bb3a71f07c046d50ab07f1e: TGT-019 (offline, PR #380), TGT-020, MATRIX-016 (recovery benchmark run 44008775914) and MATRIX-017 (performance benchmark run 38972805642) are all PASS; frozen thresholds and the recovery benchmark are met."
     },
     {
       "node_id": "N22",

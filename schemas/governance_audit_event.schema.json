@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mucaro.local/schemas/governance_audit_event.schema.json",
+  "title": "Mucaro Governance Audit Event 1.0",
+  "description": "PROVENANCE contract: append-only, hash-chained record of source acquisition and permission changes (TGT-035). Identifiers, hashes and counts only; never document text or secrets.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["event_id", "event", "actor", "created_at", "details", "previous_event_sha256", "event_sha256"],
+  "properties": {
+    "event_id": {"type": "string", "pattern": "^govevent_[a-f0-9]+$"},
+    "event": {"enum": ["SOURCE_INGESTED", "SOURCE_DELETED", "WEB_SNAPSHOT_PERSISTED", "DIRECTORY_GRANTED", "DIRECTORY_REVOKED", "LEASE_GRANTED", "LEASE_REVOKED", "MODEL_SETTINGS_CHANGED"]},
+    "actor": {"type": "string", "minLength": 1},
+    "created_at": {"type": "string", "minLength": 1},
+    "details": {"type": "object"},
+    "previous_event_sha256": {"type": ["string", "null"], "pattern": "^[a-f0-9]{64}$"},
+    "event_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+  }
+}

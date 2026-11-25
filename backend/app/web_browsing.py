@@ -17,6 +17,7 @@ from typing import Any
 from urllib.parse import urldefrag, urlparse
 
 from .config import Settings, settings
+from .governance_audit import record_governance_event, url_host
 from .permission_engine import PermissionEngineError, PermissionRequest, require
 from .utils import read_json, stable_id, utc_now, write_json
 
@@ -694,6 +695,19 @@ def fetch_web_snapshot(
     write_json(path, snapshot)
     snapshot_sha256 = hashlib.sha256(path.read_bytes()).hexdigest()
     ledger = _append_snapshot_ledger_entry(cfg, snapshot, str(path), snapshot_sha256)
+    record_governance_event(
+        "WEB_SNAPSHOT_PERSISTED",
+        "web.fetch",
+        {
+            "snapshot_id": snapshot["snapshot_id"],
+            "snapshot_sha256": snapshot_sha256,
+            "content_sha256": snapshot["content_sha256"],
+            "content_size_bytes": snapshot["content_size_bytes"],
+            "http_status": snapshot["http_status"],
+            "host": url_host(snapshot["final_url"]),
+        },
+        cfg,
+    )
     return {
         "status": "WEB_FETCH_SNAPSHOT_OK",
         "snapshot": snapshot,

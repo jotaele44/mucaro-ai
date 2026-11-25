@@ -25,16 +25,20 @@ export function deriveRun(run, events) {
     createdAt: run.created_at,
     plan: null,
     route: null,
+    agentStep: null,
     calls: new Map(),
     approvals: [],
     question: null,
     questionResolution: null,
     answer: "",
     citations: [],
+    context: null,
     artifacts: [],
     warnings: [],
     error: null,
     final: null,
+    // The vector the model proposed at the end of its answer (a record, not an instruction); see nextVectorOptions.js.
+    nextVector: null,
     interrupted: null,
     notes: [],
     lastSeq: 0,
@@ -48,6 +52,9 @@ export function deriveRun(run, events) {
         break;
       case "route":
         view.route = data;
+        break;
+      case "agent_step":
+        view.agentStep = data;
         break;
       case "tool_call":
       case "retry_requested":
@@ -91,8 +98,14 @@ export function deriveRun(run, events) {
       case "interrupted":
         view.interrupted = data;
         break;
+      case "next_vector":
+        view.nextVector = data;
+        break;
       case "final":
         view.final = data;
+        break;
+      case "context":
+        view.context = data;
         break;
       default:
         break;

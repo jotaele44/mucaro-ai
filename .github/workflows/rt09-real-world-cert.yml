@@ -1,5 +1,9 @@
 name: RT09 Real World Retrieval Certification
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 on:
   workflow_dispatch:
   pull_request:
@@ -15,14 +19,20 @@ on:
       - "scripts/certify_retrieval_real_world_live.py"
       - ".github/workflows/rt09-real-world-cert.yml"
 
+permissions:
+  contents: read
+
 jobs:
   certify-real-world-corpus:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
+          cache: pip
+          cache-dependency-path: pyproject.toml
       - name: Install Mucaro
         run: python -m pip install -e ".[dev]"
       - name: Validate RT09 denominator

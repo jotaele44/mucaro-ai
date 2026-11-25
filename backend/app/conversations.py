@@ -3,6 +3,7 @@ from __future__ import annotations
 import threading
 from typing import Any
 
+from .agent_store import delete_agent_conversation
 from .config import Settings, settings
 from .context_state import build_context_state, build_model_context
 from .db import delete_payload, init_db, list_payloads, upsert_payload
@@ -54,6 +55,7 @@ def _model_choice(model: dict[str, Any]) -> dict[str, Any]:
         "model_provider": str(model["model_provider"]).strip().lower(),
         "model_name": (str(model.get("model_name") or "").strip() or None),
         "allow_live": bool(model.get("allow_live")),
+        "agent": bool(model.get("agent")),
     }
 
 
@@ -63,6 +65,25 @@ def set_conversation_model(conversation_id: str, model: dict[str, Any], cfg: Set
         if conversation is None:
             raise KeyError(conversation_id)
         conversation["model"] = _model_choice(model)
+        conversation["updated_at"] = utc_now()
+        upsert_payload("conversations", "conversation_id", conversation, cfg.sqlite_path)
+        return conversation
+
+
+def set_conversation_repo(conversation_id: str, repo: dict[str, Any] | None, cfg: Settings = settings) -> dict[str, Any]:
+    """Bind the chat to one repository (already validated by the caller), or clear the binding with None."""
+    with _CONVERSATION_LOCK:
+        conversation = get_conversation(conversation_id, cfg)
+        if conversation is None:
+            raise KeyError(conversation_id)
+        if repo is None:
+            conversation.pop("repo", None)
+        else:
+            conversation["repo"] = {
+                "repo_root": str(repo["repo_root"]),
+                "coding_image": (str(repo.get("coding_image") or "").strip() or None),
+                "remote_repo": (str(repo.get("remote_repo") or "").strip() or None),
+            }
         conversation["updated_at"] = utc_now()
         upsert_payload("conversations", "conversation_id", conversation, cfg.sqlite_path)
         return conversation
@@ -112,6 +133,9 @@ def rename_conversation(conversation_id: str, title: str, cfg: Settings = settin
 def delete_conversation(conversation_id: str, cfg: Settings = settings) -> dict[str, Any]:
     init_db(cfg.sqlite_path)
     removed = delete_payload("conversations", "conversation_id", conversation_id, cfg.sqlite_path)
+    if removed:
+        # Stored agent message history (inactive storage foundation) never outlives its conversation.
+        delete_agent_conversation(conversation_id, cfg)
     return {
         "status": "CONVERSATION_DELETE_OK" if removed else "ERROR_CONVERSATION_NOT_FOUND",
         "conversation_id": conversation_id,

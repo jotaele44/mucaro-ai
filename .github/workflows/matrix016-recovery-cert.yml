@@ -1,0 +1,73 @@
+name: MATRIX-016 Recovery Certification
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "_architecture/recovery_benchmark_v1.json"
+      - "backend/app/memory_benchmark.py"
+      - "backend/app/recovery_benchmark.py"
+      - "backend/app/work_runs.py"
+      - "backend/app/tools.py"
+      - "backend/app/agent_checkpoints.py"
+      - "backend/app/provider_recovery.py"
+      - "backend/app/model_router.py"
+      - "backend/app/model_routing_policy.py"
+      - "backend/app/offline.py"
+      - "backend/tests/test_matrix016_recovery_benchmark.py"
+      - "scripts/certify_matrix016_recovery.py"
+      - ".github/workflows/matrix016-recovery-cert.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "_architecture/recovery_benchmark_v1.json"
+      - "backend/app/memory_benchmark.py"
+      - "backend/app/recovery_benchmark.py"
+      - "backend/app/work_runs.py"
+      - "backend/app/tools.py"
+      - "backend/app/agent_checkpoints.py"
+      - "backend/app/provider_recovery.py"
+      - "backend/app/model_router.py"
+      - "backend/app/model_routing_policy.py"
+      - "backend/app/offline.py"
+      - "backend/tests/test_matrix016_recovery_benchmark.py"
+      - "scripts/certify_matrix016_recovery.py"
+      - ".github/workflows/matrix016-recovery-cert.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  certify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CERT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.CERT_SHA }}
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - name: Install Python package
+        run: python -m pip install -e ".[dev]"
+      - name: Run MATRIX-016 regression
+        run: python -m pytest backend/tests/test_matrix016_recovery_benchmark.py -q
+      - name: Certify frozen recovery denominator
+        run: python scripts/certify_matrix016_recovery.py --head-sha "$CERT_SHA" --output-dir "$RUNNER_TEMP/matrix016"
+      - name: Upload MATRIX-016 receipt
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: matrix016-recovery-${{ env.CERT_SHA }}
+          path: ${{ runner.temp }}/matrix016/matrix016-recovery-receipt.json
+          archive: false
+          if-no-files-found: error

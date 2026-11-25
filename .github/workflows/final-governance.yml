@@ -24,6 +24,8 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
+          cache: pip
+          cache-dependency-path: pyproject.toml
       - name: Bind to main and install validator
         env:
           EXPECTED_HEAD: ${{ inputs.expected_head }}

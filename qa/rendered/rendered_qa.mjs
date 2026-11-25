@@ -130,7 +130,7 @@ async function send(page, text, { queued = false } = {}) {
 async function axe(page, viewport, name) {
   const result = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
   const serious = result.violations.filter((v) => ["serious", "critical"].includes(v.impact));
-  check(`axe ${name}: no serious/critical WCAG violations`, viewport, serious.length === 0, serious.map((v) => `${v.id}(${v.nodes.length})`).join(", ") || `${result.violations.length} minor`);
+  check(`axe ${name}: no serious/critical WCAG violations`, viewport, serious.length === 0, serious.map((v) => `${v.id}(${v.nodes.length}: ${v.nodes.map((n) => n.target.join(" ")).join(" | ")})`).join(", ") || `${result.violations.length} minor`);
   return { view: name, viewport, violations: result.violations.map((v) => ({ id: v.id, impact: v.impact, nodes: v.nodes.length })) };
 }
 
@@ -167,7 +167,7 @@ async function scenario(browser, base, viewport, contextOptions) {
   // Ask with citations (F02, TGT-002, TGT-031).
   await send(page, "How does source lineage work?");
   await waitRunState(page, "COMPLETED");
-  const citations = lastRun(page).getByRole("button", { name: /Open citation/ });
+  const citations = lastRun(page).getByRole("button", { name: /open citation from/i });
   check("answer completes with citations", viewport, (await citations.count()) > 0, `${await citations.count()} citations`);
   check("answer text rendered", viewport, (await lastRun(page).locator(".assistant-bubble").count()) === 1);
   await shot(page, viewport, "02-answer");
@@ -328,8 +328,8 @@ async function scenario(browser, base, viewport, contextOptions) {
   await shot(page, viewport, "03-evidence");
   await page.keyboard.press("Escape");
   await evidence.waitFor({ state: "detached" });
-  const focusedName = await page.evaluate(() => document.activeElement?.getAttribute("aria-label") || "");
-  check("Escape closes the sheet and returns focus", viewport, focusedName.startsWith("Open citation"), focusedName);
+  const focusedName = await page.evaluate(() => document.activeElement?.getAttribute("aria-label") || document.activeElement?.textContent?.trim() || "");
+  check("Escape closes the sheet and returns focus", viewport, /open citation from/i.test(focusedName), focusedName);
 
   // Approval-bound action (F07) and tool summary / drawer (F08, F09).
   await send(page, "/status");
@@ -818,6 +818,279 @@ async function guarded(label, viewport, body) {
   } catch (err) {
     check(`${label}: scenario ran to completion`, viewport, false, String(err.message || err).split("\n")[0]);
   }
+}
+
+// INV-021: an answer says which saved memory and how much of this chat it used, and the Memory workspace
+// separates saved memory (kept across chats) from a chat's own earlier messages (used only in that chat).
+// Runs after the main scenarios, which saved one global memory ("Prefer tables for comparisons").
+async function memoryContextScenario(browser, base, viewport, profile) {
+  await guarded("memory context (INV-021)", viewport, async () => {
+    const context = await browser.newContext({ ...profile, baseURL: base });
+    const page = await context.newPage();
+    try {
+      await page.goto("/");
+      await page.locator("#composer-input").waitFor();
+      await ask(page, "How does source lineage work?");
+      const first = page.locator("article.run").last().getByTestId("answer-context");
+      await first.waitFor({ timeout: 8000 });
+      const firstText = (await first.innerText()).replace(/\s+/g, " ");
+      check("an answer names the saved memory it used (INV-021)", viewport, /\b1 saved memory\b/.test(firstText) && !/earlier message/.test(firstText), firstText);
+      await ask(page, "And how are chunks identified?");
+      const second = page.locator("article.run").last().getByTestId("answer-context");
+      await second.waitFor({ timeout: 8000 });
+      const secondText = (await second.innerText()).replace(/\s+/g, " ");
+      check("a follow-up names this chat's earlier messages separately from saved memory (INV-021)", viewport,
+        /saved memor/.test(secondText) && /earlier messages? from this chat/.test(secondText), secondText);
+      await second.getByRole("button", { name: /saved memor/ }).click();
+      await page.getByRole("heading", { name: "Memory" }).waitFor();
+      const note = (await page.getByTestId("memory-durable-note").innerText()).replace(/\s+/g, " ");
+      check("Memory separates saved memory from a chat's own messages (INV-021)", viewport,
+        /kept across chats/.test(note) && /used only in that chat/.test(note), note);
+      await shot(page, viewport, "memory-context");
+    } finally {
+      await context.close();
+    }
+  });
+}
+
+// TGT-014: a tool call the chat's model proposes is shown as the model's request, in the approval card and in the
+// Provenance record. A scripted OpenAI-compatible server stands in for a local model; nothing leaves the machine.
+async function startScriptedModel(model) {
+  const requests = [];
+  const server = http.createServer((req, res) => {
+    let body = "";
+    req.on("data", (chunk) => (body += chunk));
+    req.on("end", () => {
+      const send = (status, payload) => {
+        res.writeHead(status, { "content-type": "application/json" });
+        res.end(JSON.stringify(payload));
+      };
+      if (req.method === "GET" && req.url === "/v1/models") return send(200, { data: [{ id: model }] });
+      if (req.method !== "POST") return send(404, {});
+      requests.push(JSON.parse(body || "{}"));
+      const message = requests.length === 1
+        ? { role: "assistant", content: null, tool_calls: [{ id: "c1", type: "function", function: { name: "source_library__status", arguments: "{}" } }] }
+        : { role: "assistant", content: "Your library is ready." };
+      return send(200, { choices: [{ message }], usage: { prompt_tokens: 9, completion_tokens: 4, total_tokens: 13 } });
+    });
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  return { url: `http://127.0.0.1:${server.address().port}/v1`, requests, close: () => server.close() };
+}
+
+async function modelAttributionScenario(browser) {
+  const model = "qa-tool-model:1b";
+  const scripted = await startScriptedModel(model);
+  const modelPort = await freePort();
+  const modelBase = `http://127.0.0.1:${modelPort}`;
+  const noProxy = { HTTP_PROXY: "", HTTPS_PROXY: "", http_proxy: "", https_proxy: "", ALL_PROXY: "", all_proxy: "" };
+  const modelBackend = await startBackend(mkdtempSync(path.join(tmpdir(), "mucaro-qa-model-")), modelPort, {
+    ...noProxy,
+    MUCARO_AI_LOCAL_MODEL_URL: scripted.url,
+    MUCARO_AI_LOCAL_MODEL: model,
+  });
+  try {
+    if (!(await waitForHealth(modelBase))) throw new Error(`model backend did not start:\n${modelBackend.log()}`);
+    const created = await (await fetch(`${modelBase}/conversations`, jsonPost({ title: "Model attribution" }))).json();
+    const sent = await fetch(
+      `${modelBase}/conversations/${created.conversation_id}/messages`,
+      jsonPost({
+        prompt: "Check my library",
+        mode: "ask",
+        idempotency_key: `qa-${randomBytes(6).toString("hex")}`,
+        options: { model_provider: "openai_compatible_local", agent: true },
+      }),
+    );
+    if (!sent.ok) throw new Error(`send to scripted model: HTTP ${sent.status} ${await sent.text()}`);
+    const runId = (await sent.json()).run.run_id;
+    await waitServerRun(modelBase, runId, ["AWAITING_APPROVAL"]);
+    for (const [viewport, profile] of [["attribution-desktop", desktopProfile()], ["attribution-iphone", iphoneProfile()]]) {
+      await guarded("model attribution (TGT-014)", viewport, async () => {
+        const context = await browser.newContext({ ...profile, baseURL: modelBase });
+        await context.addInitScript((id) => localStorage.setItem("mucaro.activeConversation", JSON.stringify(id)), created.conversation_id);
+        const page = await context.newPage();
+        try {
+          await page.goto("/");
+          const card = page.getByRole("region", { name: "Permission request for source_library.status" });
+          await card.waitFor({ timeout: 15000 });
+          const kicker = ((await card.locator(".card-kicker").textContent()) || "").trim(); // DOM text; CSS uppercases it
+          check("a tool call the model proposed is labelled as the model's request (TGT-014)", viewport, kicker === "The model wants to run an action", kicker);
+          await shot(page, viewport, "model-attribution");
+          if (viewport === "attribution-iphone") await page.getByRole("button", { name: "Open navigation" }).click();
+          await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Provenance", exact: true }).click();
+          const row = page.locator(".tool-row").filter({ hasText: "source_library.status" }).first();
+          await row.waitFor({ timeout: 10000 });
+          await row.locator("summary").click();
+          const requestedBy = (await row.locator("dt:has-text('Requested by') + dd").innerText()).trim();
+          check("the Provenance record names the model as the requester (TGT-014)", viewport, requestedBy === "model", requestedBy);
+        } finally {
+          await context.close();
+        }
+      });
+    }
+    const call = (await (await fetch(`${modelBase}/tools/requests`)).json()).tool_calls.find((row) => row.run_id === runId);
+    check("the model's proposal waited for the person and did not run (TGT-014)", "attribution", call && call.status === "PENDING_APPROVAL" && !call.approved_by, JSON.stringify(call && { status: call.status, approved_by: call.approved_by }));
+  } finally {
+    modelBackend.kill("SIGTERM");
+    scripted.close();
+  }
+}
+
+// TGT-019: when the device reports no network, the app says so, keeps local work running, sends the fact with each
+// message (remote models are then refused at once rather than timing out), and Settings marks network-only items as
+// unavailable offline. navigator.onLine is overridden because emulating offline in the browser would also cut the
+// loopback service, which keeps running on a real offline computer.
+async function deviceOfflineScenario(browser, base, viewport, profile) {
+  await guarded("device offline (TGT-019)", viewport, async () => {
+    const context = await browser.newContext({ ...profile, baseURL: base });
+    await context.addInitScript(() => {
+      window.__mucaroOffline = false;
+      Object.defineProperty(Navigator.prototype, "onLine", { configurable: true, get: () => !window.__mucaroOffline });
+    });
+    const page = await context.newPage();
+    const setOffline = (value) => page.evaluate((offline) => {
+      window.__mucaroOffline = offline;
+      window.dispatchEvent(new Event(offline ? "offline" : "online"));
+    }, value);
+    const openSettings = async () => {
+      if (viewport.includes("iphone")) await page.getByRole("button", { name: "Open navigation" }).click();
+      await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Settings", exact: true }).click();
+      await page.getByText("What works offline").waitFor();
+    };
+    const openChat = async () => {
+      if (viewport.includes("iphone")) await page.getByRole("button", { name: "Open navigation" }).click();
+      await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Chat", exact: true }).click();
+      await page.locator("#composer-input").waitFor();
+    };
+    try {
+      await page.goto("/");
+      await page.locator("#composer-input").waitFor();
+      check("no offline notice while the device is online (TGT-019)", viewport, (await page.getByTestId("device-offline").count()) === 0);
+      await setOffline(true);
+      const notice = await appears(page.getByTestId("device-offline"));
+      check("going offline shows that local work continues and network items are unavailable (TGT-019)", viewport,
+        notice && /Local features keep working/.test(await page.getByTestId("device-offline").innerText()));
+      const sent = page.waitForRequest((req) => req.method() === "POST" && /\/conversations\/[^/]+\/messages$/.test(new URL(req.url()).pathname));
+      await ask(page, "How does source lineage work?");
+      const options = JSON.parse((await sent).postData() || "{}").options || {};
+      check("a local answer still completes while offline, and the message says the device is offline (TGT-019)", viewport,
+        options.system_offline === true, JSON.stringify({ system_offline: options.system_offline }));
+      await openSettings();
+      const unavailable = await page.locator('[data-state="UNAVAILABLE_OFFLINE"]').count();
+      const needsNetworkOffline = await page.locator(".offline-list").getByText("Needs network", { exact: true }).count();
+      const statusOffline = await page.getByTestId("offline-status").innerText();
+      check("Settings marks network-only capabilities Unavailable offline while offline (TGT-019)", viewport,
+        unavailable > 0 && needsNetworkOffline === 0 && /offline/.test(statusOffline), `unavailable=${unavailable}, needs network=${needsNetworkOffline}`);
+      await shot(page, viewport, "device-offline-settings");
+      await setOffline(false);
+      await page.locator(".offline-list").getByText("Needs network", { exact: true }).first().waitFor({ timeout: 8000 });
+      const unavailableOnline = await page.locator('[data-state="UNAVAILABLE_OFFLINE"]').count();
+      check("back online, the same capabilities read Needs network and the notice clears (TGT-019)", viewport,
+        unavailableOnline === 0 && (await page.getByTestId("device-offline").count()) === 0, `unavailable=${unavailableOnline}`);
+      await openChat();
+    } finally {
+      await context.close();
+    }
+  });
+}
+
+// TGT-003 / TGT-002: the GIS, OCR / page review, Code and Artifacts workspaces. Each request goes through the tool
+// gate in the UI (Allow binds to the argument digest, then an explicit Run) and the result is drawn as a purpose-built
+// view, not raw JSON. Inputs are local: a USGS GeoJSON fixture, a generated PNG and a throwaway git repository.
+const ONE_PIXEL_PNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+
+async function specializedWorkspacesScenario(browser, base, viewport, profile, axeSink) {
+  await guarded("specialized workspaces (TGT-003)", viewport, async () => {
+    const fixtureDir = path.join(ROOT, "backend", "tests", "fixtures", "gis_corpus");
+    const scratch = mkdtempSync(path.join(tmpdir(), "mucaro-qa-ws-"));
+    const repo = path.join(scratch, "repo");
+    mkdirSync(repo);
+    execFileSync("git", ["init", "-q", "-b", "main", repo]);
+    writeFileSync(path.join(repo, "README.md"), "workspace check\n");
+    execFileSync("git", ["-C", repo, "-c", "user.email=qa@example.invalid", "-c", "user.name=QA", "add", "README.md"]);
+    execFileSync("git", ["-C", repo, "-c", "user.email=qa@example.invalid", "-c", "user.name=QA", "-c", "commit.gpgsign=false", "commit", "-q", "-m", "init"]);
+    writeFileSync(path.join(repo, "notes.txt"), "uncommitted\n");
+    const page_png = path.join(scratch, "page.png");
+    writeFileSync(page_png, Buffer.from(ONE_PIXEL_PNG, "base64"));
+    for (const dir of [fixtureDir, scratch]) {
+      const granted = await fetch(`${base}/permissions/directories/grant`, jsonPost({ path: dir, reason: "rendered QA" }));
+      if (!granted.ok) throw new Error(`grant ${dir}: HTTP ${granted.status} ${await granted.text()}`);
+    }
+    const context = await browser.newContext({ ...profile, baseURL: base });
+    const page = await context.newPage();
+    const open = async (label) => {
+      if (viewport.includes("iphone")) await page.getByRole("button", { name: "Open navigation" }).click();
+      await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: label, exact: true }).click();
+    };
+    // Request, allow (bound to the digest shown) and run one call from a workspace; returns the call row.
+    const requestAllowRun = async (workspaceId, fieldLabel, value, button) => {
+      const ws = page.locator(`[data-testid="${workspaceId}-workspace"][data-loaded="true"]`);
+      await ws.waitFor();
+      const before = await ws.getByTestId("workspace-call").count();
+      await ws.getByLabel(fieldLabel).fill(value);
+      await ws.getByRole("button", { name: button }).click();
+      // New calls are listed first; wait until the list has grown so the row below is this request, not an older one.
+      await page.waitForFunction(
+        ([id, count]) => document.querySelectorAll(`[data-testid="${id}-workspace"] [data-testid="workspace-call"]`).length > count,
+        [workspaceId, before],
+        { timeout: 10000 },
+      );
+      const row = ws.getByTestId("workspace-call").first();
+      const pending = (await row.locator(".status-chip").innerText()).trim();
+      await row.getByRole("button", { name: "Allow" }).click();
+      await row.getByRole("button", { name: "Run" }).click();
+      await row.locator(".status-chip").filter({ hasText: /EXECUTED|FAILED/ }).waitFor({ timeout: 20000 });
+      return { row, pending, final: (await row.locator(".status-chip").innerText()).trim() };
+    };
+    try {
+      await page.goto("/");
+      await page.locator("#composer-input").waitFor();
+
+      await open("GIS");
+      const gis = await requestAllowRun("gis", "GeoJSON file", path.join(fixtureDir, "usgs_pr_earthquakes_2020-01-06_2020-01-08.geojson"), "Inspect layer");
+      const gisTable = gis.row.getByTestId("gis-features");
+      const gisRows = await gisTable.locator("tbody tr").count().catch(() => 0);
+      check("a GIS request waits for approval, then runs only on Run (TGT-003)", viewport, gis.pending === "PENDING_APPROVAL" && gis.final === "EXECUTED", `${gis.pending} -> ${gis.final}`);
+      check("the GIS workspace draws the layer: CRS, features table and bounding-box preview (TGT-003)", viewport,
+        gisRows === 30 && (await gis.row.getByTestId("gis-bbox-preview").count()) === 1 && /EPSG:4326/.test(await gis.row.getByTestId("gis-result").innerText()),
+        `rows=${gisRows}`);
+      await shot(page, viewport, "ws-gis");
+      if (axeSink && !viewport.includes("iphone")) axeSink.push(await axe(page, viewport, "gis"));
+
+      await open("OCR");
+      const ocr = await requestAllowRun("ocr", "Image file", page_png, "Read page");
+      const ocrText = (await ocr.row.innerText()).replace(/\s+/g, " ");
+      check("the OCR workspace shows the page result or the engine's error, never a silent result (TGT-003)", viewport,
+        ocr.pending === "PENDING_APPROVAL" && ((ocr.final === "EXECUTED" && (await ocr.row.getByTestId("ocr-result").count()) + (await ocr.row.getByText(/Raw result|Output/).count()) > 0) || (ocr.final === "FAILED" && /ERROR_OCR_/.test(ocrText))),
+        `${ocr.final}: ${ocrText.slice(0, 160)}`);
+      await shot(page, viewport, "ws-ocr");
+
+      await open("Code");
+      const code = await requestAllowRun("code", "Repository folder", repo, "Check repository");
+      const codeText = (await code.row.getByTestId("code-repo-result").innerText().catch(() => "")).replace(/\s+/g, " ");
+      check("the Code workspace shows branch, HEAD and untracked files for a repository (TGT-003)", viewport,
+        code.final === "EXECUTED" && /Branch main/.test(codeText) && /notes\.txt/.test(codeText), codeText.slice(0, 200));
+      check("the Code workspace offers no repository-changing action (TGT-003)", viewport,
+        (await page.getByTestId("code-workspace").getByRole("button", { name: /commit|push|apply|exec/i }).count()) === 0);
+      await shot(page, viewport, "ws-code");
+
+      await open("Artifacts");
+      const artifacts = page.getByTestId("artifacts-workspace");
+      await artifacts.getByTestId("artifact-report").first().waitFor({ timeout: 10000 });
+      await artifacts.getByTestId("artifact-answer").first().waitFor({ timeout: 10000 }).catch(() => {});
+      const reports = await artifacts.getByTestId("artifact-report").count();
+      const answers = await artifacts.getByTestId("artifact-answer").count();
+      check("the Artifacts workspace lists saved answers and inspection reports with their hashes (TGT-003)", viewport,
+        reports >= 1 && answers >= 1 && /[0-9a-f]{64}/.test(await artifacts.getByTestId("artifact-report").first().innerText()),
+        `reports=${reports}, answers=${answers}`);
+      await shot(page, viewport, "ws-artifacts");
+    } finally {
+      await context.close();
+      // Leave the grant list as other scenarios expect it.
+      for (const dir of [fixtureDir, scratch]) await fetch(`${base}/permissions/directories/revoke`, jsonPost({ path: dir }));
+      rmSync(scratch, { recursive: true, force: true });
+    }
+  });
 }
 
 // The focused element as a short string; runs inside the page.
@@ -1783,6 +2056,13 @@ try {
     axeResults.push(...(await executionEntryScenario(browser, base, "entry-393", { ...entryPhone, viewport: { width: 393, height: 852 } })));
     axeResults.push(...(await executionEntryScenario(browser, base, "entry-430", { ...entryPhone, viewport: { width: 430, height: 932 } })));
     await launchTokenScenario(browser, "desktop");
+    await memoryContextScenario(browser, base, "memory-desktop", desktopProfile());
+    await memoryContextScenario(browser, base, "memory-iphone", iphoneProfile());
+    await modelAttributionScenario(browser);
+    await specializedWorkspacesScenario(browser, base, "workspaces-desktop", desktopProfile(), axeResults);
+    await specializedWorkspacesScenario(browser, base, "workspaces-iphone", iphoneProfile());
+    await deviceOfflineScenario(browser, base, "offline-desktop", desktopProfile());
+    await deviceOfflineScenario(browser, base, "offline-iphone", iphoneProfile());
     const headers = (await fetch(`${base}/`)).headers;
     check("security headers served with the UI", "desktop", headers.get("x-frame-options") === "DENY" && (headers.get("content-security-policy") || "").includes("frame-ancestors 'none'"));
   }
