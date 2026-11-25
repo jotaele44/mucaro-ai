@@ -1,0 +1,60 @@
+name: MOB-F19 Live Pull Request Read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "backend/app/github_resources.py"
+      - "backend/app/tools.py"
+      - "backend/tests/test_mob_f19_live_receipt.py"
+      - "scripts/certify_mob_f19_live.py"
+      - ".github/workflows/mob-f19-pr-read-cert.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "backend/app/github_resources.py"
+      - "backend/app/tools.py"
+      - "backend/tests/test_mob_f19_live_receipt.py"
+      - "scripts/certify_mob_f19_live.py"
+      - ".github/workflows/mob-f19-pr-read-cert.yml"
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  certify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CERT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.CERT_SHA }}
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - name: Install Python package
+        run: python -m pip install -e ".[dev]"
+      - name: Run MOB-F19 receipt regression
+        run: python -m pytest backend/tests/test_mob_f19_live_receipt.py -q
+      - name: Read this repository's pull requests through the governed tools
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python scripts/certify_mob_f19_live.py --repo "$GITHUB_REPOSITORY" --state all --head-sha "$CERT_SHA" --output-dir "$RUNNER_TEMP/mob-f19"
+      - name: Upload MOB-F19 receipt
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: mob-f19-live-pr-read-${{ env.CERT_SHA }}
+          path: ${{ runner.temp }}/mob-f19/mob-f19-live-pr-read-receipt.json
+          archive: false
+          if-no-files-found: error

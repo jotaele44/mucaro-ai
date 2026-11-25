@@ -1,6 +1,6 @@
 {
   "schema_version": "mucaro-release-acceptance-ledger/1.0",
-  "updated_utc": "2026-11-20T01:38:17Z",
+  "updated_utc": "2026-11-23T15:34:32Z",
   "rows": [
     {
       "requirement_id": "GOAL-001",
@@ -969,42 +969,56 @@
       "requirement_id": "TGT-002",
       "requirement_text": "Conversation-first work feed",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "PARTIAL",
+      "implementation_state": "IMPLEMENTED",
       "implementation_refs": [
         "backend/app/work_runs.py",
-        "backend/app/main.py"
+        "backend/app/main.py",
+        "frontend/src/components/RunBlock.jsx",
+        "frontend/src/components/results/ToolResult.jsx",
+        "frontend/src/resultViews.js"
       ],
       "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
+      "positive_gate": "backend/tests/test_work_runs.py::test_answer_run_streams_an_ordered_feed_and_persists_turns",
+      "negative_gate": "backend/tests/test_narration_check.py::test_a_run_whose_answer_claims_a_denied_fetch_carries_the_warning",
       "benchmark": null,
       "evidence_refs": [
         "backend/tests/test_work_runs.py::test_answer_run_streams_an_ordered_feed_and_persists_turns",
         "backend/tests/test_work_runs.py::test_api_message_stream_replays_and_ends",
-        "_architecture/release/evidence/rendered_qa_a8515be3ce56.json"
+        "frontend/tests/resultViews.test.mjs",
+        "qa/rendered/rendered_qa.mjs",
+        "https://github.com/jotaele44/mucaro-ai/actions/runs/45122785727"
       ],
-      "state": "PROVISIONAL",
+      "state": "PASS",
       "blocker_id": null,
       "dag_node": "N15",
-      "notes": "Feed renders plans, actions, approvals, results, text, citations, artifacts, warnings and outcomes. OPEN: maps, tables and code-execution output in the feed (GIS/coding workspaces)."
+      "notes": "PASS. The feed renders plans, actions, approvals, results, text, citations, artifacts, warnings and outcomes; the residue (maps, tables and code-execution output) closed at main fd55c1ee0aec8d11e7e3ef554a66572f84c06b69 (PR #386): tool results render by tool as GIS facts, features table and a bounding-box preview labelled as not a map, OCR text with a spans table, repository status, diffs, execution exit code with stdout/stderr, and pull-request lists, with the raw result behind a disclosure. View models are pure functions with node tests; rendered QA checks them on desktop and iPhone in chromium and webkit (https://github.com/jotaele44/mucaro-ai/actions/runs/45122785727). The negative gate: an answer that narrates an action the records do not show executed carries WARN_NARRATION_CONTRADICTS_RECORDS (PR #387, main b07f888fee4502eb90e68ed446fc5567e4adc5c5)."
     },
     {
       "requirement_id": "TGT-003",
       "requirement_text": "Specialized workspaces",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "PARTIAL",
+      "implementation_state": "IMPLEMENTED",
       "implementation_refs": [
-        "frontend/src/App.jsx"
+        "frontend/src/App.jsx",
+        "frontend/src/components/workspaces/GovernedToolWorkspace.jsx",
+        "frontend/src/components/workspaces/SpecializedWorkspaces.jsx",
+        "frontend/src/components/workspaces/ArtifactsWorkspace.jsx",
+        "frontend/src/components/workspaces/ProvenanceWorkspace.jsx"
       ],
       "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
+      "positive_gate": ".github/workflows/rendered-qa.yml",
+      "negative_gate": "backend/tests/test_api.py::test_api_tool_runtime_requires_approval_and_audits_execution",
       "benchmark": null,
-      "evidence_refs": [],
-      "state": "OPEN",
+      "evidence_refs": [
+        "qa/rendered/rendered_qa.mjs",
+        "frontend/tests/resultViews.test.mjs",
+        "https://github.com/jotaele44/mucaro-ai/actions/runs/45122785727",
+        "backend/tests/test_tools.py::test_tool_runtime_requires_approval_before_execution"
+      ],
+      "state": "PASS",
       "blocker_id": null,
       "dag_node": "N17",
-      "notes": "Sources/Memory/Settings exist; GIS/OCR/Code/Provenance/Artifacts surfaces absent."
+      "notes": "PASS at main fd55c1ee0aec8d11e7e3ef554a66572f84c06b69 (PR #386). GIS, OCR / page review, Code and Artifacts workspaces join Sources, Memory, Provenance and Settings. Each governed workspace lists its tools' calls and requests new ones through the same gate as chat: created PENDING_APPROVAL, Allow bound to arguments_sha256, run only on an explicit Run; Code starts read-only inspections only. Rendered QA (positive gate, run https://github.com/jotaele44/mucaro-ai/actions/runs/45122785727, chromium and webkit, desktop and iPhone) grants a fixture folder, requests, allows and runs gis.inspect (30 feature rows, bbox preview, EPSG:4326), ocr.analyze_image (result or honest ERROR_OCR_* state), coding.repo_status on a temp repository (branch, HEAD, untracked file, no mutating controls) and lists Artifacts with 64-hex report hashes. Negative gate: the API refuses to run a call that was not approved."
     },
     {
       "requirement_id": "TGT-004",
@@ -1804,23 +1818,32 @@
       "requirement_id": "TGT-035",
       "requirement_text": "Observability",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "PARTIAL",
+      "implementation_state": "IMPLEMENTED",
       "implementation_refs": [
         "backend/app/work_runs.py",
-        "backend/app/tools.py"
+        "backend/app/tools.py",
+        "backend/app/governance_audit.py",
+        "schemas/governance_audit_event.schema.json",
+        "backend/app/main.py"
       ],
       "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
+      "positive_gate": "backend/tests/test_governance_audit.py::test_ingest_and_delete_are_recorded_with_identity_and_hash_but_not_text",
+      "negative_gate": "backend/tests/test_governance_audit.py::test_edited_removed_or_reordered_events_break_the_chain",
       "benchmark": null,
       "evidence_refs": [
         "backend/tests/test_work_runs.py::test_run_envelope_takes_tool_state_from_records",
-        "backend/tests/test_contracts.py::test_audit_chain_verifies_and_detects_tampering"
+        "backend/tests/test_contracts.py::test_audit_chain_verifies_and_detects_tampering",
+        "backend/tests/test_governance_audit.py::test_folder_grants_and_revocations_are_recorded",
+        "backend/tests/test_governance_audit.py::test_lease_grant_and_revocation_are_in_the_same_stream",
+        "backend/tests/test_governance_audit.py::test_model_settings_changes_name_the_fields_and_never_the_key",
+        "backend/tests/test_governance_audit.py::test_web_snapshot_is_recorded_with_host_only",
+        "backend/tests/test_governance_audit.py::test_private_fields_and_unknown_events_are_refused",
+        "backend/tests/test_governance_audit.py::test_audit_route_returns_events_and_every_chain"
       ],
-      "state": "PROVISIONAL",
+      "state": "PASS",
       "blocker_id": null,
       "dag_node": "N15",
-      "notes": "Structured run events cover workflow transitions, tool calls, approvals, errors, routing and artifacts; tool audit is hash-chained. Source acquisition and permission changes are not yet in one event stream."
+      "notes": "PASS. Run events cover workflow transitions, tool calls, approvals, errors, routing and artifacts; tool audit and lease audit are hash-chained. Residue closed at main b07f888fee4502eb90e68ed446fc5567e4adc5c5 (PR #387): source acquisition and permission changes now share one hash-chained governance stream (registered contract governance_audit_event, family PROVENANCE): SOURCE_INGESTED, SOURCE_DELETED, WEB_SNAPSHOT_PERSISTED, DIRECTORY_GRANTED/REVOKED, LEASE_GRANTED/REVOKED and MODEL_SETTINGS_CHANGED, written by the functions that make each change. Events carry identifiers, hashes and counts only (no document text, URL host only, API key only as SET/REPLACED/CLEARED; private field names refused). GET /audit returns the events with the governance, tool and lease chain verifications."
     },
     {
       "requirement_id": "TGT-036",
@@ -2271,7 +2294,7 @@
       "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N18",
-      "notes": "70 rendered checks pass (navigation, feed, progressive disclosure, settings, provenance, sources, error/loading/empty/offline-service states, keyboard). OPEN: GIS and OCR surfaces, and rendering on the supported macOS environment (WKWebView)."
+      "notes": "Rendered checks pass in chromium and webkit on every UI PR (navigation, feed, progressive disclosure, settings, provenance, sources, memory, error/loading/empty/offline states, keyboard, axe), now including the GIS, OCR, Code and Artifacts workspaces on desktop and iPhone (PR #386, run https://github.com/jotaele44/mucaro-ai/actions/runs/45122785727). OPEN: rendering in the supported macOS environment (WKWebView in the packaged app); Playwright webkit is not WKWebView."
     },
     {
       "requirement_id": "MATRIX-016",
@@ -2752,21 +2775,27 @@
       "requirement_id": "MOB-F15",
       "requirement_text": "Side-effect reconciliation after contradictory status",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "PARTIAL",
+      "implementation_state": "IMPLEMENTED",
       "implementation_refs": [
-        "backend/app/work_runs.py"
+        "backend/app/work_runs.py",
+        "backend/app/narration_check.py",
+        "frontend/src/components/RunBlock.jsx"
       ],
       "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
+      "positive_gate": "backend/tests/test_narration_check.py::test_a_run_whose_answer_claims_a_denied_fetch_carries_the_warning",
+      "negative_gate": "backend/tests/test_narration_check.py::test_plans_refusals_and_questions_are_not_claims",
       "benchmark": null,
       "evidence_refs": [
-        "backend/tests/test_work_runs.py::test_run_envelope_takes_tool_state_from_records"
+        "backend/tests/test_work_runs.py::test_run_envelope_takes_tool_state_from_records",
+        "backend/tests/test_narration_check.py::test_a_claimed_action_without_a_record_is_a_conflict",
+        "backend/tests/test_narration_check.py::test_a_claimed_action_whose_record_did_not_execute_is_a_conflict",
+        "backend/tests/test_narration_check.py::test_a_claim_backed_by_an_executed_record_is_not_a_conflict",
+        "backend/tests/test_narration_check.py::test_a_run_whose_answer_matches_its_records_carries_no_warning"
       ],
-      "state": "PROVISIONAL",
+      "state": "PASS",
       "blocker_id": null,
       "dag_node": "N15",
-      "notes": "Action state comes from call records (final.action_ledger, envelope). The chat model now proposes and narrates actions through the agent loop. Residue: narration-vs-receipt conflict flagging for model prose is not implemented."
+      "notes": "PASS. Action state comes from call records (final.action_ledger, envelope). Residue closed at main b07f888fee4502eb90e68ed446fc5567e4adc5c5 (PR #387): narration_conflicts compares completion claims in the answer (commit, push, pull request, branch, patch, clone, test run, web fetch) with the run's call records; a claim with no EXECUTED call of that kind adds WARN_NARRATION_CONTRADICTS_RECORDS with each conflict and its reason (NO_RECORD or RECORD_<status>), and the feed tells the person the action records are what happened. Plans, refusals, questions and idioms do not trigger it. Limitation: the check reads explicit completion claims; paraphrased or implied claims are not detected."
     },
     {
       "requirement_id": "MOB-F16",
@@ -2830,20 +2859,29 @@
       "requirement_id": "MOB-F19",
       "requirement_text": "Linked pull-request list and exact PR detail",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "PARTIAL",
+      "implementation_state": "IMPLEMENTED",
       "implementation_refs": [
-        "backend/app/artifact_identity.py",
-        "backend/app/coding_lifecycle.py"
+        "backend/app/github_resources.py",
+        "backend/app/tools.py",
+        "frontend/src/components/results/ToolResult.jsx",
+        "frontend/src/resultViews.js",
+        "scripts/certify_mob_f19_live.py",
+        ".github/workflows/mob-f19-pr-read-cert.yml"
       ],
       "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
+      "positive_gate": ".github/workflows/mob-f19-pr-read-cert.yml",
+      "negative_gate": "backend/tests/test_mob_f19_live_receipt.py::test_mob_f19_receipt_fails_when_detail_disagrees_with_the_list",
       "benchmark": null,
-      "evidence_refs": [],
-      "state": "OPEN",
+      "evidence_refs": [
+        "backend/tests/test_github_resources.py",
+        "backend/tests/test_mob_f19_live_receipt.py::test_mob_f19_receipt_passes_when_detail_matches_its_list_row",
+        "frontend/tests/resultViews.test.mjs",
+        "https://github.com/jotaele44/mucaro-ai/actions/runs/45206583542"
+      ],
+      "state": "PASS",
       "blocker_id": null,
       "dag_node": "N15",
-      "notes": "Governed github.prs_list and pr_view tools exist with retrieved_utc (test_github_resources.py). Residue: no linked-PR list or detail surface in the conversation feed; live gh reads need credentials."
+      "notes": "PASS. Governed github.prs_list and github.pr_view render as a linked pull-request list and exact detail in the feed (PR #386, main fd55c1ee0aec8d11e7e3ef554a66572f84c06b69; only https links render). Live read at main b07f888fee4502eb90e68ed446fc5567e4adc5c5: the MOB-F19 workflow (https://github.com/jotaele44/mucaro-ai/actions/runs/45206583542) listed this repository's pull requests and read one exactly through the governed tool runtime (request, digest-bound approval, run) with the job's read-only token; the detail matched its list row on number, title, head SHA, refs, state, draft and URL, an unapproved call refused to run, and the tool audit chain verified (receipt sha256 1ba15f360af45b2a464290516e862f9e23f6d265d6b1b86a4acd704ce010c739, artifact 14833991967); the same receipt passed on the PR head c9d56a68 (run 45124692001)."
     },
     {
       "requirement_id": "MOB-F20",
