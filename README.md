@@ -19,10 +19,12 @@ needs to be installed beforehand and nothing is written outside the project fold
 double-clicks reuse completed setup steps and can work offline. Close the native window to stop
 the backend it started. API calls and remote fetches still require internet access.
 
-Supported: macOS 14+ on Apple silicon, macOS 13+ on Intel, Windows 10/11 x64, Windows 11 on ARM
-(through x64 emulation; not yet run on ARM hardware), and Linux x86_64 (run `./"Mucaro AI.command"`
-from a terminal). See `docs/ONE_CLICK_SETUP.md` for what the setup
-does, its error codes, and how to remove it.
+The release target is macOS 14+ on Apple silicon; that is the only platform release builds are
+made and certified for (`docs/RELEASE_SCOPE_2026-09-29.md`). This source setup also runs on macOS
+13+ on Intel, Windows 10/11 x64, Windows 11 on ARM (through x64 emulation; not yet run on ARM
+hardware), and Linux x86_64 (run `./"Mucaro AI.command"` from a terminal); there are no packaged or
+signed release builds for those. See `docs/ONE_CLICK_SETUP.md` for what the setup does, its error
+codes, and how to remove it.
 
 Settings go in `.env` (created from `.env.example` on first run). The launcher reads it at
 startup; variables already exported in your shell take precedence. If the UI shows **Backend not
@@ -117,6 +119,27 @@ another server, Claude, or no model. For a model server, enter its address, choo
 chat's **Model** button); Settings holds the default for new chats. The server address and
 any API key are saved on the computer that runs Mucaro; the key is never shown again.
 
+With **Let the model propose actions** on (the default for model servers), the chat's model can
+ask to run an action: check the library, search the web, fetch a page, or read a git
+repository on this computer. It can only ask. Each request appears as a card with **Allow once**
+and **Deny**; in Auto mode only local read-only actions run without asking. What an action returns
+is handed back to the model as data, never as instructions. The model cannot change permissions.
+
+**Coding from chat.** Choose **Repository** in a chat (or "Work on a code repository" when starting
+one) and pick a git repository inside a folder you have granted. In that chat the model can list,
+search and read files, propose a patch, and ask to apply it, create a work branch, commit, run
+commands in the isolated container, and prepare a pull request. A proposed patch is shown as a diff
+on the approval card. The model cannot choose another repository, cannot apply a patch that was not
+checked first, cannot work on `main` or `master`, and every change, commit or command asks you, even
+in Auto mode for container runs. Running commands needs a pinned container image set for the chat.
+
+The model can also ask to **clone** a GitHub repository (`https://github.com/owner/name` only) into
+Mucaro's workspace folder; allowing it binds the chat to that clone if the chat has no repository
+yet. It can ask to **push** the work branch: exactly the approved commit, to the GitHub `origin`
+remote, never forced and never `main` or `master`. After a push, the pull request can be opened from
+chat. Pushing and opening the pull request use your own Git and `gh` logins; Mucaro stores no GitHub
+credentials.
+
 A message that matches none of your sources is still answered by the chat's model and is
 marked **No sources used**; it is never presented as a cited answer. `mucaro ask` and
 `POST /ask` stay strict and return `ERROR_NO_RETRIEVAL_CONTEXT`.
@@ -171,6 +194,24 @@ citations table (`.csv`). A browser keeps the file with its downloads (a phone p
 the desktop app asks where to save it. **Share** opens the system share sheet with the answer as a
 `.txt` file. Browsers offer the share sheet only on https or on the computer itself, so a phone
 that opens Mucaro over plain http saves the file instead; see `docs/PHONE_ACCESS.md`.
+
+## Relaying the next vector
+
+After a finished answer Mucaro offers a next step: **Choose the next vector**, then **Start selected vector**.
+The four built-in choices ask the model to close its reply with a `NEXT VECTOR:` block (an anchor line and `→`
+steps, then `CROSS ALL T'S:`, `MAXIMIZE YIELD:` and `FINAL GATE:` rows). When a reply closes with such a block,
+that vector is listed first and one tap on **Start selected vector** sends it as your next message. **Preview
+exact prompt** shows exactly what will be sent. Each code block also has its own copy button, and **Copy
+proposed vector** copies the block alone.
+
+A proposed vector is the model's suggestion. It is never sent for you, actions it leads to still ask first, and
+the gate states in it are what the model wrote, not something Mucaro checked. A block that contains a line
+starting with `/` is not offered, because Mucaro reads such a line in a message as a command.
+
+The conversation list shows what each chat is doing: **Working**, **Needs your approval**, **New result** and
+**Next vector ready**. A chat keeps working after you open another one. Which results you have opened is
+remembered per browser. The built-in mock answerer only quotes sources and never writes a block; use a local,
+remote or Claude model for the relay. See `docs/VIDEO_VECTOR_RELAY_V1.md` for what is and is not verified.
 
 ## Measuring latency
 

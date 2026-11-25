@@ -21,6 +21,7 @@ PROTECTED_READS = [
     ("get", "/runs", None),
     ("get", "/runs/summary", None),
     ("get", "/conversations", None),
+    ("get", "/conversations/activity", None),
     ("get", "/permissions/directories", None),
     ("get", "/workspaces", None),
     ("get", "/exports/run_missing", None),

@@ -116,6 +116,6 @@ def test_frozen_entry_runs_only_allow_listed_helpers(tmp_path: Path) -> None:
 
 def test_macos_workflow_installs_from_the_hashed_lock_and_runs_the_e2e() -> None:
     workflow = (ROOT / ".github/workflows/macos-app.yml").read_text(encoding="utf-8")
-    assert "runs-on: macos-14" in workflow
+    assert "runs-on: macos-15" in workflow
     assert "--require-hashes" in workflow and "requirements-macos-arm64.lock" in workflow
     assert "scripts/build_macos_app.py" in workflow and "scripts/verify_macos_app.py" in workflow

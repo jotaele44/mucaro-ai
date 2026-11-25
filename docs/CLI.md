@@ -31,6 +31,8 @@ PYTHONPATH=.:backend python3 -m backend.app.cli --help
 | Command | Purpose | Success Exit | Failure Exit |
 |---|---|---:|---:|
 | `mucaro doctor` | Check local assistant readiness | 0 | 2 with `--strict` warnings/failures |
+| `mucaro` / `mucaro tui` / `mucaro agent` | Open the persistent terminal workspace over canonical conversations, runs, agent DAGs, approvals, GitHub receipts, and context telemetry | 0 | 2 on terminal/projection failure |
+| `mucaro tui --snapshot` | Render one deterministic headless terminal frame without requiring a TTY | 0 | 2 |
 | `mucaro release state` | Classify bounded release-state progress | 0 | 2 with `--strict` until governed release is ready |
 | `mucaro release dashboard` | Summarize release state, receipts, handoff artifacts, remote binding, and blockers | 0 | 2 on local evidence failure, or with `--strict` until ready |
 | `mucaro release hosted-governance` | Print hosted GitHub governance blocker evidence and exact operator remediation commands | 0 | 2 with `--strict` until hosted governance is ready |
@@ -122,7 +124,15 @@ PYTHONPATH=.:backend python3 -m backend.app.cli --help
 | `mucaro tools run TOOL_CALL_ID` | Execute an approved tool call | 0 | 2 |
 | `mucaro tools audit` | Inspect local tool runtime audit events | 0 | 2 |
 | `mucaro plan REQUEST` | Analyze a task with the Planning Gate | 0 | 2 |
-| `mucaro permissions COMMAND` | Manage user-directory access grants | 0 | 2 |
+| `mucaro permissions grant PATH` | Grant bounded user-directory access | 0 | 2 |
+| `mucaro permissions list` | List directory access grants | 0 | 2 |
+| `mucaro permissions check PATH` | Check directory access | 0 | 2 |
+| `mucaro permissions revoke PATH` | Revoke directory access | 0 | 2 |
+| `mucaro permissions lease-list` | List bounded run-scoped tool permission leases | 0 | 2 |
+| `mucaro permissions lease-grant RUN_ID` | Grant an explicit run-scoped tool permission lease | 0 | 2 |
+
+For consequential actions, add `--arguments-sha256 <64-hex>` to bind the lease to one exact canonical tool-argument payload. A changed argument set will not match that lease.
+| `mucaro permissions lease-revoke LEASE_ID` | Revoke one exact run-scoped permission lease | 0 | 2 |
 | `mucaro validate` | Validate JSON artifacts and schemas | 0 | 2 |
 | `mucaro serve` | Start the local FastAPI server | 0 | 2 |
 
@@ -130,6 +140,133 @@ Global flags:
 
 - `--version` prints the installed package version for fresh-clone and support
   receipts.
+
+## Terminal workspace
+
+Running `mucaro`, `mucaro tui`, or `mucaro agent` opens the same persistent
+full-screen terminal workspace. The terminal is a projection over canonical
+backend state; it does not maintain a second conversation, run, approval,
+checkpoint, GitHub, or context database.
+
+The left rail contains **Current**, **Sessions**, **Issues**, **Pull Requests**,
+and **Gists**. GitHub views never fetch directly from the renderer. They display
+only results from governed `github.*` tool calls and preserve each result's
+`retrieved_utc`.
+
+Useful terminal commands:
+
+```text
+:tool coding.repo_status '{"repo_root":"/path/to/repo"}'
+:tool coding.exec '{"repo_root":"/path/to/repo","argv":["python","-m","pytest"],"image":"IMAGE@sha256:..."}'
+:tool coding.branch_create '{"repo_root":"/path/to/repo","branch_name":"feat/example","expected_head_sha":"..."}'
+:tool coding.commit '{"repo_root":"/path/to/repo","message":"...","expected_head_sha":"...","candidate_paths":["..."]}'
+:tool coding.regression_run '{"repo_root":"/path/to/repo","profile":"test","image":"IMAGE@sha256:..."}'
+:tool github.ci_status '{"repo":"OWNER/REPO","head_sha":"..."}'
+:tool github.pr_open_update '{"repo":"OWNER/REPO","request_sha256":"...","repo_root":"/path/to/repo"}'
+
+:mode plan
+:mode interactive
+:mode auto
+:mode autopilot
+
+:new Optional title
+:open CONVERSATION_ID
+
+:issues OWNER/REPO
+:prs OWNER/REPO
+:gists [OWNER]
+
+:allow-run [uses=N] [ttl=N]
+:allow-tool TOOL [network] [mutating] [uses=N] [ttl=N] [workspace=PATH] [args=SHA256]
+:approve
+:approve lease
+:deny
+
+:answer OPTION_ID
+:answer-text FREEFORM TEXT
+:stop
+
+:autopilot authorize CHECKPOINT_ID
+:autopilot run CHECKPOINT_ID
+```
+
+Terminal permission grants are deliberately narrower than a literal
+"Allow All". `:allow-run` grants only local read-only authority for the active
+run. Remote or mutating authority must use `:allow-tool` for one exact tool;
+mutating grants additionally require `workspace=PATH` or an exact
+`args=SHA256` binding.
+
+The generic `:tool TOOL_NAME JSON_OBJECT` command only creates a governed
+`PENDING_APPROVAL` call bound to the active run/checkpoint (or
+`tui:<conversation_id>`). It never auto-approves or executes a tool. The
+existing `:approve`, `:approve lease`, and `:deny` boundaries remain
+authoritative, including mutation/network lease requirements.
+
+The terminal does not silently turn a natural-language prompt into an Autopilot
+plan. In `autopilot` mode, natural-language submission fails closed until
+model-driven plan generation/replanning is separately implemented and
+certified. Existing canonical Autopilot checkpoints can be authorized and run
+explicitly.
+
+Keyboard controls are `Ctrl-L` Current, `Ctrl-S` Sessions, `Ctrl-O` Issues,
+`Ctrl-R` Pull Requests, `Ctrl-G` Gists, `Ctrl-P` command palette, Tab to
+cycle views, Escape to clear the input buffer, and `Ctrl-C` to stop the active
+run or exit when no run is active. `Ctrl-O` is used for Issues because legacy
+terminal protocols encode `Ctrl-I` and Tab as the same byte.
+
+For deterministic CI and non-interactive inspection:
+
+```bash
+mucaro tui --snapshot --width 120 --height 40
+mucaro agent --snapshot --view sessions
+```
+
+The status bar reports configured/active model, execution mode, run/agent state,
+provenance-classified context status, and Git branch/HEAD only when a governed
+`coding.repo_status` receipt exists. Unknown token or cost telemetry is shown
+as unknown; it is never silently estimated.
+
+## Run-scoped permission leases
+
+`mucaro permissions lease-grant` is the bounded equivalent of a session/run
+"allow" mode. A lease is always tied to one exact `run_id` and one declared
+scope: `RUN_READ_ONLY`, `EXACT_TOOLS`, or `TOOL_PREFIXES`. Mutation and
+network authority are independent opt-ins; an optional `--workspace-root`
+binds repository actions to one canonical path. Every lease has a TTL of at
+most 24 hours and a maximum-use ceiling; a lease without an expiry cannot be
+granted.
+
+`RUN_READ_ONLY` and `TOOL_PREFIXES` leases cover only the read-only local
+inspection tools (`source_library.status`, `product.audit`,
+`workspace_profiles.list`, `coding.repo_status`,
+`coding.read_file`, `coding.diff`, `coding.patch_check`). Any tool that
+executes a command (`coding.exec`, `coding.regression_run`), mutates files or
+repositories, pushes, or reaches a remote is covered only by an `EXACT_TOOLS`
+lease that names it, or by a per-call approval. Autopilot approves its own
+calls only for that same read-only set.
+
+Grant and revoke commands require interactive confirmation unless `--yes` is
+supplied. Grant identity, use reservations, and revocation are hash-chain
+audited. Overlapping leases that both authorize the same pending call fail
+closed rather than choosing one deterministically. Expired, exhausted, revoked,
+tampered, wrong-run, wrong-workspace, or insufficient mutation/network leases
+cannot authorize a call.
+
+Example:
+
+```bash
+mucaro permissions lease-grant RUN_ID \
+  --scope EXACT_TOOLS \
+  --tool coding.patch_apply \
+  --allow-mutating \
+  --workspace-root /path/to/repo \
+  --ttl-seconds 900 \
+  --max-uses 4 \
+  --yes
+
+mucaro permissions lease-list --run-id RUN_ID
+mucaro permissions lease-revoke LEASE_ID --yes
+```
 
 Supported ingest inputs are TXT, MD, HTML, HTM, DOCX, EML, MSG, CSV, JSON, PDF, PNG,
 JPEG, GIF, WEBP, WAV, MP3, M4A, MP4, MOV, and WEBM. HTML files are parsed as

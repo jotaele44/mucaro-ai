@@ -1,0 +1,222 @@
+{
+  "schema": "mucaro-video-vector-relay-gap-matrix/1.0",
+  "denominator_id": "VIDEO_VECTOR_RELAY_V1",
+  "baseline_main_sha": "301297065526047fde7ae2b9858e687631a3f8f2",
+  "audit_scope": "baseline_state is the default-branch source at baseline_main_sha. implementation_state is the tree that contains this file. Implementation state is read from source and its regression tests; it is not exact-head certification, and no row has been exercised with a live model.",
+  "implementation_states": [
+    "IMPLEMENTED",
+    "PARTIAL",
+    "ABSENT",
+    "UNVERIFIED"
+  ],
+  "certification_states": [
+    "PASS",
+    "FAIL",
+    "OPEN",
+    "BLOCKED",
+    "PROVISIONAL",
+    "AUDIT_ONLY",
+    "NONCANONICAL",
+    "CANDIDATE_NOT_IDENTITY",
+    "UNRESOLVED",
+    "SUPERSEDED"
+  ],
+  "baseline_counts": {
+    "IMPLEMENTED": 4,
+    "PARTIAL": 6,
+    "ABSENT": 4,
+    "UNVERIFIED": 0,
+    "TOTAL": 14
+  },
+  "counts": {
+    "IMPLEMENTED": 9,
+    "PARTIAL": 4,
+    "ABSENT": 1,
+    "UNVERIFIED": 0,
+    "TOTAL": 14
+  },
+  "rows": [
+    {
+      "id": "VRL-001",
+      "baseline_state": "IMPLEMENTED",
+      "implementation_state": "IMPLEMENTED",
+      "certification_state": "OPEN",
+      "evidence": [
+        "backend/app/work_runs.py",
+        "backend/tests/test_work_runs.py",
+        "backend/tests/test_vector_relay.py"
+      ],
+      "gap": "One run is active per conversation and conversations run independently. Not exercised: several live-model runs at once against one model server, or any limit on simultaneous runs."
+    },
+    {
+      "id": "VRL-002",
+      "baseline_state": "ABSENT",
+      "implementation_state": "PARTIAL",
+      "certification_state": "OPEN",
+      "evidence": [
+        "backend/app/next_vector.py",
+        "frontend/src/nextVectorOptions.js",
+        "backend/tests/test_next_vector.py"
+      ],
+      "gap": "The reply-format contract travels in relayed prompts only (the four deterministic choices and the proposed vector). A first typed message does not carry it, no conversation-level contract reaches the system prompt, the built-in mock answerer never writes a block, and no local, remote or Anthropic model has been run against the contract."
+    },
+    {
+      "id": "VRL-003",
+      "baseline_state": "PARTIAL",
+      "implementation_state": "IMPLEMENTED",
+      "certification_state": "OPEN",
+      "evidence": [
+        "frontend/src/components/RichText.jsx",
+        "frontend/src/components/NextVectorPicker.jsx",
+        "qa/rendered/relay_qa.mjs"
+      ],
+      "gap": "Every fenced block and the proposed vector have a copy control. Rendered evidence is Chromium at desktop and phone width with a scripted model; WebKit and the selection-copy fallback on a phone over plain http were not exercised for these controls."
+    },
+    {
+      "id": "VRL-004",
+      "baseline_state": "PARTIAL",
+      "implementation_state": "IMPLEMENTED",
+      "certification_state": "OPEN",
+      "evidence": [
+        "backend/app/next_vector.py",
+        "backend/app/work_runs.py",
+        "frontend/src/components/NextVectorPicker.jsx",
+        "frontend/src/components/ChatView.jsx",
+        "backend/tests/test_vector_relay.py"
+      ],
+      "gap": "One Start sends the proposed vector as the next message in ask-first mode, with the exact text shown beforehand. That message is the block inside a fixed provenance line and the reply-format contract, not the bare block; pasting the copied block sends it bare. The relay exists on the conversation run bus only: the CLI `conversations ask` command and POST /conversations/{id}/ask produce no proposals."
+    },
+    {
+      "id": "VRL-005",
+      "baseline_state": "IMPLEMENTED",
+      "implementation_state": "IMPLEMENTED",
+      "certification_state": "OPEN",
+      "evidence": [
+        "backend/app/next_vector.py",
+        "backend/tests/test_vector_relay.py",
+        "backend/tests/test_next_vector.py",
+        "frontend/tests/nextVectorOptions.test.mjs",
+        "docs/GOAL_PLAN_EXECUTION_ENTRY_V1.md"
+      ],
+      "gap": "A proposal submits nothing and approves nothing, and a block containing a slash-command line is withheld. No automatic or budgeted relay exists, by contract (execution-entry N14); adding one needs its own authorization contract."
+    },
+    {
+      "id": "VRL-006",
+      "baseline_state": "PARTIAL",
+      "implementation_state": "IMPLEMENTED",
+      "certification_state": "OPEN",
+      "evidence": [
+        "frontend/src/App.jsx",
+        "frontend/src/threadActivity.js",
+        "backend/app/work_runs.py",
+        "qa/rendered/relay_qa.mjs"
+      ],
+      "gap": "A second conversation can be started while the first works, and the list shows which conversations hold a vector. Exercised with two conversations and a scripted model; the recorded five-conversation pass with live models was not reproduced, and no single view starts vectors across conversations."
+    },
+    {
+      "id": "VRL-007",
+      "baseline_state": "ABSENT",
+      "implementation_state": "IMPLEMENTED",
+      "certification_state": "OPEN",
+      "evidence": [
+        "backend/app/work_runs.py",
+        "backend/app/main.py",
+        "frontend/src/threadActivity.js",
+        "frontend/src/App.jsx",
+        "frontend/tests/threadActivity.test.mjs"
+      ],
+      "gap": "Thread status comes from run records. Which results were seen is kept per browser, so a phone and a desktop do not share it. The list is polled only while a run is active, so a run started from another device appears on the next list load. There is no push notification."
+    },
+    {
+      "id": "VRL-008",
+      "baseline_state": "IMPLEMENTED",
+      "implementation_state": "IMPLEMENTED",
+      "certification_state": "OPEN",
+      "evidence": [
+        "backend/app/work_runs.py",
+        "frontend/src/components/RunBlock.jsx",
+        "frontend/src/components/Composer.jsx",
+        "backend/tests/test_work_runs.py"
+      ],
+      "gap": "Present before this denominator: run state, stop, and a queue for follow-up messages. How long a run worked is not shown on its answer."
+    },
+    {
+      "id": "VRL-009",
+      "baseline_state": "ABSENT",
+      "implementation_state": "ABSENT",
+      "certification_state": "OPEN",
+      "evidence": [
+        "frontend/src/App.jsx"
+      ],
+      "gap": "Conversations are listed by last update with a text filter. Nothing can be pinned."
+    },
+    {
+      "id": "VRL-010",
+      "baseline_state": "PARTIAL",
+      "implementation_state": "PARTIAL",
+      "certification_state": "OPEN",
+      "evidence": [
+        "backend/app/agent_loop.py",
+        "backend/app/tools.py",
+        "backend/app/permission_leases.py",
+        "backend/app/autopilot.py",
+        "backend/app/supervisor_queue.py",
+        "backend/app/web_search.py"
+      ],
+      "gap": "A chat model can propose search, fetch and render actions, capped at 6 steps per run (12 with a repository). Every network action waits for an approval, so an unattended conversation parks at AWAITING_APPROVAL and is listed as needing approval. Auto mode pre-approves local read-only actions only, and only for a model that runs on this machine. Run-scoped permission leases, Autopilot budgets and the supervisor-queue primitives exist but are not connected to conversation runs."
+    },
+    {
+      "id": "VRL-011",
+      "baseline_state": "IMPLEMENTED",
+      "implementation_state": "IMPLEMENTED",
+      "certification_state": "OPEN",
+      "evidence": [
+        "backend/app/citations.py",
+        "backend/app/services.py",
+        "frontend/src/components/RunBlock.jsx",
+        "frontend/src/components/EvidencePanel.jsx"
+      ],
+      "gap": "Present before this denominator: citations with an evidence panel, and a reply with no matching source is marked as using none. Not re-certified for relayed vector runs."
+    },
+    {
+      "id": "VRL-012",
+      "baseline_state": "ABSENT",
+      "implementation_state": "PARTIAL",
+      "certification_state": "OPEN",
+      "evidence": [
+        "backend/app/next_vector.py",
+        "schemas/next_vector_proposal.schema.json",
+        "frontend/src/components/NextVectorPicker.jsx",
+        "backend/app/execution_entry.py"
+      ],
+      "gap": "Gate rows are parsed and shown as the model's claims with verified=false. They are not compared with execution-entry gate evidence or release receipts, a claimed PASS is checked against nothing, and whether a model keeps unverified gates OPEN or WITHHELD is not measured."
+    },
+    {
+      "id": "VRL-013",
+      "baseline_state": "PARTIAL",
+      "implementation_state": "PARTIAL",
+      "certification_state": "OPEN",
+      "evidence": [
+        "backend/app/next_vector.py",
+        "backend/app/exports.py",
+        "backend/app/conversations.py",
+        "backend/app/context_state.py",
+        "backend/app/model_router.py"
+      ],
+      "gap": "Each proposal carries the SHA-256 of its text and the run that wrote it, and each answer trace is exported by run. There is no per-conversation ledger of frozen baselines that a vector can name or that checks a preserve-exact-hash step, and a relayed run is not linked to the proposal it started from. The model receives a compacted summary plus at most 8 recent turns, each cut to 320 characters, so a long relay depends on the block itself to carry state."
+    },
+    {
+      "id": "VRL-014",
+      "baseline_state": "PARTIAL",
+      "implementation_state": "IMPLEMENTED",
+      "certification_state": "OPEN",
+      "evidence": [
+        "frontend/src/styles.css",
+        "frontend/src/App.jsx",
+        "qa/rendered/relay_qa.mjs",
+        "docs/PHONE_ACCESS.md"
+      ],
+      "gap": "The loop was driven at iPhone 14 width in Chromium with touch emulation. WebKit, an installed phone browser, and phone access over a private network were not exercised for the relay."
+    }
+  ]
+}

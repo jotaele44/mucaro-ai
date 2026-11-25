@@ -27,6 +27,9 @@ Guarantees (MOB F02-F04, F07-F09, F13-F16, F18; TGT-014, TGT-018):
 - Stop halts before the next step and records INTERRUPTED, listing any
   call that was in flight. A process restart marks RUNNING runs
   INTERRUPTED; runs waiting on approval or input resume after restart.
+- An answer that closes with a NEXT VECTOR block yields a ``next_vector``
+  event: a proposal the user may start as the next message. It is data.
+  Nothing here submits it, and it approves nothing (see ``next_vector``).
 """
 
 from __future__ import annotations
@@ -39,12 +42,17 @@ from typing import Any
 
 from .config import Settings, settings
 from .context_usage import ContextUsageError, build_context_usage_status
-from .conversations import append_turns, build_conversation_context, get_conversation
+from .conversations import append_turns, build_conversation_context, get_conversation, set_conversation_repo
 from .db import ensure_db, get_connection
 from .error_categories import classify_error
 from .execution_records import build_run_manifest
-from .model_router import ModelProviderError
+from . import agent_loop
+from .narration_check import NARRATION_WARNING, narration_conflicts
+from .model_router import MODEL_PROVIDER_SPECS, ModelProviderError, generate_turn, supports_tool_calls
 from .model_routing_policy import ModelRoutingError, plan_model_route
+from .next_vector import STATUS_ABSENT as NEXT_VECTOR_ABSENT
+from .next_vector import STATUS_ECHO as NEXT_VECTOR_ECHO
+from .next_vector import propose_next_vector
 from .response_flow import (
     InteractionError,
     build_response_envelope,
@@ -59,7 +67,7 @@ from .response_flow import (
     make_tool_call_part,
     make_tool_result_part,
 )
-from .services import answer_question, describe_blocked_route
+from .services import agent_context, answer_question, describe_blocked_route
 from .tools import (
     TOOL_REGISTRY,
     ToolRuntimeError,
@@ -83,12 +91,13 @@ MODES = {
 EVENT_TYPES = {
     "queued", "run_started", "route", "plan", "tool_call", "approval_request", "tool_started", "tool_result",
     "tool_summary", "question", "question_resolved", "retry_requested", "user_note", "retrieval", "text_delta",
-    "citation", "artifact", "warning", "error", "interrupted", "cancelled", "final",
+    "citation", "artifact", "warning", "error", "interrupted", "cancelled", "final", "agent_step", "context",
+    "next_vector",
 }
 MAX_PROMPT_CHARS = 20_000
 TEXT_DELTA_CHARS = 160
 
-# Slash commands are explicit user-invoked tool requests, not model autonomy.
+# Slash commands are explicit user-invoked tool requests. A model can only propose calls (see _phase_agent).
 COMMANDS: dict[str, dict[str, Any]] = {
     "/status": {"tool": "source_library.status", "usage": "/status", "arg": None},
     "/audit": {"tool": "product.audit", "usage": "/audit", "arg": None},
@@ -140,6 +149,15 @@ def available_modes() -> dict[str, Any]:
             }
         )
     return {"status": "RUN_MODES_OK", "default_mode": "ask", "modes": [{"mode": key, "description": value} for key, value in MODES.items()], "commands": commands}
+
+
+def _agent_enabled(run: dict[str, Any], question: str | None = None) -> bool:
+    """The chat's model may propose tools: opted in, there is a message to answer, and the provider can."""
+    options = run.get("options") or {}
+    agent = run.get("agent") or {}
+    text = run.get("question") if question is None else question
+    return bool(options.get("agent")) and bool(text) and not agent.get("final") and not agent.get("disabled") \
+        and supports_tool_calls(options.get("model_provider"))
 
 
 def _auto_approvable(tool_name: str) -> bool:
@@ -345,6 +363,59 @@ def list_runs(
         "runs": [summarize_run(run, cfg) for run in runs],
         "next_before_seq": runs[-1]["queue_seq"] if len(rows) > limit else None,
     }
+
+
+_IDLE_ACTIVITY: dict[str, Any] = {
+    "state": "IDLE", "queued": 0, "last_finished_run_id": None, "last_finished_state": None,
+    "last_finished_at": None, "next_vector_ready": False,
+}
+
+
+def idle_activity() -> dict[str, Any]:
+    return dict(_IDLE_ACTIVITY)
+
+
+def conversation_activity(cfg: Settings = settings) -> dict[str, dict[str, Any]]:
+    """Thread-list status for every existing conversation that has runs.
+
+    Read from the indexed state columns; only each conversation's newest finished run is decoded.
+    Runs outlive a deleted conversation as receipts, so they are filtered out here.
+    ``next_vector_ready`` means that run completed with a proposal and nothing is active or queued,
+    so the thread is waiting on the user's next relay. It reports state; it starts nothing.
+    """
+    ensure_db(cfg.sqlite_path)
+    activity: dict[str, dict[str, Any]] = {}
+    with get_connection(cfg.sqlite_path) as conn:
+        counts = conn.execute(
+            "SELECT conversation_id, state, COUNT(*) AS n FROM work_runs "
+            "WHERE state IN ('QUEUED','RUNNING','AWAITING_APPROVAL','AWAITING_INPUT') "
+            "AND conversation_id IN (SELECT conversation_id FROM conversations) GROUP BY conversation_id, state"
+        ).fetchall()
+        finished = conn.execute(
+            "SELECT w.conversation_id, w.run_id, w.state, w.payload_json, "
+            "EXISTS(SELECT 1 FROM run_events e WHERE e.run_id = w.run_id AND e.event_type = 'next_vector') AS has_vector "
+            "FROM work_runs w JOIN ("
+            "  SELECT conversation_id, MAX(queue_seq) AS queue_seq FROM work_runs "
+            "  WHERE state IN ('COMPLETED','FAILED','INTERRUPTED') "
+            "  AND conversation_id IN (SELECT conversation_id FROM conversations) GROUP BY conversation_id"
+            ") newest ON newest.conversation_id = w.conversation_id AND newest.queue_seq = w.queue_seq"
+        ).fetchall()
+    for row in counts:
+        item = activity.setdefault(row["conversation_id"], idle_activity())
+        if row["state"] == "QUEUED":
+            item["queued"] = int(row["n"])
+        else:
+            item["state"] = row["state"]
+    for item in activity.values():
+        if item["state"] == "IDLE" and item["queued"]:
+            item["state"] = "QUEUED"
+    for row in finished:
+        item = activity.setdefault(row["conversation_id"], idle_activity())
+        item["last_finished_run_id"] = row["run_id"]
+        item["last_finished_state"] = row["state"]
+        item["last_finished_at"] = json.loads(row["payload_json"]).get("finished_at")
+        item["next_vector_ready"] = bool(row["has_vector"]) and row["state"] == "COMPLETED" and item["state"] == "IDLE"
+    return activity
 
 
 # --- submission, queue and dispatch -----------------------------------------------
@@ -712,6 +783,9 @@ def _advance_once(run_id: str, cfg: Settings) -> None:
         elif phase == "tools_decision":
             if not _phase_tools_decision(run, cfg):
                 return
+        elif phase == "agent":
+            if not _phase_agent(run, cfg):
+                return
         elif phase == "answer":
             _phase_answer(run, cfg)
         elif phase == "done":
@@ -732,6 +806,7 @@ def _phase_start(run: dict[str, Any], cfg: Settings) -> None:
             preferred_model=options.get("model_name"),
             allow_live=bool(options.get("allow_live")),
             require_offline=bool(options.get("require_offline")),
+            system_offline=bool(options.get("system_offline")),
             cfg=cfg,
         )
         route_event = {
@@ -756,7 +831,10 @@ def _phase_start(run: dict[str, Any], cfg: Settings) -> None:
         for command in commands
     ]
     if question:
-        steps += [{"step": "retrieve local sources"}, {"step": "compose a cited answer"}]
+        steps += [{"step": "retrieve local sources"}]
+        if _agent_enabled(run, question):
+            steps += [{"step": "the model may propose actions; each one asks first unless it is local and read-only in Auto"}]
+        steps += [{"step": "compose a cited answer"}]
     _emit_only(run_id, cfg, "plan", {"goal": question or "Run the requested actions.", "mode": run["mode"], "steps": steps})
 
     if run["mode"] == "plan":
@@ -780,7 +858,7 @@ def _phase_start(run: dict[str, Any], cfg: Settings) -> None:
     def change(current: dict[str, Any]) -> None:
         current["tool_call_ids"] = call_ids
         current["question"] = question
-        current["phase"] = "tools" if call_ids else "answer"
+        current["phase"] = "tools" if call_ids else ("agent" if _agent_enabled(current, question) else "answer")
 
     _update(run_id, cfg, change, events)
 
@@ -793,6 +871,8 @@ def _call_view(call: dict[str, Any]) -> dict[str, Any]:
         "arguments_sha256": call.get("arguments_sha256"),
         "status": call["status"],
         "retry_of": call.get("retry_of"),
+        # "model" when the chat's model proposed the call; the person still decides.
+        "requested_by": call.get("requested_by"),
     }
 
 
@@ -856,12 +936,14 @@ def _phase_tools(run: dict[str, Any], cfg: Settings) -> bool:
     round_ids = set(get_run(run_id, cfg).get("round_call_ids") or [call["tool_call_id"] for call in calls])
     round_calls = [call for call in calls if call["tool_call_id"] in round_ids]
     failed = [call for call in round_calls if call["status"] in {"FAILED", "INTERRUPTED"}]
+    if run.get("agent_round"):
+        failed = []  # a failed action the model proposed goes back to the model, not to a question
     events = [("tool_result", _result_view(call)) for call in unreported]
     events.append(("tool_summary", {"round": run["round"], **summarize_tool_calls(calls)}))
 
     def record_round(current: dict[str, Any]) -> None:
         current["reported_call_ids"] = sorted(set(current["reported_call_ids"]) | {call["tool_call_id"] for call in unreported})
-        current["phase"] = "tools_decision" if failed else "answer"
+        current["phase"] = "tools_decision" if failed else ("agent" if _agent_enabled(current) else "answer")
         current["failed_call_ids"] = [call["tool_call_id"] for call in failed]
 
     _update(run_id, cfg, record_round, events)
@@ -944,9 +1026,181 @@ def _phase_tools_decision(run: dict[str, Any], cfg: Settings) -> bool:
     def proceed(current: dict[str, Any]) -> None:
         current["pending_interaction_id"] = None
         current["state"] = "RUNNING"
-        current["phase"] = "answer"
+        current["phase"] = "agent" if _agent_enabled(current) else "answer"
 
     _update(run_id, cfg, proceed, events)
+    return True
+
+
+def _bind_cloned_repository(run: dict[str, Any], call: dict[str, Any], cfg: Settings) -> None:
+    """An approved clone the model proposed binds the chat to that repository, as its approval card said.
+
+    Only when the chat has no repository yet: a clone never replaces a binding the person chose.
+    """
+    result = call.get("result") or {}
+    if call.get("tool_name") != "repo.clone" or call.get("status") != "EXECUTED" or result.get("status") != "CODING_CLONE_OK":
+        return
+    conversation = get_conversation(run["conversation_id"], cfg) or {}
+    if conversation.get("repo"):
+        return
+    set_conversation_repo(run["conversation_id"], {"repo_root": result["repo_root"], "remote_repo": result.get("remote_repo")}, cfg)
+    _emit_only(run["run_id"], cfg, "warning", {"status": "NOTE_CHAT_BOUND_TO_CLONED_REPOSITORY", "detail": str(result["repo_root"])})
+
+
+def _phase_agent(run: dict[str, Any], cfg: Settings) -> bool:
+    """One agent step: fold finished tool results in, ask the model, and turn its proposals into governed calls.
+
+    The model never approves or runs anything. Proposals are requested with requested_by="model" and wait
+    in the same approval gate as a typed command; Auto mode pre-approves only local read-only tools.
+    """
+    run_id = run["run_id"]
+    options = run.get("options", {})
+    question = run.get("question") or ""
+    agent = dict(run.get("agent") or {})
+    step = int(agent.get("step", 0))
+    transcript = list(agent.get("transcript") or [])
+    proposed_ids = list(agent.get("proposed_call_ids") or [])
+
+    def leave(reason: str | None = None) -> bool:
+        """Hand over to the plain answer step, which reports routing and retrieval problems in its own words."""
+        def change(current: dict[str, Any]) -> None:
+            current["agent"] = {**agent, "disabled": True, "disabled_reason": reason}
+            current["agent_round"] = False
+            current["phase"] = "answer"
+
+        _update(run_id, cfg, change)
+        return True
+
+    pending = list(agent.get("pending") or [])
+    if pending:
+        by_id = {call["tool_call_id"]: call for call in _run_calls(run, cfg)}
+        for item in pending:
+            call = by_id.get(item["tool_call_id"])
+            if call is None or call["status"] not in {"EXECUTED", "FAILED", "DENIED", "CANCELLED", "INTERRUPTED"}:
+                _update(run_id, cfg, lambda current: current.__setitem__("phase", "tools"))
+                return True
+            transcript.append({"role": "tool", "call_id": item["id"], "name": call["tool_name"],
+                               "content": agent_loop.render_tool_result(call)})
+            _bind_cloned_repository(run, call, cfg)
+
+    try:
+        route = plan_model_route(
+            task_type="conversation",
+            preferred_provider=options.get("model_provider"),
+            preferred_model=options.get("model_name"),
+            allow_live=bool(options.get("allow_live")),
+            require_offline=bool(options.get("require_offline")),
+            system_offline=bool(options.get("system_offline")),
+            cfg=cfg,
+        )
+    except (ModelRoutingError, ModelProviderError) as exc:
+        return leave(getattr(exc, "status", type(exc).__name__))
+    # The same consent and readiness rules as any answer: a remote model without allow_live never gets here.
+    if route["status"] != "MODEL_ROUTE_READY" or not supports_tool_calls(route["selected_provider"]):
+        return leave(route.get("selection_reason"))
+    selected_spec = MODEL_PROVIDER_SPECS.get(route["selected_provider"])
+    model_is_local = selected_spec is not None and selected_spec.locality == "local"
+    conversation = get_conversation(run["conversation_id"], cfg) or {"turns": []}
+    # The repository this chat is bound to; a model can use coding tools on it and on nothing else.
+    repo = conversation.get("repo") or None
+    executed = [call for call in _run_calls(run, cfg) if call["status"] == "EXECUTED"]
+    step_limit = agent_loop.max_steps(repo)
+    context = agent_context(
+        question,
+        top_k=int(options.get("top_k", 5)),
+        retrieval_strategy=str(options.get("retrieval_strategy") or "hybrid"),
+        conversation_scope_id=run["conversation_id"],
+        cfg=cfg,
+    )
+    if context["status"] != "AGENT_CONTEXT_OK":
+        return leave(context["status"])
+    exhausted = step >= step_limit
+    messages = agent_loop.build_messages(
+        question,
+        retrieved_chunks=context["retrieved_chunks"],
+        conversation_context=build_conversation_context(conversation),
+        memory_context=context["memory_context"],
+        transcript=transcript,
+        budget_exhausted=exhausted,
+        repo=repo,
+    )
+    try:
+        turn = generate_turn(
+            messages,
+            [] if exhausted else agent_loop.agent_tool_specs(repo),
+            model_provider=route["selected_provider"],
+            model_name=route["selected_model"],
+            cfg=cfg,
+        )
+    except ModelProviderError as exc:
+        _fail(run_id, exc.status, exc.detail, cfg)
+        return False
+
+    if not turn["tool_calls"] or exhausted:
+        if not turn["text"]:
+            _fail(run_id, "ERROR_AGENT_NO_ANSWER", "The model kept requesting actions and gave no answer within the step limit.", cfg)
+            return False
+        final = {
+            "answer": turn["text"],
+            "model_name": turn["model_name"],
+            "model_usage": turn.get("model_usage"),
+            "agent": {"steps": step, "tool_call_ids": proposed_ids, "tool_protocol": turn.get("tool_protocol")},
+        }
+
+        def finish(current: dict[str, Any]) -> None:
+            current["agent"] = {"step": step, "transcript": transcript, "pending": [], "proposed_call_ids": proposed_ids, "final": final}
+            current["agent_round"] = False
+            current["phase"] = "answer"
+
+        _update(run_id, cfg, finish)
+        return True
+
+    transcript.append({"role": "assistant", "content": turn["text"], "tool_calls": [
+        {"id": call["id"], "name": call["name"], "arguments": call["arguments"]} for call in turn["tool_calls"]]})
+    new_pending: list[dict[str, str]] = []
+    events: list[tuple[str, dict[str, Any]]] = []
+    for proposal in turn["tool_calls"]:
+        arguments, refusal = (None, proposal["error"]) if proposal.get("error") else agent_loop.validate_proposal(
+            proposal["name"], proposal["arguments"], repo=repo, executed=executed)
+        record = None
+        if refusal is None:
+            try:
+                record = request_tool_call(proposal["name"], arguments, cfg=cfg, requested_by="model",
+                                           reason=f"proposed by the model, step {step + 1}", run_id=run_id)["tool_call"]
+            except ToolRuntimeError as exc:
+                refusal = f"{exc.status}: {exc.detail}"
+        if record is None:
+            transcript.append({"role": "tool", "call_id": proposal["id"], "name": proposal["name"],
+                               "content": agent_loop.refused_result(proposal["name"], str(refusal))})
+            events.append(("warning", {"status": "WARN_AGENT_PROPOSAL_REFUSED", "category": "BLOCKED_ACTION",
+                                       "detail": f"{str(proposal['name'])[:80]}: {refusal}"}))
+            continue
+        always_ask = bool(agent_loop.AGENT_TOOLS[record["tool_name"]].get("always_ask"))
+        # Auto mode pre-approves local read-only tools only when the model itself runs on this machine. A remote
+        # model would receive the tool's result, so local content reaching it needs the person's approval per call.
+        if run["mode"] == "auto" and _auto_approvable(record["tool_name"]) and not always_ask and model_is_local:
+            record = approve_tool_call(record["tool_call_id"], cfg=cfg, approved_by="policy:auto-local-read-only",
+                                       expected_arguments_sha256=record["arguments_sha256"])["tool_call"]
+        new_pending.append({"id": proposal["id"], "tool_call_id": record["tool_call_id"]})
+        events.append(("tool_call", _call_view(record)))
+    new_ids = [item["tool_call_id"] for item in new_pending]
+    events.append(("agent_step", {"step": step + 1, "max_steps": step_limit, "proposed": len(turn["tool_calls"]),
+                                  "requested": len(new_ids), "tool_protocol": turn.get("tool_protocol")}))
+
+    def record_step(current: dict[str, Any]) -> None:
+        current["agent"] = {"step": step + 1, "transcript": transcript, "pending": new_pending,
+                            "proposed_call_ids": proposed_ids + new_ids}
+        current["state"] = "RUNNING"
+        if new_ids:
+            current["tool_call_ids"] = current["tool_call_ids"] + new_ids
+            current["round_call_ids"] = new_ids
+            current["round"] = current["round"] + 1
+            current["agent_round"] = True
+            current["phase"] = "tools"
+        else:
+            current["phase"] = "agent"  # every proposal was refused; the model is told and tries again
+
+    _update(run_id, cfg, record_step, events)
     return True
 
 
@@ -977,12 +1231,14 @@ def _phase_answer(run: dict[str, Any], cfg: Settings) -> None:
             allow_mock_fallback=bool(options.get("allow_mock_fallback")),
             allow_live=bool(options.get("allow_live")),
             require_offline=bool(options.get("require_offline")),
+            system_offline=bool(options.get("system_offline")),
             conversation_context=build_conversation_context(conversation),
             conversation_scope_id=run["conversation_id"],
             cfg=cfg,
             on_text_delta=stream_delta,
             # Chat replies even when no source matches; the turn is then marked as using no sources.
             allow_ungrounded=True,
+            answer_override=(run.get("agent") or {}).get("final"),
         )
     except (ModelProviderError, ModelRoutingError, ValueError) as exc:
         status = getattr(exc, "status", None) or str(exc)
@@ -1007,6 +1263,15 @@ def _phase_answer(run: dict[str, Any], cfg: Settings) -> None:
     events: list[tuple[str, dict[str, Any]]] = [
         ("retrieval", {"strategy": trace.get("retrieval_strategy"), "retrieved_chunk_ids": trace.get("retrieved_chunk_ids", []),
                        "source_ids": trace.get("source_ids", []), "grounding": trace.get("grounding") or "SOURCES"}),
+        # What this answer used besides sources: saved memory (kept across chats until the person turns it off or
+        # deletes it) and earlier messages of this chat (used only here, never saved as memory). Identifiers and
+        # counts only; memory content stays in the Memory workspace.
+        ("context", {
+            "conversation_context_turn_count": int(trace.get("conversation_context_turn_count") or 0),
+            "memory_context_count": int(trace.get("memory_context_count") or 0),
+            "memory_scope_counts": dict(trace.get("memory_scope_counts") or {}),
+            "memory_ids": [str(item) for item in trace.get("memory_ids") or []],
+        }),
     ]
     answer = str(trace["answer"])
     if not trace.get("answer_streamed"):
@@ -1022,10 +1287,50 @@ def _phase_answer(run: dict[str, Any], cfg: Settings) -> None:
     for flag in trace.get("validation_flags", []):
         if str(flag).startswith("ERROR_") or str(flag).startswith("WARN"):
             events.append(("warning", {"status": flag, "category": classify_error(flag)}))
+    conflicts = narration_conflicts(answer, calls)
+    if conflicts:
+        # MOB-F15: the answer claims an action the call records do not show as executed; the records win.
+        events.append(("warning", {
+            "status": NARRATION_WARNING,
+            "category": classify_error(NARRATION_WARNING),
+            "detail": "The answer describes actions that the call records do not show as done: "
+                      + ", ".join(sorted({item["claim"].lower().replace("_", " ") for item in conflicts})) + ".",
+            "conflicts": conflicts,
+        }))
+    events.extend(_next_vector_events(run_id, answer, trace, calls, prompt=run["prompt"]))
     with _Tx(cfg) as conn:
         for event_type, data in events:
             _emit(conn, run_id, event_type, data)
     _complete(run_id, cfg, outcome="ANSWERED", answer_trace=trace, action_ledger=ledger)
+
+
+def _next_vector_events(
+    run_id: str, answer: str, trace: dict[str, Any], calls: list[dict[str, Any]], *, prompt: str | None = None
+) -> list[tuple[str, dict[str, Any]]]:
+    """A proposal when the answer closes with a valid NEXT VECTOR block; a warning when it closes with a bad one."""
+    network_tools = [
+        call["tool_name"] for call in calls
+        if call["status"] == "EXECUTED" and getattr(TOOL_REGISTRY.get(call["tool_name"]), "network", "none") != "none"
+    ]
+    try:
+        proposal, status = propose_next_vector(
+            answer,
+            work_run_id=run_id,
+            answer_run_id=trace.get("run_id"),
+            model_provider=trace.get("model_provider"),
+            model_name=trace.get("model_name"),
+            validation_flags=[str(flag) for flag in trace.get("validation_flags", [])],
+            network_tools=network_tools,
+            prompt=prompt,
+        )
+    except Exception:  # noqa: BLE001 - the answer is finished; an optional proposal must never fail its run
+        proposal, status = None, "NEXT_VECTOR_REJECTED_INTERNAL_ERROR"
+    if proposal is not None:
+        return [("next_vector", proposal)]
+    if status in {NEXT_VECTOR_ABSENT, NEXT_VECTOR_ECHO}:
+        return []
+    blocked = status.endswith(("SLASH_COMMAND", "CONTROL_CHARACTERS"))
+    return [("warning", {"status": "WARN_NEXT_VECTOR_NOT_OFFERED", "category": "BLOCKED_ACTION" if blocked else "INPUT_INVALID", "detail": status})]
 
 
 def _complete(
